@@ -670,6 +670,7 @@ input::placeholder, textarea::placeholder { color: #726C62; opacity: 1; }
 .demo-share-link > .text-button { min-height: 25px; font-size: 11px; justify-self: start; }
 .demo-connect-panel .call-link-help { margin-bottom: 0; font-size: 11px; }
 .demo-desk .demo-talk-panel { display: grid; gap: 13px; margin: 0; padding: 20px; position: static; box-shadow: none; }
+.demo-desk.has-call .demo-talk-panel { position: static; }
 .demo-talk-panel .talk-info { display: block; padding: 0; }
 .demo-talk-panel .talk-info h3 { font-size: 15px; }
 .demo-talk-panel .talk-info p { font-size: 12px; margin-top: 6px; }
