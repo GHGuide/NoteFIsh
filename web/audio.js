@@ -1,5 +1,26 @@
 // The phone's inbound channel is receive-only in the browser. Microphone clips
 // are uploaded separately for transcription; no microphone is sent to Twilio.
+export function audioRms(samples) {
+  if (!(samples instanceof Float32Array) || !samples.length) return 0;
+  let energy = 0;
+  for (const sample of samples) energy += Number.isFinite(sample) ? Math.min(1, Math.abs(sample)) ** 2 : 0;
+  return Math.sqrt(energy / samples.length);
+}
+
+export function audioPeaks(samples, count = 48) {
+  if (!(samples instanceof Float32Array) || !Number.isInteger(count) || count < 1 || count > 128) return [];
+  return Array.from({ length: count }, (_, index) => {
+    const start = Math.floor(index * samples.length / count);
+    const end = Math.max(start + 1, Math.floor((index + 1) * samples.length / count));
+    let peak = 0;
+    for (let offset = start; offset < Math.min(end, samples.length); offset++) {
+      const sample = samples[offset];
+      if (Number.isFinite(sample)) peak = Math.max(peak, Math.min(1, Math.abs(sample)));
+    }
+    return peak;
+  });
+}
+
 export class CallerAudio {
   constructor() { this.context = null; this.nextTime = 0; this.sources = new Set(); this.ringSources = new Set(); this.ringTimer = null; }
   async enable() {

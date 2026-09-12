@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AudioLines, CheckCircle2, Globe2, Headphones, Loader2, Mic, MicOff, Phone, PhoneOff, ShieldCheck, Volume2 } from 'lucide-react';
 import { BrowserCallAudio } from './browser-call-audio.js';
+import AudioWaveform from './components/AudioWaveform.jsx';
+import { motion, useReducedMotion } from 'motion/react';
 
 const COPY = {
   fr: {
@@ -12,6 +14,8 @@ const COPY = {
     audio: 'Activer le son', audioHelp: 'Le son est en pause. Touchez le bouton pour reprendre l’appel.', retry: 'Réessayer', unavailable: 'Ce lien n’est pas disponible.', newLink: 'Demandez un nouveau lien d’appel à votre interlocuteur.',
     privacy: 'Votre voix est transmise pour cet appel et traduite pour votre interlocuteur. Elle n’est pas clonée.', headset: 'Pour un son clair, utilisez des écouteurs et gardez cette page ouverte.', browser: 'Appel audio sécurisé dans votre navigateur', microphoneEnded: 'Le microphone a été déconnecté. Demandez un nouveau lien pour rappeler.',
     disconnected: 'La connexion a été interrompue. Demandez un nouveau lien pour rappeler.',
+    mute: 'Couper le micro', unmute: 'Réactiver le micro', mutedByYou: 'Votre microphone est coupé.',
+    deviceMuted: 'Votre microphone est temporairement indisponible.', micWaveform: 'Activité réelle du microphone', replyWaveform: 'Audio de votre interlocuteur',
   },
   en: {
     label: 'A CONVERSATION, MADE SIMPLE', title: 'We’re listening.', intro: 'Speak in your language. The person at the desk replies with a translated voice.',
@@ -22,6 +26,8 @@ const COPY = {
     audio: 'Enable audio', audioHelp: 'Audio is paused. Tap the button to resume the call.', retry: 'Try again', unavailable: 'This call link is unavailable.', newLink: 'Ask the person at the desk for a new call link.',
     privacy: 'Your voice is shared for this call and translated for the person at the desk. It is never cloned.', headset: 'For clear audio, use headphones and keep this page open.', browser: 'A secure audio call in your browser', microphoneEnded: 'The microphone was disconnected. Ask for a new link to call again.',
     disconnected: 'The connection was interrupted. Ask for a new link to call again.',
+    mute: 'Mute microphone', unmute: 'Unmute microphone', mutedByYou: 'Your microphone is muted.',
+    deviceMuted: 'Your microphone is temporarily unavailable.', micWaveform: 'Live microphone activity', replyWaveform: 'Audio from the person at the desk',
   },
 };
 
@@ -34,7 +40,12 @@ export default function Caller() {
   const [playing, setPlaying] = useState(false);
   const [audioState, setAudioState] = useState('idle');
   const [microphoneReady, setMicrophoneReady] = useState(false);
+  const [microphoneStream, setMicrophoneStream] = useState(null);
+  const [microphoneMuted, setMicrophoneMuted] = useState(false);
+  const [deviceMuted, setDeviceMuted] = useState(false);
   const [used, setUsed] = useState(false);
+  const reducedMotion = useReducedMotion();
+  const mutedRef = useRef(false);
   const runtime = useRef(null);
   const pendingPlayback = useRef(null);
   const stateRef = useRef('ready');
@@ -43,7 +54,7 @@ export default function Caller() {
   copyRef.current = copy;
   const connected = state === 'in_call';
   const inProgress = ['connecting', 'ringing', 'in_call'].includes(state);
-  const microphoneLive = connected && phase === 'listening' && !playing && audioState === 'running';
+  const microphoneLive = connected && phase === 'listening' && !playing && audioState === 'running' && !microphoneMuted && !deviceMuted;
 
   const finish = (finalState = 'ended', message = '', sendEnd = false) => {
     const session = runtime.current;
@@ -58,6 +69,7 @@ export default function Caller() {
     stateRef.current = finalState;
     setState(finalState);
     setMicrophoneReady(false);
+    setMicrophoneStream(null);
     setPlaying(false);
     if (message) setError(message);
   };
@@ -76,6 +88,7 @@ export default function Caller() {
   const start = async () => {
     if (!token || used || (runtime.current && !runtime.current.ended)) return;
     setError(''); setState('connecting'); stateRef.current = 'connecting';
+    mutedRef.current = false; setMicrophoneMuted(false); setDeviceMuted(false);
     const session = { ended: false, socket: null, audio: null, timeout: null };
     runtime.current = session;
     try {
@@ -91,6 +104,7 @@ export default function Caller() {
         onPlayback: value => { if (!session.ended) setPlaying(value); },
         onAudioState: value => { if (!session.ended) { setAudioState(value); if (value !== 'running') session.audio?.setListening(false); } },
         onMicrophoneEnded: () => { if (!session.ended) finish('error', copyRef.current.microphoneEnded, true); },
+        onMicrophoneState: value => { if (!session.ended) setDeviceMuted(value.muted); },
       });
       // AudioContext.resume is invoked within the tap gesture, before any await.
       const unlocked = session.audio.unlock();
@@ -99,6 +113,7 @@ export default function Caller() {
       if (session.ended) return;
       setAudioState(session.audio.context.state);
       setMicrophoneReady(true);
+      setMicrophoneStream(session.audio.stream);
       const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/caller`);
       session.socket = socket;
       socket.binaryType = 'arraybuffer';
@@ -118,7 +133,7 @@ export default function Caller() {
           stateRef.current = nextState;
           setState(nextState);
           setPhase(message.phase || 'listening');
-          session.audio.setListening(nextState === 'in_call' && message.phase === 'listening' && !session.audio.source && session.audio.context.state === 'running');
+          session.audio.setListening(nextState === 'in_call' && message.phase === 'listening' && !session.audio.source && session.audio.context.state === 'running' && !mutedRef.current);
         }
         if (message.type === 'audio' && message.payload && message.playbackId) {
           session.audio.setListening(false);
@@ -147,17 +162,35 @@ export default function Caller() {
     try { await session.audio.unlock(); setAudioState('running'); setError(''); const pending = pendingPlayback.current; if (pending) { await session.audio.play(pending.payload, pending.playbackId); pendingPlayback.current = null; } }
     catch (failure) { setError(failure.message); }
   };
+  const toggleMicrophone = () => {
+    const next = !mutedRef.current;
+    mutedRef.current = next;
+    runtime.current?.audio?.setMuted(next);
+    setMicrophoneMuted(next);
+  };
 
   const heading = state === 'ended' ? copy.ended : state === 'unavailable' || (state === 'error' && used) ? copy.unavailable : connected ? copy.live : state === 'ringing' ? copy.ringing : state === 'connecting' ? copy.connecting : copy.title;
-  const body = state === 'ended' ? copy.endedBody : state === 'unavailable' || (state === 'error' && used) ? copy.newLink : connected ? playing ? copy.playing : phase !== 'listening' ? copy.translating : copy.listening : state === 'ringing' ? copy.waiting : state === 'connecting' ? microphoneReady ? copy.waiting : copy.preparing : copy.intro;
+  const body = state === 'ended' ? copy.endedBody : state === 'unavailable' || (state === 'error' && used) ? copy.newLink : connected ? playing ? copy.playing : phase !== 'listening' ? copy.translating : microphoneMuted ? copy.mutedByYou : deviceMuted ? copy.deviceMuted : copy.listening : state === 'ringing' ? copy.waiting : state === 'connecting' ? microphoneReady ? copy.waiting : copy.preparing : copy.intro;
   return <div className="caller-page" lang={language}>
     <header className="caller-header"><div className="wordmark"><span className="brand-mark"><AudioLines size={23} /></span>NoteFIsh<span className="wordmark-dot">.</span></div><button className="caller-language" onClick={() => setLanguage(language === 'fr' ? 'en' : 'fr')} aria-label={language === 'fr' ? 'Switch to English' : 'Passer en français'}><Globe2 size={14} />{language === 'fr' ? 'FR' : 'EN'}</button></header>
     <main className="caller-main"><div className={`caller-orb ${inProgress ? 'is-active' : ''} ${playing ? 'is-playing' : ''}`} aria-hidden="true">{state === 'ended' ? <CheckCircle2 size={45} strokeWidth={1} /> : playing ? <Volume2 size={45} strokeWidth={1} /> : state === 'connecting' ? <Loader2 className="spin" size={42} strokeWidth={1} /> : <AudioLines size={49} strokeWidth={1} />}</div><span className="eyebrow">{copy.label}</span><div className="caller-state" role="status" aria-live="polite"><h1>{heading}</h1><p>{body}</p></div>
       {inProgress && <div className={`caller-mic-state ${microphoneLive ? 'is-live' : ''}`}>{microphoneLive ? <Mic size={14} /> : <MicOff size={14} />}<span>{microphoneLive ? copy.microphone : copy.muted}</span></div>}
+      {connected && <div className={`caller-live-audio ${playing ? 'is-playing' : ''}`}>
+        <AudioWaveform stream={playing ? null : microphoneStream} analyser={playing ? runtime.current?.audio?.playbackAnalyser : null}
+          audioContext={runtime.current?.audio?.context} active={microphoneLive || playing} height={56} label={playing ? copy.replyWaveform : copy.micWaveform} />
+      </div>}
       {error && <div className="caller-error" role="alert">{error}</div>}
       {inProgress && audioState !== 'running' && audioState !== 'idle' && <div className="caller-audio-recovery"><p>{copy.audioHelp}</p><button className="button primary" onClick={resumeAudio}><Volume2 size={17} />{copy.audio}</button></div>}
-      {!inProgress && !used && token && state !== 'ended' && <><button className="button primary caller-call-button" onClick={start}><Phone size={19} />{state === 'error' ? copy.retry : copy.call}</button><span className="caller-permission">{copy.allow}</span></>}
-      {inProgress && <button className="button end-call caller-end-button" onClick={() => finish('ended', '', true)}><PhoneOff size={17} />{copy.end}</button>}
+      {!inProgress && !used && token && state !== 'ended' && <><motion.button className="button primary caller-call-button" onClick={start} whileTap={reducedMotion ? undefined : { scale: .98 }}><Phone size={19} />{state === 'error' ? copy.retry : copy.call}</motion.button><span className="caller-permission">{copy.allow}</span></>}
+      {inProgress && <div className="caller-touch-controls">
+        {microphoneReady && <motion.button type="button" className={`button secondary caller-mute-button ${microphoneMuted ? 'is-muted' : ''}`}
+          style={{ minHeight: 48, minWidth: 48 }} aria-pressed={microphoneMuted} aria-label={microphoneMuted ? copy.unmute : copy.mute}
+          onClick={toggleMicrophone} whileTap={reducedMotion ? undefined : { scale: .97 }}>
+          {microphoneMuted ? <MicOff size={19} /> : <Mic size={19} />}<span>{microphoneMuted ? copy.unmute : copy.mute}</span>
+        </motion.button>}
+        <motion.button className="button end-call caller-end-button" style={{ minHeight: 48, minWidth: 48 }}
+          onClick={() => finish('ended', '', true)} whileTap={reducedMotion ? undefined : { scale: .97 }}><PhoneOff size={17} />{copy.end}</motion.button>
+      </div>}
       <div className="caller-headphone-note"><Headphones size={17} /><p>{copy.headset}</p></div>
     </main><footer className="caller-footer"><div><ShieldCheck size={15} /><p>{copy.privacy}</p></div><span>{copy.browser}</span></footer>
   </div>;

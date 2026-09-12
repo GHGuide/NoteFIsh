@@ -17,6 +17,7 @@ ENV NODE_ENV=production HOST=0.0.0.0 PORT=3001 DATA_DIR=/var/data
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --chown=node:node server ./server
+COPY --chown=node:node docs/THIRD_PARTY_NOTICES.md ./THIRD_PARTY_NOTICES.md
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY docker-entrypoint.sh /usr/local/bin/notefish-entrypoint
 RUN chmod 755 /usr/local/bin/notefish-entrypoint && install -d -m 700 -o node -g node /var/data

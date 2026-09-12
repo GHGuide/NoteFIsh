@@ -30,15 +30,21 @@ export class Pcm16Encoder {
 }
 
 export class BrowserCallAudio {
-  constructor({ onChunk, onPlayed, onPlayback, onAudioState, onMicrophoneEnded }) {
+  constructor({ onChunk, onPlayed, onPlayback, onAudioState, onMicrophoneEnded, onMicrophoneState }) {
     const Context = window.AudioContext || window.webkitAudioContext;
     if (!Context) throw new Error('This browser does not support call audio. Please open the link in Safari or Chrome.');
     this.context = new Context({ latencyHint: 'interactive' });
+    this.playbackAnalyser = this.context.createAnalyser();
+    this.playbackAnalyser.fftSize = 2048;
+    this.playbackAnalyser.connect(this.context.destination);
     this.onChunk = onChunk;
     this.onPlayed = onPlayed;
     this.onPlayback = onPlayback;
     this.onAudioState = onAudioState;
     this.onMicrophoneEnded = onMicrophoneEnded;
+    this.onMicrophoneState = onMicrophoneState;
+    this.userMuted = false;
+    this.deviceMuted = false;
     this.listening = false;
     this.disposed = false;
     this.generation = 0;
@@ -55,7 +61,17 @@ export class BrowserCallAudio {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }, video: false });
     if (this.disposed) { stream.getTracks().forEach(track => track.stop()); return; }
     this.stream = stream;
-    for (const track of stream.getAudioTracks()) track.onended = () => { if (!this.disposed) this.onMicrophoneEnded?.(); };
+    const updateTrackState = () => {
+      this.deviceMuted = stream.getAudioTracks().some(track => track.muted || track.readyState !== 'live');
+      if (this.deviceMuted) this.setListening(false);
+      if (!this.disposed) this.onMicrophoneState?.({ muted: this.deviceMuted });
+    };
+    for (const track of stream.getAudioTracks()) {
+      track.enabled = !this.userMuted;
+      track.onended = () => { if (!this.disposed) this.onMicrophoneEnded?.(); };
+      track.onmute = updateTrackState; track.onunmute = updateTrackState;
+    }
+    updateTrackState();
     this.microphone = this.context.createMediaStreamSource(stream);
     const sink = this.context.createGain();
     sink.gain.value = 0;
@@ -80,10 +96,16 @@ export class BrowserCallAudio {
     this.processor.connect(sink);
   }
   setListening(enabled) {
-    if (this.listening === Boolean(enabled)) return;
-    this.listening = Boolean(enabled);
+    const allowed = Boolean(enabled) && !this.userMuted && !this.deviceMuted && !this.disposed;
+    if (this.listening === allowed) return;
+    this.listening = allowed;
     this.encoder?.reset();
     this.processor?.port?.postMessage({ enabled: this.listening });
+  }
+  setMuted(muted) {
+    this.userMuted = Boolean(muted);
+    for (const track of this.stream?.getAudioTracks() || []) track.enabled = !this.userMuted;
+    if (this.userMuted) this.setListening(false);
   }
   clearPlayback() {
     this.generation += 1;
@@ -104,7 +126,7 @@ export class BrowserCallAudio {
     if (this.disposed || generation !== this.generation) return;
     const source = this.context.createBufferSource();
     source.buffer = buffer;
-    source.connect(this.context.destination);
+    source.connect(this.playbackAnalyser);
     this.source = source;
     this.setListening(false);
     source.onended = () => {
@@ -123,12 +145,13 @@ export class BrowserCallAudio {
     this.disposed = true;
     this.setListening(false);
     this.clearPlayback();
-    this.stream?.getTracks().forEach(track => { track.onended = null; track.stop(); });
+    this.stream?.getTracks().forEach(track => { track.onended = null; track.onmute = null; track.onunmute = null; track.stop(); });
     if (this.processor?.port) this.processor.port.onmessage = null;
     if (this.processor?.onaudioprocess) this.processor.onaudioprocess = null;
     try { this.microphone?.disconnect(); } catch {}
     try { this.processor?.disconnect(); } catch {}
     try { this.sink?.disconnect(); } catch {}
+    try { this.playbackAnalyser?.disconnect(); } catch {}
     this.context.onstatechange = null;
     this.context.close().catch(() => {});
   }

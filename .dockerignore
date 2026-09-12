@@ -9,7 +9,8 @@ test-results
 playwright-report
 *.log
 .DS_Store
-docs
+docs/*
+!docs/THIRD_PARTY_NOTICES.md
 tests
 **/*.pem
 **/keys.js
