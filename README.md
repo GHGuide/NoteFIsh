@@ -36,9 +36,15 @@ Generate a caller invitation in the desk and open it on the phone. Hold Space re
 
 ## Create and keep your voice
 
-Open **Create voice** from the sidebar or call desk. Give the voice a name, then record a clear 15–30-second sample or upload an audio file. Confirm that it is your voice or that you have the speaker's permission, then choose **Create voice**. Fish processes the sample and the named voice is saved in the library; training status continues updating when you switch pages. Once ready, preview it and choose **Use at call desk**. You can rename it later, and the library and selected voice survive service restarts.
+Open **Create voice** from the sidebar or call desk. Press **Record my voice** and read the visible passage at a natural pace (about 30–40 seconds). Stop, listen back, name it, confirm that it is your voice or that you have permission, then choose **Create voice**. Existing recordings remain available under a collapsed option. Fish processes the sample and the named voice is saved in the library; training status continues updating when you switch pages. Once ready, preview it and choose **Use at call desk**. You can rename it later, and the library and selected voice survive service restarts.
 
 The current no-login demo is a **shared workspace**. Everyone who can open the site can access its voice library, settings, and saved calls. Fish models are created with private provider visibility, but this does not make the demo's library private to an individual visitor.
+
+## Record the demo
+
+The home page opens the call desk. Select a voice, choose the two languages, and click **Create call link**. This enables desk audio and requests microphone permission before the first reply. Copy the link to your partner. Answer when they call; the live transcript stays on the right, beside the speaking controls. **Focus view** hides the surrounding navigation for the video. Call notes are collapsed, and saved transcripts remain available from **Saved conversations**.
+
+See the [two-person demo script and verification checklist](docs/demo-video.md).
 
 ## Deploy
 
