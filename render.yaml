@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: notefish
+    runtime: docker
+    plan: 0.5c-512mb
+    region: frankfurt
+    healthCheckPath: /healthz
+    numInstances: 1
+    disk:
+      name: notefish-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATA_DIR
+        value: /var/data
+      - key: NOTEFISH_DESK_PASSWORD
+        sync: false
+      - key: FISH_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: FISH_MODEL
+        value: s2.1-pro-free

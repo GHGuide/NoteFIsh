@@ -1,0 +1,30 @@
+{
+  "name": "notefish",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server/index.mjs",
+    "dev:web": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "start": "node server/index.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:docker": "node scripts/smoke-container.mjs"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "lucide-react": "^0.468.0",
+    "multer": "^2.0.2",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "twilio": "^5.9.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "vite": "^7.1.5"
+  }
+}

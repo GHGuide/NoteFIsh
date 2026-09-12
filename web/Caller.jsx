@@ -1,0 +1,164 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { AudioLines, CheckCircle2, Globe2, Headphones, Loader2, Mic, MicOff, Phone, PhoneOff, ShieldCheck, Volume2 } from 'lucide-react';
+import { BrowserCallAudio } from './browser-call-audio.js';
+
+const COPY = {
+  fr: {
+    label: 'UNE CONVERSATION, TOUT SIMPLEMENT', title: 'On vous écoute.', intro: 'Parlez dans votre langue. Votre interlocuteur vous répond avec une voix traduite.',
+    call: 'Appeler', connecting: 'Connexion en cours…', ringing: 'Votre interlocuteur est prévenu.', waiting: 'Patientez un instant. La conversation commence dès qu’il répond.',
+    live: 'Vous êtes en ligne.', listening: 'À vous de parler. Votre interlocuteur vous entend.', translating: 'Votre interlocuteur prépare sa réponse…', playing: 'Écoutez la réponse de votre interlocuteur.',
+    end: 'Terminer l’appel', ended: 'Merci pour cette conversation.', endedBody: 'L’appel est terminé. Vous pouvez fermer cette page.',
+    microphone: 'Microphone actif', muted: 'Microphone en pause', allow: 'Autorisez votre microphone pour commencer.', preparing: 'Préparation du microphone…',
+    audio: 'Activer le son', audioHelp: 'Le son est en pause. Touchez le bouton pour reprendre l’appel.', retry: 'Réessayer', unavailable: 'Ce lien n’est pas disponible.', newLink: 'Demandez un nouveau lien d’appel à votre interlocuteur.',
+    privacy: 'Votre voix est transmise pour cet appel et traduite pour votre interlocuteur. Elle n’est pas clonée.', headset: 'Pour un son clair, utilisez des écouteurs et gardez cette page ouverte.', browser: 'Appel audio sécurisé dans votre navigateur', microphoneEnded: 'Le microphone a été déconnecté. Demandez un nouveau lien pour rappeler.',
+    disconnected: 'La connexion a été interrompue. Demandez un nouveau lien pour rappeler.',
+  },
+  en: {
+    label: 'A CONVERSATION, MADE SIMPLE', title: 'We’re listening.', intro: 'Speak in your language. The person at the desk replies with a translated voice.',
+    call: 'Call', connecting: 'Connecting…', ringing: 'Your call is ringing.', waiting: 'Just a moment. The conversation starts when the person at the desk answers.',
+    live: 'You’re connected.', listening: 'Go ahead and speak. The person at the desk can hear you.', translating: 'The person at the desk is preparing a reply…', playing: 'Listen to their reply.',
+    end: 'End call', ended: 'Thanks for the conversation.', endedBody: 'The call has ended. You can close this page.',
+    microphone: 'Microphone active', muted: 'Microphone paused', allow: 'Allow microphone access to begin.', preparing: 'Preparing your microphone…',
+    audio: 'Enable audio', audioHelp: 'Audio is paused. Tap the button to resume the call.', retry: 'Try again', unavailable: 'This call link is unavailable.', newLink: 'Ask the person at the desk for a new call link.',
+    privacy: 'Your voice is shared for this call and translated for the person at the desk. It is never cloned.', headset: 'For clear audio, use headphones and keep this page open.', browser: 'A secure audio call in your browser', microphoneEnded: 'The microphone was disconnected. Ask for a new link to call again.',
+    disconnected: 'The connection was interrupted. Ask for a new link to call again.',
+  },
+};
+
+export default function Caller() {
+  const [token] = useState(() => { try { return decodeURIComponent(location.hash.slice(1)); } catch { return ''; } });
+  const [language, setLanguage] = useState('fr');
+  const [state, setState] = useState(token ? 'ready' : 'unavailable');
+  const [phase, setPhase] = useState('listening');
+  const [error, setError] = useState('');
+  const [playing, setPlaying] = useState(false);
+  const [audioState, setAudioState] = useState('idle');
+  const [microphoneReady, setMicrophoneReady] = useState(false);
+  const [used, setUsed] = useState(false);
+  const runtime = useRef(null);
+  const pendingPlayback = useRef(null);
+  const stateRef = useRef('ready');
+  const copy = COPY[language] || COPY.en;
+  const copyRef = useRef(copy);
+  copyRef.current = copy;
+  const connected = state === 'in_call';
+  const inProgress = ['connecting', 'ringing', 'in_call'].includes(state);
+  const microphoneLive = connected && phase === 'listening' && !playing && audioState === 'running';
+
+  const finish = (finalState = 'ended', message = '', sendEnd = false) => {
+    const session = runtime.current;
+    if (session) {
+      session.ended = true;
+      clearTimeout(session.timeout);
+      session.audio?.stop();
+      if (sendEnd && session.socket?.readyState === WebSocket.OPEN) session.socket.send(JSON.stringify({ type: 'end' }));
+      if (session.socket && session.socket.readyState < WebSocket.CLOSING) session.socket.close(1000);
+    }
+    pendingPlayback.current = null;
+    stateRef.current = finalState;
+    setState(finalState);
+    setMicrophoneReady(false);
+    setPlaying(false);
+    if (message) setError(message);
+  };
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.title = language === 'fr' ? 'Votre appel · NoteFIsh' : 'Your call · NoteFIsh';
+  }, [language]);
+  useEffect(() => {
+    const leave = () => { const session = runtime.current; if (!session) return; session.ended = true; clearTimeout(session.timeout); session.audio?.stop(); if (session.socket?.readyState === WebSocket.OPEN) { session.socket.send(JSON.stringify({ type: 'end' })); session.socket.close(1000); } };
+    window.addEventListener('pagehide', leave);
+    return () => { window.removeEventListener('pagehide', leave); leave(); };
+  }, []);
+  useEffect(() => { runtime.current?.audio?.setListening(microphoneLive); }, [microphoneLive]);
+
+  const start = async () => {
+    if (!token || used || (runtime.current && !runtime.current.ended)) return;
+    setError(''); setState('connecting'); stateRef.current = 'connecting';
+    const session = { ended: false, socket: null, audio: null, timeout: null };
+    runtime.current = session;
+    try {
+      session.audio = new BrowserCallAudio({
+        onChunk: chunk => {
+          if (!session.ended && session.socket?.readyState === WebSocket.OPEN && session.audio.listening) {
+            // Do not queue old microphone audio behind a stalled network.
+            if (session.socket.bufferedAmount > 64000) { finish('error', copyRef.current.disconnected, true); return; }
+            session.socket.send(chunk);
+          }
+        },
+        onPlayed: playbackId => { if (!session.ended && session.socket?.readyState === WebSocket.OPEN) session.socket.send(JSON.stringify({ type: 'played', playbackId })); },
+        onPlayback: value => { if (!session.ended) setPlaying(value); },
+        onAudioState: value => { if (!session.ended) { setAudioState(value); if (value !== 'running') session.audio?.setListening(false); } },
+        onMicrophoneEnded: () => { if (!session.ended) finish('error', copyRef.current.microphoneEnded, true); },
+      });
+      // AudioContext.resume is invoked within the tap gesture, before any await.
+      const unlocked = session.audio.unlock();
+      const microphone = session.audio.startMicrophone();
+      await Promise.all([unlocked, microphone]);
+      if (session.ended) return;
+      setAudioState(session.audio.context.state);
+      setMicrophoneReady(true);
+      const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/caller`);
+      session.socket = socket;
+      socket.binaryType = 'arraybuffer';
+      session.timeout = setTimeout(() => { if (!session.ended && stateRef.current === 'connecting') finish('error', copyRef.current.disconnected, true); }, 15000);
+      socket.onopen = () => { if (!session.ended) socket.send(JSON.stringify({ type: 'join', token })); };
+      socket.onmessage = event => {
+        if (session.ended || typeof event.data !== 'string') return;
+        let message; try { message = JSON.parse(event.data); } catch { return; }
+        if (message.type === 'state') {
+          clearTimeout(session.timeout);
+          const nextState = message.state;
+          if (!['ringing', 'in_call', 'ended'].includes(nextState)) return;
+          setUsed(true);
+          if (message.customerLanguage) setLanguage(message.customerLanguage === 'fr' ? 'fr' : 'en');
+          if (message.error) setError(message.error);
+          if (nextState === 'ended') { finish('ended', message.error || ''); return; }
+          stateRef.current = nextState;
+          setState(nextState);
+          setPhase(message.phase || 'listening');
+          session.audio.setListening(nextState === 'in_call' && message.phase === 'listening' && !session.audio.source && session.audio.context.state === 'running');
+        }
+        if (message.type === 'audio' && message.payload && message.playbackId) {
+          session.audio.setListening(false);
+          pendingPlayback.current = message;
+          session.audio.play(message.payload, message.playbackId).then(() => { if (!session.ended && pendingPlayback.current === message) pendingPlayback.current = null; }).catch(failure => { if (!session.ended) { setError(failure.message); setAudioState(session.audio.context.state); } });
+        }
+        if (message.type === 'clear') { pendingPlayback.current = null; session.audio.clearPlayback(); }
+        if (message.type === 'error') {
+          const messageText = message.error || copyRef.current.disconnected;
+          if (stateRef.current === 'connecting') finish('error', messageText, true);
+          else setError(messageText);
+        }
+      };
+      socket.onerror = () => { if (!session.ended) finish('error', copyRef.current.disconnected, true); };
+      socket.onclose = () => { if (!session.ended) finish('error', copyRef.current.disconnected); };
+    } catch (failure) {
+      if (session.ended) return;
+      const message = failure.name === 'NotAllowedError' ? language === 'fr' ? 'Autorisez le microphone dans votre navigateur, puis réessayez.' : 'Allow microphone access in your browser, then try again.' : failure.message;
+      finish('error', message, true);
+    }
+  };
+
+  const resumeAudio = async () => {
+    const session = runtime.current;
+    if (!session || session.ended) return;
+    try { await session.audio.unlock(); setAudioState('running'); setError(''); const pending = pendingPlayback.current; if (pending) { await session.audio.play(pending.payload, pending.playbackId); pendingPlayback.current = null; } }
+    catch (failure) { setError(failure.message); }
+  };
+
+  const heading = state === 'ended' ? copy.ended : state === 'unavailable' || (state === 'error' && used) ? copy.unavailable : connected ? copy.live : state === 'ringing' ? copy.ringing : state === 'connecting' ? copy.connecting : copy.title;
+  const body = state === 'ended' ? copy.endedBody : state === 'unavailable' || (state === 'error' && used) ? copy.newLink : connected ? playing ? copy.playing : phase !== 'listening' ? copy.translating : copy.listening : state === 'ringing' ? copy.waiting : state === 'connecting' ? microphoneReady ? copy.waiting : copy.preparing : copy.intro;
+  return <div className="caller-page" lang={language}>
+    <header className="caller-header"><div className="wordmark"><span className="brand-mark"><AudioLines size={23} /></span>NoteFIsh<span className="wordmark-dot">.</span></div><button className="caller-language" onClick={() => setLanguage(language === 'fr' ? 'en' : 'fr')} aria-label={language === 'fr' ? 'Switch to English' : 'Passer en français'}><Globe2 size={14} />{language === 'fr' ? 'FR' : 'EN'}</button></header>
+    <main className="caller-main"><div className={`caller-orb ${inProgress ? 'is-active' : ''} ${playing ? 'is-playing' : ''}`} aria-hidden="true">{state === 'ended' ? <CheckCircle2 size={45} strokeWidth={1} /> : playing ? <Volume2 size={45} strokeWidth={1} /> : state === 'connecting' ? <Loader2 className="spin" size={42} strokeWidth={1} /> : <AudioLines size={49} strokeWidth={1} />}</div><span className="eyebrow">{copy.label}</span><div className="caller-state" role="status" aria-live="polite"><h1>{heading}</h1><p>{body}</p></div>
+      {inProgress && <div className={`caller-mic-state ${microphoneLive ? 'is-live' : ''}`}>{microphoneLive ? <Mic size={14} /> : <MicOff size={14} />}<span>{microphoneLive ? copy.microphone : copy.muted}</span></div>}
+      {error && <div className="caller-error" role="alert">{error}</div>}
+      {inProgress && audioState !== 'running' && audioState !== 'idle' && <div className="caller-audio-recovery"><p>{copy.audioHelp}</p><button className="button primary" onClick={resumeAudio}><Volume2 size={17} />{copy.audio}</button></div>}
+      {!inProgress && !used && token && state !== 'ended' && <><button className="button primary caller-call-button" onClick={start}><Phone size={19} />{state === 'error' ? copy.retry : copy.call}</button><span className="caller-permission">{copy.allow}</span></>}
+      {inProgress && <button className="button end-call caller-end-button" onClick={() => finish('ended', '', true)}><PhoneOff size={17} />{copy.end}</button>}
+      <div className="caller-headphone-note"><Headphones size={17} /><p>{copy.headset}</p></div>
+    </main><footer className="caller-footer"><div><ShieldCheck size={15} /><p>{copy.privacy}</p></div><span>{copy.browser}</span></footer>
+  </div>;
+}
