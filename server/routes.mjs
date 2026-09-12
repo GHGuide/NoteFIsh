@@ -136,6 +136,7 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     if ('customerLanguage' in req.body) patch.customerLanguage = language(req.body.customerLanguage);
     if ('queueName' in req.body) patch.queueName = text(req.body.queueName, 'queue name', 100);
     const settings = await store.update(state => { Object.assign(state.settings, patch); return state.settings; });
+    await calls.applySettings(settings);
     stateEvent(); res.json({ settings });
   };
   router.put('/settings', saveSettings); router.patch('/settings', saveSettings);

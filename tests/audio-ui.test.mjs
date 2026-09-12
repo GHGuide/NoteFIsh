@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
-import { audioPeaks, audioRms } from '../web/audio.js';
+import { audioPeaks, audioRms, audioBufferToWav, audioTime } from '../web/audio.js';
+import { microphoneIssue } from '../web/microphone-help.js';
 import { BrowserCallAudio, Pcm16Encoder } from '../web/browser-call-audio.js';
 
 test('audio meter reports silence and real signal strength without inventing activity', () => {
@@ -126,4 +127,47 @@ test('clear during decode prevents stale reply from starting or acknowledging', 
   const playing = audio.play('AA==', 'stale');
   audio.clearPlayback(); finishDecode({ duration: .1 }); await playing;
   assert.equal(sources.length, 0); assert.deepEqual(acknowledgements, []);
+});
+
+test('microphone readiness does not wait forever for browser audio unlock', async t => {
+  const { audio, track } = browserAudioFixture(t);
+  audio.context.resume = () => new Promise(() => {});
+  await audio.prepare();
+  assert.equal(audio.stream.getAudioTracks()[0], track);
+  assert.equal(audio.context.state, 'suspended');
+  assert.equal(audio.listening, false, 'audio recovery gesture is still required before sending speech');
+});
+
+test('late microphone permission after cancellation releases the stream', async t => {
+  const { audio, track } = browserAudioFixture(t);
+  let grant;
+  navigator.mediaDevices.getUserMedia = () => new Promise(resolve => { grant = resolve; });
+  const starting = audio.prepare();
+  audio.stop();
+  grant({ getTracks: () => [track], getAudioTracks: () => [track] });
+  await starting;
+  assert.equal(track.readyState, 'ended');
+  assert.equal(audio.stream, undefined);
+});
+
+test('preview WAV duration follows actual samples and time labels use one consistent clock', async () => {
+  const rate = 24000; const length = rate * 23 + rate * .75;
+  const samples = Float32Array.from({ length }, (_, i) => .25 * Math.sin(2 * Math.PI * 440 * i / rate));
+  const wav = await audioBufferToWav({ numberOfChannels: 1, length, sampleRate: rate, getChannelData: () => samples }).arrayBuffer();
+  const view = new DataView(wav);
+  assert.equal(view.getUint32(24, true), rate);
+  assert.equal(view.getUint32(40, true) / view.getUint32(28, true), 23.75);
+  assert.equal(wav.byteLength, 44 + length * 2);
+  assert.equal(audioTime(23.75 / 2), '0:11');
+  assert.equal(audioTime(23.75), '0:23');
+  assert.equal(audioTime(Infinity), '0:00');
+  assert.equal(audioTime(65.9), '1:05');
+});
+
+test('microphone failures give actionable categories without pretending access can be granted by the site', () => {
+  assert.equal(microphoneIssue({ name: 'NotAllowedError' }), 'blocked');
+  assert.equal(microphoneIssue({ name: 'NotReadableError' }), 'busy');
+  assert.equal(microphoneIssue({ name: 'NotFoundError' }), 'missing');
+  assert.equal(microphoneIssue({}, { supported: false }), 'unsupported');
+  assert.equal(microphoneIssue({}, { secure: false }), 'unsupported');
 });

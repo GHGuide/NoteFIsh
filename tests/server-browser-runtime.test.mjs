@@ -63,6 +63,10 @@ test('public caller shell and one-use socket admission never expose desk data or
   assert.equal(runtime.calls.snapshot().length, 1);
   assert.equal((await fetch(`${base}/api/calls/${ringing.callId}/answer`, { method: 'POST', headers, body: '{}' })).status, 200);
   await caller.waitFor(event => event.type === 'state' && event.state === 'in_call');
+  assert.equal((await fetch(`${base}/api/settings`, { method: 'PUT', headers, body: JSON.stringify({ customerLanguage: 'de' }) })).status, 200);
+  const changed = await caller.waitFor(event => event.type === 'state' && event.state === 'in_call' && event.customerLanguage === 'de');
+  assert.deepEqual(Object.keys(changed).sort(), ['callId', 'customerLanguage', 'phase', 'state', 'type']);
+  assert.equal(runtime.calls.snapshot()[0].customerLanguage, 'de');
   assert.equal((await fetch(`${base}/api/calls/${ringing.callId}/ticket`, { method: 'PATCH', headers, body: JSON.stringify({ issue: 'Private agent ticket' }) })).status, 200);
   caller.ws.send(JSON.stringify({ type: 'end' }));
   await caller.waitFor(event => event.type === 'state' && event.state === 'ended');

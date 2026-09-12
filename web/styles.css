@@ -743,3 +743,21 @@ input::placeholder, textarea::placeholder { color: #726C62; opacity: 1; }
   .guided-recorder { display: flex; flex-direction: column; }
   .guided-record-controls { order: -1; position: sticky; top: 8px; z-index: 2; border-top: 0; border-bottom: 1px dashed var(--line); background: var(--panel); padding: 10px 0 17px; margin-bottom: 20px; }
 }
+.recorded-player-controls { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.recorded-player-controls .icon-button { flex: 0 0 44px; width: 44px; height: 44px; }
+.recorded-player-controls output { flex: 0 0 auto; font-size: 13px; font-variant-numeric: tabular-nums; }
+.recorded-player-controls input[type="range"] { flex: 1; min-width: 48px; width: 100%; height: 44px; padding: 0; border: 0; background: transparent; appearance: none; cursor: pointer; touch-action: pan-y; }
+.recorded-player-controls input[type="range"]::-webkit-slider-runnable-track { height: 5px; border-radius: 5px; background: linear-gradient(to right, #242424 var(--played), #D8D6D1 var(--played)); }
+.recorded-player-controls input[type="range"]::-webkit-slider-thumb { appearance: none; margin-top: -7px; width: 19px; height: 19px; border-radius: 50%; background: #242424; }
+.recorded-player-controls input[type="range"]::-moz-range-track { height: 5px; border-radius: 5px; background: #D8D6D1; }
+.recorded-player-controls input[type="range"]::-moz-range-progress { height: 5px; background: #242424; }
+.recorded-player-controls input[type="range"]::-moz-range-thumb { width: 19px; height: 19px; border: 0; border-radius: 50%; background: #242424; }
+.recorded-duration { margin: 8px 0 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.transcript-language { font-size: 10px; font-weight: 600; display: inline-block; margin-right: 7px; }
+.caller-microphone-help { width: 100%; max-width: 430px; margin-top: 20px; padding: 16px; border: 1px dashed var(--line); border-radius: 12px; text-align: left; background: var(--panel); }
+.caller-microphone-help summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+.caller-microphone-help p { font-size: 13px; line-height: 1.6; margin: 14px 0; color: var(--muted); }
+.caller-microphone-help .button { min-height: 44px; margin-bottom: 14px; }
+.caller-microphone-help input { min-width: 0; font-size: 12px; }
+.caller-permission-wait { max-width: 360px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.caller-speech-language { display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--muted); font-size: 13px; }

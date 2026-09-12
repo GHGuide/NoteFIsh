@@ -56,6 +56,12 @@ export class BrowserCallAudio {
     await this.context.resume();
     if (this.context.state !== 'running') throw new Error('Tap Enable audio to allow sound for this call.');
   }
+  async prepare() {
+    // Both operations begin in the tap gesture. A suspended AudioContext must
+    // not hold an already-approved microphone behind a never-resolving resume.
+    void this.unlock().catch(() => { if (!this.disposed) this.onAudioState?.(this.context.state); });
+    await this.startMicrophone();
+  }
   async startMicrophone() {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Microphone access needs a secure HTTPS page. Open the public call link in Safari or Chrome.');
     const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }, video: false });

@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AudioLines, CheckCircle2, Globe2, Headphones, Loader2, Mic, MicOff, Phone, PhoneOff, ShieldCheck, Volume2 } from 'lucide-react';
+import { AudioLines, CheckCircle2, Copy, Globe2, Headphones, Loader2, Mic, MicOff, Phone, PhoneOff, ShieldCheck, Volume2 } from 'lucide-react';
 import { BrowserCallAudio } from './browser-call-audio.js';
+import { microphoneIssue } from './microphone-help.js';
+import { languageName } from '../server/languages.mjs';
 import AudioWaveform from './components/AudioWaveform.jsx';
 import { motion, useReducedMotion } from 'motion/react';
 
@@ -16,6 +18,13 @@ const COPY = {
     disconnected: 'La connexion a été interrompue. Demandez un nouveau lien pour rappeler.',
     mute: 'Couper le micro', unmute: 'Réactiver le micro', mutedByYou: 'Votre microphone est coupé.',
     deviceMuted: 'Votre microphone est temporairement indisponible.', micWaveform: 'Activité réelle du microphone', replyWaveform: 'Audio de votre interlocuteur',
+    cancel: 'Annuler', permissionTitle: 'Le microphone ne fonctionne pas ?',
+    permissionOpen: 'Ouvrez ce lien directement dans Safari ou Chrome, plutôt que dans WhatsApp, Instagram ou le navigateur d’une autre application.',
+    permissionSettings: 'Dans le menu du site de votre navigateur, autorisez le microphone, puis réessayez. Si le téléphone bloque le navigateur, autorisez aussi son microphone dans les réglages du téléphone.',
+    permissionWaiting: 'Autorisez le microphone dans la fenêtre de votre navigateur. Si aucune fenêtre ne s’affiche, consultez l’aide ci-dessous.',
+    copyLink: 'Copier le lien', copiedLink: 'Lien copié. Collez-le dans Safari ou Chrome.', manualCopy: 'Copiez le lien ci-dessous et collez-le dans Safari ou Chrome.',
+    linkLabel: 'Lien complet de cet appel', speechLanguage: 'Langue de l’appel',
+    micErrors: { blocked: 'L’accès au microphone est bloqué par le navigateur ou le téléphone.', missing: 'Aucun microphone disponible. Vérifiez votre appareil.', busy: 'Le microphone est indisponible. Fermez les autres appels et réessayez.', unsupported: 'Ce navigateur ne permet pas l’accès au microphone ici. Ouvrez le lien HTTPS dans Safari ou Chrome.', failed: 'Le microphone n’a pas pu démarrer. Réessayez ou ouvrez le lien dans Safari ou Chrome.', timeout: 'La demande de microphone est toujours en attente. Autorisez-la, puis réessayez.' },
   },
   en: {
     label: 'A CONVERSATION, MADE SIMPLE', title: 'We’re listening.', intro: 'Speak in your language. The person at the desk replies with a translated voice.',
@@ -28,6 +37,13 @@ const COPY = {
     disconnected: 'The connection was interrupted. Ask for a new link to call again.',
     mute: 'Mute microphone', unmute: 'Unmute microphone', mutedByYou: 'Your microphone is muted.',
     deviceMuted: 'Your microphone is temporarily unavailable.', micWaveform: 'Live microphone activity', replyWaveform: 'Audio from the person at the desk',
+    cancel: 'Cancel', permissionTitle: 'Microphone not working?',
+    permissionOpen: 'Open this link directly in Safari or Chrome, rather than inside WhatsApp, Instagram, or another app’s browser.',
+    permissionSettings: 'In your browser’s site menu, allow Microphone, then try again. If your phone blocks the browser, also allow its microphone in your phone settings.',
+    permissionWaiting: 'Allow the microphone in your browser’s permission popup. If no popup appears, open the help below.',
+    copyLink: 'Copy call link', copiedLink: 'Link copied. Paste it into Safari or Chrome.', manualCopy: 'Copy the link below and paste it into Safari or Chrome.',
+    linkLabel: 'Full link for this call', speechLanguage: 'Call language',
+    micErrors: { blocked: 'Microphone access is blocked by the browser or phone.', missing: 'No microphone is available. Check your device.', busy: 'The microphone is unavailable. Close other calls and try again.', unsupported: 'This browser cannot access the microphone here. Open the HTTPS link in Safari or Chrome.', failed: 'The microphone could not start. Try again or open the link in Safari or Chrome.', timeout: 'The microphone request is still waiting. Allow it, then try again.' },
   },
 };
 
@@ -43,6 +59,9 @@ export default function Caller() {
   const [microphoneStream, setMicrophoneStream] = useState(null);
   const [microphoneMuted, setMicrophoneMuted] = useState(false);
   const [deviceMuted, setDeviceMuted] = useState(false);
+  const [permissionProblem, setPermissionProblem] = useState('');
+  const [linkNotice, setLinkNotice] = useState('');
+  const [speechLanguage, setSpeechLanguage] = useState('fr');
   const [used, setUsed] = useState(false);
   const reducedMotion = useReducedMotion();
   const mutedRef = useRef(false);
@@ -87,11 +106,15 @@ export default function Caller() {
 
   const start = async () => {
     if (!token || used || (runtime.current && !runtime.current.ended)) return;
-    setError(''); setState('connecting'); stateRef.current = 'connecting';
+    setError(''); setPermissionProblem(''); setState('connecting'); stateRef.current = 'connecting'; setAudioState('idle');
     mutedRef.current = false; setMicrophoneMuted(false); setDeviceMuted(false);
     const session = { ended: false, socket: null, audio: null, timeout: null };
     runtime.current = session;
     try {
+      session.timeout = setTimeout(() => {
+        if (session.ended) return;
+        setPermissionProblem('timeout'); finish('error', copyRef.current.micErrors.timeout);
+      }, 30000);
       session.audio = new BrowserCallAudio({
         onChunk: chunk => {
           if (!session.ended && session.socket?.readyState === WebSocket.OPEN && session.audio.listening) {
@@ -106,11 +129,9 @@ export default function Caller() {
         onMicrophoneEnded: () => { if (!session.ended) finish('error', copyRef.current.microphoneEnded, true); },
         onMicrophoneState: value => { if (!session.ended) setDeviceMuted(value.muted); },
       });
-      // AudioContext.resume is invoked within the tap gesture, before any await.
-      const unlocked = session.audio.unlock();
-      const microphone = session.audio.startMicrophone();
-      await Promise.all([unlocked, microphone]);
+      await session.audio.prepare();
       if (session.ended) return;
+      clearTimeout(session.timeout);
       setAudioState(session.audio.context.state);
       setMicrophoneReady(true);
       setMicrophoneStream(session.audio.stream);
@@ -127,7 +148,7 @@ export default function Caller() {
           const nextState = message.state;
           if (!['ringing', 'in_call', 'ended'].includes(nextState)) return;
           setUsed(true);
-          if (message.customerLanguage) setLanguage(message.customerLanguage === 'fr' ? 'fr' : 'en');
+          if (message.customerLanguage) { setSpeechLanguage(message.customerLanguage); setLanguage(message.customerLanguage === 'fr' ? 'fr' : 'en'); }
           if (message.error) setError(message.error);
           if (nextState === 'ended') { finish('ended', message.error || ''); return; }
           stateRef.current = nextState;
@@ -151,8 +172,9 @@ export default function Caller() {
       socket.onclose = () => { if (!session.ended) finish('error', copyRef.current.disconnected); };
     } catch (failure) {
       if (session.ended) return;
-      const message = failure.name === 'NotAllowedError' ? language === 'fr' ? 'Autorisez le microphone dans votre navigateur, puis réessayez.' : 'Allow microphone access in your browser, then try again.' : failure.message;
-      finish('error', message, true);
+      const issue = microphoneIssue(failure, { secure: window.isSecureContext, supported: !!navigator.mediaDevices?.getUserMedia });
+      setPermissionProblem(issue);
+      finish('error', copyRef.current.micErrors[issue], true);
     }
   };
 
@@ -168,6 +190,11 @@ export default function Caller() {
     runtime.current?.audio?.setMuted(next);
     setMicrophoneMuted(next);
   };
+  const fullCallLink = `${location.origin}${location.pathname}#${encodeURIComponent(token)}`;
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(fullCallLink); setLinkNotice(copy.copiedLink); }
+    catch { setLinkNotice(copy.manualCopy); }
+  };
 
   const heading = state === 'ended' ? copy.ended : state === 'unavailable' || (state === 'error' && used) ? copy.unavailable : connected ? copy.live : state === 'ringing' ? copy.ringing : state === 'connecting' ? copy.connecting : copy.title;
   const body = state === 'ended' ? copy.endedBody : state === 'unavailable' || (state === 'error' && used) ? copy.newLink : connected ? playing ? copy.playing : phase !== 'listening' ? copy.translating : microphoneMuted ? copy.mutedByYou : deviceMuted ? copy.deviceMuted : copy.listening : state === 'ringing' ? copy.waiting : state === 'connecting' ? microphoneReady ? copy.waiting : copy.preparing : copy.intro;
@@ -180,8 +207,16 @@ export default function Caller() {
           audioContext={runtime.current?.audio?.context} active={microphoneLive || playing} height={56} label={playing ? copy.replyWaveform : copy.micWaveform} />
       </div>}
       {error && <div className="caller-error" role="alert">{error}</div>}
+      {connected && <p className="caller-speech-language"><Globe2 size={14} />{copy.speechLanguage}: <strong>{languageName(speechLanguage)}</strong></p>}
+      {state === 'connecting' && !microphoneReady && <p className="caller-permission-wait" role="status">{copy.permissionWaiting}</p>}
       {inProgress && audioState !== 'running' && audioState !== 'idle' && <div className="caller-audio-recovery"><p>{copy.audioHelp}</p><button className="button primary" onClick={resumeAudio}><Volume2 size={17} />{copy.audio}</button></div>}
       {!inProgress && !used && token && state !== 'ended' && <><motion.button className="button primary caller-call-button" onClick={start} whileTap={reducedMotion ? undefined : { scale: .98 }}><Phone size={19} />{state === 'error' ? copy.retry : copy.call}</motion.button><span className="caller-permission">{copy.allow}</span></>}
+      {!used && token && state !== 'ended' && <details className="caller-microphone-help" open={!!permissionProblem}>
+        <summary>{copy.permissionTitle}</summary><p>{copy.permissionOpen}</p><p>{copy.permissionSettings}</p>
+        <button type="button" className="button secondary" onClick={copyLink}><Copy size={15} />{copy.copyLink}</button>
+        <label className="field"><span>{copy.linkLabel}</span><input readOnly value={fullCallLink} onFocus={event => event.target.select()} /></label>
+        {linkNotice && <p role="status">{linkNotice}</p>}
+      </details>}
       {inProgress && <div className="caller-touch-controls">
         {microphoneReady && <motion.button type="button" className={`button secondary caller-mute-button ${microphoneMuted ? 'is-muted' : ''}`}
           style={{ minHeight: 48, minWidth: 48 }} aria-pressed={microphoneMuted} aria-label={microphoneMuted ? copy.unmute : copy.mute}
@@ -189,7 +224,7 @@ export default function Caller() {
           {microphoneMuted ? <MicOff size={19} /> : <Mic size={19} />}<span>{microphoneMuted ? copy.unmute : copy.mute}</span>
         </motion.button>}
         <motion.button className="button end-call caller-end-button" style={{ minHeight: 48, minWidth: 48 }}
-          onClick={() => finish('ended', '', true)} whileTap={reducedMotion ? undefined : { scale: .97 }}><PhoneOff size={17} />{copy.end}</motion.button>
+          onClick={() => finish(state === 'connecting' && !runtime.current?.socket ? 'ready' : 'ended', '', true)} whileTap={reducedMotion ? undefined : { scale: .97 }}><PhoneOff size={17} />{state === 'connecting' && !microphoneReady ? copy.cancel : copy.end}</motion.button>
       </div>}
       <div className="caller-headphone-note"><Headphones size={17} /><p>{copy.headset}</p></div>
     </main><footer className="caller-footer"><div><ShieldCheck size={15} /><p>{copy.privacy}</p></div><span>{copy.browser}</span></footer>

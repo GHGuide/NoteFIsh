@@ -21,7 +21,7 @@ async function fixture(t) {
   };
   const app = express();
   app.use(createSecurity(config), express.json());
-  app.use('/api', createApiRouter({ config, store, providers, calls: { snapshot: () => [] }, broadcast: () => {}, audioAvailable: true }));
+  app.use('/api', createApiRouter({ config, store, providers, calls: { applySettings: async () => {}, snapshot: () => [] }, broadcast: () => {}, audioAvailable: true }));
   app.use(errorHandler);
   const server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   const base = `http://127.0.0.1:${server.address().port}`;

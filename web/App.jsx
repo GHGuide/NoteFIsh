@@ -6,6 +6,7 @@ import { CallerAudio, recordingType } from './audio.js';
 import { languages, languageName } from '../server/languages.mjs';
 import Caller from './Caller.jsx';
 import AudioWaveform from './components/AudioWaveform.jsx';
+import RecordedAudio from './components/RecordedAudio.jsx';
 import { UiProvider, Dialog as Modal, ChoiceTabs, ActionMenu, Tooltip, RouteTransition } from './components/ui.jsx';
 import { motion } from 'motion/react';
 import conversationIllustration from './assets/undraw-audio-conversation.svg';
@@ -165,7 +166,7 @@ function WorkspaceApp() {
   }, [updateCall]);
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 5000); return () => clearTimeout(timer); }, [notice]);
   const saveSettings = async patch => {
-    try { const result = await api.settings({ ...data.settings, ...patch }); setData(current => ({ ...current, settings: result.settings || result })); return true; }
+    try { const result = await api.settings(patch); setData(current => ({ ...current, settings: result.settings || result })); return true; }
     catch (failure) { setError(failure.message); return false; }
   };
   const refreshVoices = async savedVoice => {
@@ -278,7 +279,6 @@ const VOICE_READING_SCRIPT = "Hello, it’s good to meet you. I’m here to list
 
 function Enroll({ data, navigate, setError, setNotice, refreshVoices, saveSettings, sharedDemo, trainingNotes }) {
   const [sample, setSample] = useState(null);
-  const [audioUrl, setAudioUrl] = useState('');
   const [name, setName] = useState('My voice');
   const [consent, setConsent] = useState(false);
   const [language, setLanguage] = useState('en');
@@ -292,19 +292,18 @@ function Enroll({ data, navigate, setError, setNotice, refreshVoices, saveSettin
   const capture = useCapture((blob, duration) => {
     if (duration < 10) { setError('Read for at least 10 seconds. Try reading the whole passage at your usual pace.'); return; }
     setSample({ blob, duration, name: `voice-recording.${blob.type.includes('mp4') ? 'm4a' : 'webm'}`, guided: true });
-    setAudioUrl(URL.createObjectURL(blob)); setTranscript(VOICE_READING_SCRIPT); setLanguage('en');
+    setTranscript(VOICE_READING_SCRIPT); setLanguage('en');
   });
-  useEffect(() => () => { if (audioUrl) URL.revokeObjectURL(audioUrl); }, [audioUrl]);
   useEffect(() => { if (capture.error) setError(capture.error); }, [capture.error]);
   useEffect(() => { if (sample) reviewHeading.current?.focus(); }, [sample]);
   const liveCall = data.calls.some(call => ['ringing', 'in_call'].includes(callState(call)));
   useEffect(() => { if (liveCall) capture.stop(true); }, [liveCall, capture.stop]);
-  const resetSample = () => { setSample(null); setAudioUrl(''); setConsent(false); };
+  const resetSample = () => { setSample(null); setConsent(false); };
   const upload = file => {
     if (!file) return;
     if (!/\.(wav|mp3|m4a|webm|ogg)$/i.test(file.name) && !['audio/wav', 'audio/x-wav', 'audio/mpeg', 'audio/mp4', 'audio/webm', 'audio/ogg'].includes(file.type)) { setError('Choose a WAV, MP3, M4A, WebM, or OGG recording.'); return; }
     if (file.size > 30 * 1024 * 1024) { setError('Choose a recording smaller than 30 MB.'); return; }
-    setSample({ blob: file, name: file.name }); setAudioUrl(URL.createObjectURL(file)); setTranscript(''); setConsent(false);
+    setSample({ blob: file, name: file.name }); setTranscript(''); setConsent(false);
   };
   const submit = async event => {
     event.preventDefault(); if (!sample || !consent || !name.trim() || busy || liveCall) return;
@@ -344,7 +343,7 @@ function Enroll({ data, navigate, setError, setNotice, refreshVoices, saveSettin
       </div>
     </section> : <form className="guided-review" onSubmit={submit}>
       <h2 ref={reviewHeading} tabIndex={-1}>Your recording</h2>
-      <div className="sample-ready"><AudioWaveform blob={sample.blob} height={48} label="Your recorded voice" /><audio controls src={audioUrl} aria-label="Listen to your recording" /><div className="sample-review-meta"><span>{sample.duration ? `${Math.round(sample.duration)} seconds` : sample.name}</span><button type="button" className="text-button" disabled={busy} onClick={resetSample}><RefreshCw size={14} />Record again</button></div></div>
+      <div className="sample-ready"><RecordedAudio blob={sample.blob} /><div className="sample-review-meta"><span>{sample.guided ? 'Microphone recording' : sample.name}</span><button type="button" className="text-button" disabled={busy} onClick={resetSample}><RefreshCw size={14} />Record again</button></div></div>
       <label className="field"><span>Voice name</span><input required maxLength={100} value={name} onChange={event => setName(event.target.value)} placeholder="e.g. Alex" disabled={busy} /></label>
       <details className="recording-options"><summary>Recording details <ChevronDown size={14} /></summary><div className="form-stack"><LanguageSelect label="Recording language" value={language} onChange={setLanguage} disabled={busy} /><label className="field"><span>Words in your recording <small>optional</small></span><textarea rows={4} maxLength={5000} value={transcript} onChange={event => setTranscript(event.target.value)} disabled={busy} /></label><p className="field-help">If you changed the passage, update the words here or leave this blank.</p></div></details>
       <label className="checkbox-label"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} disabled={busy} required /><span>This is my voice, or I have permission to clone it and use it for translated calls.</span></label>
@@ -365,6 +364,7 @@ function Desk({ data, navigate, setError, setNotice, saveSettings, updateCall, c
   const [busy, setBusy] = useState('');
   const [reply, setReply] = useState('');
   const [typed, setTyped] = useState(false);
+  const [languageSaving, setLanguageSaving] = useState(false);
   const [ticket, setTicket] = useState({ issue: '', address: '', dispatch: false });
   const [elapsed, setElapsed] = useState(0);
   const transcriptContainer = useRef(null);
@@ -379,7 +379,7 @@ function Desk({ data, navigate, setError, setNotice, saveSettings, updateCall, c
   const voice = readyVoices.find(item => item.id === data.settings.voiceId);
   const phase = currentCall?.phase || 'listening';
   const processing = active && !['listening', 'idle'].includes(phase);
-  const canTalk = active && !!voice && !busy && !processing && connection === 'connected';
+  const canTalk = active && !!voice && !busy && !languageSaving && !processing && connection === 'connected';
   const capture = useCapture(async (blob, duration) => {
     if (duration < .3) { setNotice('Hold a little longer to record your reply.'); return; }
     const call = activeRef.current;
@@ -435,6 +435,11 @@ function Desk({ data, navigate, setError, setNotice, saveSettings, updateCall, c
     catch (failure) { setError(failure.name === 'NotAllowedError' ? 'Allow microphone access in your browser, then create the call link again.' : failure.message); }
     finally { setInviteBusy(false); }
   };
+  const changePartnerLanguage = async customerLanguage => {
+    setLanguageSaving(true);
+    try { if (await saveSettings({ customerLanguage })) setNotice(`Partner language changed to ${languageName(customerLanguage)}. New phrases and replies use this language.`); }
+    finally { setLanguageSaving(false); }
+  };
   const copyInvitation = async () => { try { await navigator.clipboard.writeText(invitation.url); setNotice('Call link copied. Share it with the person calling you.'); } catch { setError('Select and copy the call link manually. Clipboard access is unavailable.'); } };
   const shareInvitation = async () => { try { await navigator.share({ title: 'NoteFIsh call', text: 'Open this link on your phone and tap Call.', url: invitation.url }); } catch (failure) { if (failure.name !== 'AbortError') setError(failure.message); } };
   const phaseLabel = capture.interrupted ? 'Microphone paused' : capture.recording ? 'Recording your reply' : capture.requesting ? 'Allow microphone access' : busy === 'reply' || processing ? phase === 'playing' ? 'Sending your voice reply' : currentCall?.stage === 'synthesizing' ? `Creating ${languageName(data.settings.customerLanguage)} speech` : currentCall?.stage === 'transcribing' ? 'Transcribing your reply' : 'Translating your reply' : active ? 'Listening to your partner' : ringing ? 'Your partner is calling' : 'Ready for a conversation';
@@ -447,7 +452,8 @@ function Desk({ data, navigate, setError, setNotice, saveSettings, updateCall, c
           <div className="mini-section-heading"><h2>Your voice</h2><button className="text-button" disabled={active || ringing} onClick={() => navigate('/voices')}><Library size={14} />Manage voices</button></div>
           <label className="field"><span className="sr-only">Voice for this call</span><div className="select-wrap"><AudioLines size={17} /><select aria-label="Voice for this call" value={data.settings.voiceId || ''} disabled={active || ringing || !!busy} onChange={event => action('settings', () => saveSettings({ voiceId: event.target.value || null }))}><option value="">Choose a voice</option>{readyVoices.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><ChevronDown size={14} /></div></label>
           <button className="text-button" disabled={active || ringing} onClick={() => navigate('/enroll')}><Plus size={14} />Record a new voice</button>
-          <div className="demo-language-pair"><LanguageSelect label="You speak" value={data.settings.agentLanguage} onChange={agentLanguage => action('settings', () => saveSettings({ agentLanguage }))} disabled={active || ringing || !!busy} /><LanguageSelect label="Partner speaks" value={data.settings.customerLanguage} onChange={customerLanguage => action('settings', () => saveSettings({ customerLanguage }))} disabled={active || ringing || !!busy} /></div>
+          <div className="demo-language-pair"><LanguageSelect label="You speak" value={data.settings.agentLanguage} onChange={agentLanguage => action('settings', () => saveSettings({ agentLanguage }))} disabled={active || ringing || !!busy} /><LanguageSelect label="Partner speaks" value={data.settings.customerLanguage} onChange={changePartnerLanguage} disabled={languageSaving || connection !== 'connected'} /></div>
+          {(active || ringing) && <p className="field-help" role="status">{languageSaving ? 'Changing language…' : 'Changes apply to new phrases and replies. A reply already underway finishes in its original language.'}</p>}
         </section>
         <section className={`demo-connect-panel ${ringing ? 'is-ringing' : ''}`} aria-label="Browser call link">
           {active || ringing ? <><div className="demo-call-identity"><span className="phone-icon">{ringing ? <PhoneCall size={22} /> : <Phone size={22} />}</span><div><span className="eyebrow">{ringing ? 'INCOMING CALL' : 'LIVE CALL'}</span><h2>{currentCall.from || 'Your partner'}</h2><p>{active ? formatDuration(elapsed) : 'Your partner is waiting.'}</p></div></div><div className="line-actions">{ringing ? <><button className="button secondary" disabled={!!busy} onClick={() => action('end', () => api.end(currentCall.id))}>Decline</button><button className="button answer" disabled={!!busy} onClick={() => action('answer', async () => { await enableAudio(); return api.answer(currentCall.id); })}>{busy === 'answer' ? <Spinner /> : <Phone size={17} />}Answer call</button></> : <button className="button end-call full-width" disabled={busy === 'end'} onClick={() => { capture.stop(true); clearAudio(); action('end', () => api.end(currentCall.id)); }}><PhoneOff size={17} />End call</button>}</div></> : <><h2>{currentCall ? 'Call ended. Transcript saved.' : 'Invite your partner'}</h2><p>{invitation && !inviteExpired ? 'Send this link to your partner. Keep this desk open and answer when it rings.' : 'Create a link. Your partner opens it on their phone and taps Call.'}</p>
@@ -467,7 +473,7 @@ function Desk({ data, navigate, setError, setNotice, saveSettings, updateCall, c
       <section className="captions-panel demo-transcript-panel" aria-label="Live transcript">
         <header className="panel-header"><div><h2>Live transcript</h2><span>{languageName(currentCall?.agentLanguage || data.settings.agentLanguage)} above · {languageName(currentCall?.customerLanguage || data.settings.customerLanguage)} below</span></div><span className={`caption-state ${active ? 'live' : ''}`}><span />{active ? capture.recording ? 'Recording reply' : processing ? 'Replying' : 'Listening' : ringing ? 'Incoming call' : currentCall ? 'Saved' : 'Waiting for call'}</span></header>
         <div className="transcript" ref={transcriptContainer} role="log" aria-label="Call transcript" aria-live="polite" aria-relevant="additions text" tabIndex={0} onScroll={event => { const el = event.currentTarget; followTranscript.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; if (followTranscript.current) setNewCaptions(false); }}>
-          {transcript.length ? transcript.map((line, index) => <article className={`transcript-line ${line.speaker === 'agent' ? 'agent' : 'customer'}`} key={line.id || index}><div className="transcript-meta"><span className="speaker-avatar">{line.speaker === 'agent' ? <AudioLines size={14} /> : <Phone size={13} />}</span><strong>{line.speaker === 'agent' ? 'You' : 'Partner'}</strong><time>{stamp(line.t || line.at)}</time>{line.delivery && line.delivery !== 'caption' && <span className={`delivery ${line.delivery}`}>{line.delivery === 'played' ? 'Played to caller' : line.delivery === 'pending' ? 'Sending' : line.delivery}</span>}</div><p>{line.speaker === 'agent' ? line.textSource : line.textShown}</p>{line.textSource !== line.textShown && <div className="source-text"><Globe2 size={12} /><span>{line.speaker === 'agent' ? line.textShown : line.textSource}</span></div>}</article>) : <div className="transcript-empty"><AudioLines size={34} strokeWidth={1} /><h3>{active ? 'Your partner can speak now.' : 'The conversation appears here.'}</h3><p>{active ? `Their ${languageName(data.settings.customerLanguage)} speech appears in ${languageName(data.settings.agentLanguage)} after each phrase.` : 'Share a call link and answer your partner. Follow their words here as you talk.'}</p><div className="language-chips"><span>{languageName(data.settings.customerLanguage)}</span><ArrowRight size={14} /><span>{languageName(data.settings.agentLanguage)}</span></div></div>}
+          {transcript.length ? transcript.map((line, index) => <article className={`transcript-line ${line.speaker === 'agent' ? 'agent' : 'customer'}`} key={line.id || index}><div className="transcript-meta"><span className="speaker-avatar">{line.speaker === 'agent' ? <AudioLines size={14} /> : <Phone size={13} />}</span><strong>{line.speaker === 'agent' ? 'You' : 'Partner'}</strong><time>{stamp(line.t || line.at)}</time>{line.delivery && line.delivery !== 'caption' && <span className={`delivery ${line.delivery}`}>{line.delivery === 'played' ? 'Played to caller' : line.delivery === 'pending' ? 'Sending' : line.delivery}</span>}</div><p>{line.speaker === 'agent' ? line.textSource : line.textShown}</p>{line.textSource !== line.textShown && <div className="source-text"><Globe2 size={12} /><span><span className="transcript-language">{languageName(line.speaker === 'agent' ? line.targetLang || currentCall.customerLanguage : line.sourceLang || currentCall.customerLanguage)}</span>{line.speaker === 'agent' ? line.textShown : line.textSource}</span></div>}</article>) : <div className="transcript-empty"><AudioLines size={34} strokeWidth={1} /><h3>{active ? 'Your partner can speak now.' : 'The conversation appears here.'}</h3><p>{active ? `Their ${languageName(data.settings.customerLanguage)} speech appears in ${languageName(data.settings.agentLanguage)} after each phrase.` : 'Share a call link and answer your partner. Follow their words here as you talk.'}</p><div className="language-chips"><span>{languageName(data.settings.customerLanguage)}</span><ArrowRight size={14} /><span>{languageName(data.settings.agentLanguage)}</span></div></div>}
         </div>
         {newCaptions && <button className="button secondary latest-captions" onClick={scrollToLatest}>New captions <ChevronDown size={14} /></button>}
         {currentCall?.error && <div className="call-error" role="alert">{currentCall.error}</div>}

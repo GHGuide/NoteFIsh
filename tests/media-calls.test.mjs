@@ -86,6 +86,32 @@ test('stopping a pending provider prevents stale audio and allows next reply', a
   assert.equal(f.service.snapshot()[0].phase, 'listening');
 });
 
+test('live language change flushes old speech under its original hint and preserves an in-flight reply', async t => {
+  let release;
+  const f = setup({ providers: { synthesize: () => new Promise(resolve => { release = resolve; }) } });
+  t.after(() => f.service.close());
+  const { call, ws } = await f.start(); await f.service.answer(call.id);
+  const media = payload => ws.message({ event: 'media', streamSid, media: { track: 'inbound', payload: payload.toString('base64') } });
+  for (let i = 0; i < 20; i++) media(Buffer.alloc(160, 0x80));
+  const settings = await f.store.update(state => { state.settings.customerLanguage = 'de'; return state.settings; });
+  await f.service.applySettings(settings); await delay(10);
+  assert.equal(f.service.snapshot()[0].customerLanguage, 'de');
+  assert.equal(f.service.snapshot()[0].transcript[0].sourceLang, 'fr', 'partial old phrase keeps French hint');
+  for (let i = 0; i < 20; i++) media(Buffer.alloc(160, 0x80));
+  for (let i = 0; i < 35; i++) media(Buffer.alloc(160, 0xff));
+  await delay(10);
+  assert.equal(f.service.snapshot()[0].transcript[1].sourceLang, 'de', 'next phrase uses German hint');
+  const speaking = f.service.say(call.id, { text: 'Already in progress' }); await delay(10);
+  const next = await f.store.update(state => { state.settings.customerLanguage = 'es'; return state.settings; });
+  await f.service.applySettings(next);
+  release(Buffer.alloc(200)); await speaking;
+  const latest = f.service.snapshot()[0];
+  assert.equal(latest.customerLanguage, 'es');
+  assert.equal(latest.transcript.at(-1).targetLang, 'de', 'reply already started keeps its selected target');
+  assert.equal(latest.phase, 'playing');
+  assert.equal(latest.state, 'in_call');
+});
+
 test('stream start is bound to registered account/call and rejects malformed frames', async t => {
   const f = setup(); t.after(() => f.service.close()); const { call, ws } = await f.start();
   const other = new Socket(); f.service.handleStream(other);

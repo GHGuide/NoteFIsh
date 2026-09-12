@@ -6,7 +6,7 @@ const BAR_COUNT = 48;
 const EMPTY = Array(BAR_COUNT).fill(0);
 
 /** Real microphone samples or a decoded recording. Never synthesizes activity. */
-export default function AudioWaveform({ stream, blob, audioElement, active = false,
+export default function AudioWaveform({ stream, blob, audioBuffer, audioElement, active = false,
   className = '', height = 52, label = 'Audio activity', audioContext, analyser: suppliedAnalyser }) {
   const reducedMotion = useReducedMotion();
   const [peaks, setPeaks] = useState(EMPTY);
@@ -17,7 +17,7 @@ export default function AudioWaveform({ stream, blob, audioElement, active = fal
 
   useEffect(() => {
     if ((!stream && !suppliedAnalyser) || !active) {
-      if (!blob) { setPeaks(EMPTY); setLevel(0); setStatus('idle'); }
+      if (!blob && !audioBuffer) { setPeaks(EMPTY); setLevel(0); setStatus('idle'); }
       return;
     }
     const Context = window.AudioContext || window.webkitAudioContext;
@@ -53,18 +53,20 @@ export default function AudioWaveform({ stream, blob, audioElement, active = fal
       try { source?.disconnect(); if (!suppliedAnalyser) analyser?.disconnect(); } catch {}
       if (owned) context?.close().catch(() => {});
     };
-  }, [stream, active, audioContext, suppliedAnalyser, reducedMotion, blob]);
+  }, [stream, active, audioContext, suppliedAnalyser, reducedMotion, blob, audioBuffer]);
 
   useEffect(() => {
-    if (!blob || ((stream || suppliedAnalyser) && active)) return;
+    if ((!blob && !audioBuffer) || ((stream || suppliedAnalyser) && active)) return;
     let disposed = false;
     setStatus('decoding'); setPeaks(EMPTY); setLevel(0);
     void (async () => {
-      if (!(blob instanceof Blob) || blob.size > 30 * 1024 * 1024) throw new Error('Invalid recording');
-      const Context = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-      if (!Context) throw new Error('Waveform unavailable');
-      const context = new Context(1, 1, 16000);
-      const decoded = await context.decodeAudioData(await blob.arrayBuffer());
+      let decoded = audioBuffer;
+      if (!decoded) {
+        if (!(blob instanceof Blob) || blob.size > 30 * 1024 * 1024) throw new Error('Invalid recording');
+        const Context = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+        if (!Context) throw new Error('Waveform unavailable');
+        decoded = await new Context(1, 1, 16000).decodeAudioData(await blob.arrayBuffer());
+      }
       if (disposed) return;
       if (!Number.isFinite(decoded.duration) || decoded.duration > 120) throw new Error('Recording is too long');
       const channels = Array.from({ length: Math.min(decoded.numberOfChannels, 2) }, (_, index) => audioPeaks(decoded.getChannelData(index), BAR_COUNT));
@@ -72,22 +74,22 @@ export default function AudioWaveform({ stream, blob, audioElement, active = fal
       setPeaks(waveform); setLevel(0); setStatus('recorded');
     })().catch(() => { if (!disposed) { setPeaks(EMPTY); setStatus('unavailable'); } });
     return () => { disposed = true; };
-  }, [blob, stream, suppliedAnalyser, active]);
+  }, [blob, audioBuffer, stream, suppliedAnalyser, active]);
 
   useEffect(() => {
     if (!audioElement?.addEventListener) { setProgress(0); return; }
     const update = () => setProgress(Number.isFinite(audioElement.duration) && audioElement.duration > 0
       ? Math.min(1, Math.max(0, audioElement.currentTime / audioElement.duration)) : 0);
-    for (const event of ['timeupdate', 'seeking', 'loadedmetadata', 'emptied', 'ended']) audioElement.addEventListener(event, update);
+    for (const event of ['timeupdate', 'seeking', 'durationchange', 'loadedmetadata', 'emptied', 'ended']) audioElement.addEventListener(event, update);
     update();
-    return () => { for (const event of ['timeupdate', 'seeking', 'loadedmetadata', 'emptied', 'ended']) audioElement.removeEventListener(event, update); };
+    return () => { for (const event of ['timeupdate', 'seeking', 'durationchange', 'loadedmetadata', 'emptied', 'ended']) audioElement.removeEventListener(event, update); };
   }, [audioElement]);
 
   const measured = active && status === 'live';
   const accessibleLabel = status === 'unavailable' ? `${label}. Visual preview unavailable.`
     : measured ? `${label}. Live audio signal.` : status === 'recorded' ? `${label}. Recorded audio waveform.` : `${label}. No live audio displayed.`;
   return <motion.div className={`audio-waveform ${measured ? 'is-live' : ''} ${status === 'recorded' ? 'is-recorded' : ''} ${className}`}
-    data-audio-state={status} data-audio-level={measured ? Math.round(level * 100) : 0}
+    data-audio-state={status} data-audio-progress={progress} data-audio-level={measured ? Math.round(level * 100) : 0}
     initial={reducedMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reducedMotion ? 0 : .18 }}>
     <svg viewBox={`0 0 480 ${displayHeight}`} width="100%" height={displayHeight} role="img" aria-label={accessibleLabel} preserveAspectRatio="none">
       {peaks.map((peak, index) => {
@@ -96,7 +98,7 @@ export default function AudioWaveform({ stream, blob, audioElement, active = fal
         const amplitude = Math.min(1, peak * 2.4);
         const barHeight = Math.max(2, amplitude * (displayHeight - 8));
         return <rect key={index} x={index * 10 + 2.5} y={(displayHeight - barHeight) / 2} width="5" height={barHeight}
-          rx="2.5" fill="currentColor" opacity={status === 'recorded' && progress > 0 && index / BAR_COUNT > progress ? .32 : peak < .008 ? .28 : 1} />;
+          rx="2.5" fill="currentColor" opacity={status === 'recorded' && audioElement && index / BAR_COUNT >= progress ? .32 : peak < .008 ? .28 : 1} />;
       })}
     </svg>
   </motion.div>;

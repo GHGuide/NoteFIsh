@@ -178,13 +178,27 @@ export function createCallService({
       }
       return;
     }
-    const settings = store.snapshot().settings;
+    const settings = runtime.call;
     if (!languageCodes.has(settings.customerLanguage) || !languageCodes.has(settings.agentLanguage)) {
       warn(runtime, 'Choose supported call languages before continuing captions.'); return;
     }
-    runtime.call.customerLanguage = settings.customerLanguage; runtime.call.agentLanguage = settings.agentLanguage;
     runtime.captionQueue.push({ audio, sourceLanguage: settings.customerLanguage, targetLanguage: settings.agentLanguage });
     void drainCaptions(runtime);
+  }
+
+  async function applySettings(settings) {
+    if (!languageCodes.has(settings.customerLanguage) || !languageCodes.has(settings.agentLanguage)) throw new CallError('Choose supported call languages.', 400);
+    const pending = [];
+    for (const runtime of live.values()) {
+      if (runtime.call.state === 'ended' || (runtime.call.customerLanguage === settings.customerLanguage && runtime.call.agentLanguage === settings.agentLanguage)) continue;
+      // Finish the current phrase with its original language hint. Already queued
+      // captions and an in-flight reply keep their own captured language pair.
+      if (runtime.call.state === 'in_call') queueCaption(runtime, runtime.segmenter.flush());
+      runtime.call.customerLanguage = settings.customerLanguage;
+      runtime.call.agentLanguage = settings.agentLanguage;
+      pending.push(persist(runtime));
+    }
+    await Promise.all(pending);
   }
 
   async function createInboundCall({ callSid, from, to, transport }) {
@@ -474,7 +488,7 @@ export function createCallService({
   async function close() {
     await Promise.all([...live.values()].map(runtime => backgroundFinish(runtime, 'The server is shutting down.', true)));
   }
-  return { initialize, snapshot, registerInbound, registerBrowserInbound, handleStatus, handleStream, handleBrowserStream, answer, end, stop, update, close,
+  return { initialize, snapshot, registerInbound, registerBrowserInbound, handleStatus, handleStream, handleBrowserStream, answer, end, stop, update, close, applySettings,
     ptt: (id, { buffer, mimetype }) => reply(id, { buffer, mimetype }),
     say: (id, { text }) => reply(id, { text }),
   };

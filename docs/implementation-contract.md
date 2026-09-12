@@ -50,3 +50,11 @@ Optional Twilio transport: `/twilio/incoming` returns `<Connect><Stream>` pointi
 ## Success evidence
 
 Build/tests/UI are intermediate evidence. Finish requires a real phone browser opening an HTTPS link and calling a laptop: ringing, answer, audible real caller microphone at the desk, English captions, real English agent microphone reply heard in the selected approved Fish voice in French on the phone, end call, and retained transcript. Same-machine tabs, mock providers, generated test input, or successful build/container checks are intermediate evidence only.
+
+## Live language changes and microphone recovery — 12 Sep 2026
+
+Settings updates immediately synchronize the active call's language pair and notify its caller through the existing sanitized state message. A partial caller phrase is flushed under its previous language hint; queued captions and a reply already underway keep the pair captured when they started. Future phrases and replies use the new pair. Transcript rows preserve sourceLang/targetLang independently of the current call defaults.
+
+Caller startup requests microphone access within the Call tap, with a 30-second preparation timeout and cancellation that releases late-arriving streams. AudioContext activation cannot indefinitely block a granted microphone. If sound remains suspended, the existing explicit Enable audio control resumes it. Denied/missing/busy/unsupported microphone states have separate guidance and full-link copying; the site does not grant browser or OS permission itself.
+
+Browser references: [getUserMedia permission and pending requests](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia), [WebKit embedded-browser capture requirements](https://webkit.org/blog/11353/mediarecorder-api/).

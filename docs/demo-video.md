@@ -26,3 +26,11 @@ The reading passage for voice creation is deliberately visible above the recorde
 A person must confirm the partner’s actual microphone is heard at the desk, English captions reflect the spoken French, the actual held English reply becomes French audio heard on the phone, and hangup retains the transcript. A played acknowledgment means the browser completed playback; it does not establish that a person heard it through their chosen output device.
 
 Prerecorded audio, simulated call protocols, provider-generated previews, and passing automated tests are intermediate checks. Do not present them as a physical two-person conversation or proof of personal clone fidelity. If a call link expires or has already been used, create a new one. A phone that pauses browser audio offers an Enable audio recovery control.
+
+## Microphone and language checks
+
+If the phone cannot grant microphone access, open the full invitation link directly in Safari or Chrome. The caller page includes microphone help, a copyable full link, a retry button, and a cancel button while requesting access. Allow Microphone for the site and, if needed, for the browser in the phone settings. A request with no response now times out after 30 seconds; before the caller connects, the same unused invitation can be retried. Audio activation is separate from microphone permission, with an Enable audio button if the browser suspends playback.
+
+During a call, change **Partner speaks** on the desk. The caller sees the updated call language without hanging up. New phrases and replies use that language; a reply already being generated or played finishes in its original language. Saved transcript rows retain their own language labels.
+
+The recording preview uses the decoded audio duration, rather than the elapsed recording timer. Its seek slider, elapsed/total time, and waveform progress share the same audio element. The original sample is still sent to Fish when creating a voice.

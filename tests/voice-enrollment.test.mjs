@@ -49,7 +49,7 @@ async function fixture(t) {
     store = await createStore(dataPath);
     const app = express();
     app.use(createSecurity(config), express.json());
-    app.use('/api', createApiRouter({ config, store, providers, calls: { snapshot: () => store.snapshot().calls }, broadcast: () => {}, audioAvailable: true }));
+    app.use('/api', createApiRouter({ config, store, providers, calls: { applySettings: async () => {}, snapshot: () => store.snapshot().calls }, broadcast: () => {}, audioAvailable: true }));
     app.use(errorHandler);
     server = await new Promise(resolve => { const listening = app.listen(0, '127.0.0.1', () => resolve(listening)); });
     base = `http://127.0.0.1:${server.address().port}`;
