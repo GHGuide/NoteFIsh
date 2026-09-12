@@ -661,6 +661,8 @@ input::placeholder, textarea::placeholder { color: #726C62; opacity: 1; }
 .demo-call-identity p { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .demo-call-identity .eyebrow { font-size: 9px; }
 .demo-connect-panel .line-actions > .button { flex: 1; }
+.desk-mute-button { min-height: 44px; }
+.desk-mute-button.is-muted { background: #FBECE9; border-color: #C4796B; color: #8C3023; }
 .demo-share-link { display: grid; gap: 9px; }
 .demo-share-link input { font-size: 11px; }
 .demo-link-secondary { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10px; color: var(--muted); }

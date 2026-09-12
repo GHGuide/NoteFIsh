@@ -29,6 +29,8 @@ Prerecorded audio, simulated call protocols, provider-generated previews, and pa
 
 ## Microphone and language checks
 
+During a call, **Mute** beside **End call** on the desk disables microphone replies and discards a recording in progress. **Unmute** enables hold-to-speak again. You still hear the caller and receive captions while muted; typed replies remain available. A reply already submitted continues unless you use Cancel reply / Stop playback. The caller has a separate microphone mute button on their phone.
+
 If the phone cannot grant microphone access, open the full invitation link directly in Safari or Chrome. The caller page includes microphone help, a copyable full link, a retry button, and a cancel button while requesting access. Allow Microphone for the site and, if needed, for the browser in the phone settings. A request with no response now times out after 30 seconds; before the caller connects, the same unused invitation can be retried. Audio activation is separate from microphone permission, with an Enable audio button if the browser suspends playback.
 
 During a call, change **Partner speaks** on the desk. The caller sees the updated call language without hanging up. New phrases and replies use that language; a reply already being generated or played finishes in its original language. Saved transcript rows retain their own language labels.

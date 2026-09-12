@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Activity, Archive, ArrowDownToLine, ArrowLeft, ArrowRight, AudioLines, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Copy, ExternalLink, FileAudio, Globe2, Headphones, Library, Link2, Loader2, Menu, Maximize2, Minimize2, Mic, MoreHorizontal, Phone, PhoneCall, PhoneOff, Play, Plus, Radio, RefreshCw, Search, Send, Settings2, Share2, ShieldCheck, Smartphone, Sparkles, Square, Trash2, Upload, Volume2, X } from 'lucide-react';
+import { Activity, Archive, ArrowDownToLine, ArrowLeft, ArrowRight, AudioLines, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Copy, ExternalLink, FileAudio, Globe2, Headphones, Library, Link2, Loader2, Menu, Maximize2, Minimize2, Mic, MicOff, MoreHorizontal, Phone, PhoneCall, PhoneOff, Play, Plus, Radio, RefreshCw, Search, Send, Settings2, Share2, ShieldCheck, Smartphone, Sparkles, Square, Trash2, Upload, Volume2, X } from 'lucide-react';
 import { api } from './api.js';
 import { mergeTrainingStatus, monitorVoiceTraining } from './voice-training.js';
 import { CallerAudio, recordingType } from './audio.js';
@@ -29,16 +29,20 @@ function useCapture(onFinish, maximumSeconds = 90) {
   const [captureError, setCaptureError] = useState('');
   const capture = useRef(null);
   const wanted = useRef(false);
+  const captureAttempt = useRef(0);
   const done = useRef(onFinish);
   done.current = onFinish;
   const stop = useCallback((cancel = false) => {
     wanted.current = false;
+    captureAttempt.current++;
+    setRequesting(false);
     const current = capture.current;
     if (current) { current.cancelled ||= cancel; if (current.recorder.state !== 'inactive') current.recorder.stop(); }
   }, []);
   const start = useCallback(async () => {
     if (wanted.current || capture.current) return;
     wanted.current = true;
+    const attempt = ++captureAttempt.current;
     setRequesting(true);
     setCaptureError('');
     setInterrupted(false);
@@ -47,7 +51,7 @@ function useCapture(onFinish, maximumSeconds = 90) {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('Microphone recording requires HTTPS or localhost. Upload a recording, or open the secure website.');
       const mimeType = recordingType();
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
-      if (!wanted.current) { stream.getTracks().forEach(track => track.stop()); return; }
+      if (!wanted.current || attempt !== captureAttempt.current) { stream.getTracks().forEach(track => track.stop()); return; }
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       const chunks = [];
       const current = { recorder, stream, cancelled: false, startedAt: Date.now() };
@@ -78,8 +82,8 @@ function useCapture(onFinish, maximumSeconds = 90) {
       recorder.start(200);
       setSeconds(0);
       setRecording(true);
-    } catch (error) { wanted.current = false; stream?.getTracks().forEach(track => track.stop()); if (capture.current?.stream === stream) capture.current = null; setRecording(false); setStream(null); throw error; }
-    finally { setRequesting(false); }
+    } catch (error) { stream?.getTracks().forEach(track => track.stop()); if (attempt !== captureAttempt.current) return; wanted.current = false; if (capture.current?.stream === stream) capture.current = null; setRecording(false); setStream(null); throw error; }
+    finally { if (attempt === captureAttempt.current) setRequesting(false); }
   }, []);
   useEffect(() => {
     if (!recording) return;
@@ -364,6 +368,8 @@ function Desk({ data, navigate, setError, setNotice, saveSettings, updateCall, c
   const [busy, setBusy] = useState('');
   const [reply, setReply] = useState('');
   const [typed, setTyped] = useState(false);
+  const [microphoneMuted, setMicrophoneMuted] = useState(false);
+  const microphoneMutedRef = useRef(false);
   const [languageSaving, setLanguageSaving] = useState(false);
   const [ticket, setTicket] = useState({ issue: '', address: '', dispatch: false });
   const [elapsed, setElapsed] = useState(0);
@@ -381,6 +387,7 @@ function Desk({ data, navigate, setError, setNotice, saveSettings, updateCall, c
   const processing = active && !['listening', 'idle'].includes(phase);
   const canTalk = active && !!voice && !busy && !languageSaving && !processing && connection === 'connected';
   const capture = useCapture(async (blob, duration) => {
+    if (microphoneMutedRef.current) return;
     if (duration < .3) { setNotice('Hold a little longer to record your reply.'); return; }
     const call = activeRef.current;
     if (callState(call) !== 'in_call') return;
@@ -390,6 +397,7 @@ function Desk({ data, navigate, setError, setNotice, saveSettings, updateCall, c
     finally { setBusy(''); }
   }, 45);
   useEffect(() => { if (capture.error) setError(capture.error); }, [capture.error]);
+  useEffect(() => { microphoneMutedRef.current = false; setMicrophoneMuted(false); }, [active, currentCall?.id]);
   useEffect(() => { setTicket({ issue: currentCall?.ticket?.issue || '', address: currentCall?.ticket?.address || '', dispatch: needsDispatch(currentCall?.ticket?.dispatch) }); }, [currentCall?.id]);
   useEffect(() => {
     if (!active) { setElapsed(0); capture.stop(true); clearAudio(); return; }
@@ -404,7 +412,13 @@ function Desk({ data, navigate, setError, setNotice, saveSettings, updateCall, c
   useEffect(() => { if (liveCall) { setSelectedCallId(liveCall.id); setInvitation(null); } }, [liveCall?.id]);
   useEffect(() => { setAudioMuted(capture.recording || capture.requesting || processing || busy === 'reply'); return () => setAudioMuted(false); }, [capture.recording, capture.requesting, processing, busy]);
   useEffect(() => { if (!invitation) return; const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, [invitation]);
-  const startTalk = useCallback(() => { if (canTalk) { clearAudio(); capture.start().catch(failure => setError(failure.message)); } }, [canTalk, capture.start]);
+  const startTalk = useCallback(() => { if (canTalk && !microphoneMutedRef.current) { clearAudio(); capture.start().catch(failure => setError(failure.message)); } }, [canTalk, capture.start]);
+  const toggleMicrophone = () => {
+    const muted = !microphoneMutedRef.current;
+    microphoneMutedRef.current = muted;
+    if (muted) { pointerHeld.current = false; capture.stop(true); }
+    setMicrophoneMuted(muted);
+  };
   useEffect(() => {
     const down = event => {
       if (event.key === 'Escape') { capture.stop(true); return; }
@@ -456,15 +470,15 @@ function Desk({ data, navigate, setError, setNotice, saveSettings, updateCall, c
           {(active || ringing) && <p className="field-help" role="status">{languageSaving ? 'Changing language…' : 'Changes apply to new phrases and replies. A reply already underway finishes in its original language.'}</p>}
         </section>
         <section className={`demo-connect-panel ${ringing ? 'is-ringing' : ''}`} aria-label="Browser call link">
-          {active || ringing ? <><div className="demo-call-identity"><span className="phone-icon">{ringing ? <PhoneCall size={22} /> : <Phone size={22} />}</span><div><span className="eyebrow">{ringing ? 'INCOMING CALL' : 'LIVE CALL'}</span><h2>{currentCall.from || 'Your partner'}</h2><p>{active ? formatDuration(elapsed) : 'Your partner is waiting.'}</p></div></div><div className="line-actions">{ringing ? <><button className="button secondary" disabled={!!busy} onClick={() => action('end', () => api.end(currentCall.id))}>Decline</button><button className="button answer" disabled={!!busy} onClick={() => action('answer', async () => { await enableAudio(); return api.answer(currentCall.id); })}>{busy === 'answer' ? <Spinner /> : <Phone size={17} />}Answer call</button></> : <button className="button end-call full-width" disabled={busy === 'end'} onClick={() => { capture.stop(true); clearAudio(); action('end', () => api.end(currentCall.id)); }}><PhoneOff size={17} />End call</button>}</div></> : <><h2>{currentCall ? 'Call ended. Transcript saved.' : 'Invite your partner'}</h2><p>{invitation && !inviteExpired ? 'Send this link to your partner. Keep this desk open and answer when it rings.' : 'Create a link. Your partner opens it on their phone and taps Call.'}</p>
+          {active || ringing ? <><div className="demo-call-identity"><span className="phone-icon">{ringing ? <PhoneCall size={22} /> : <Phone size={22} />}</span><div><span className="eyebrow">{ringing ? 'INCOMING CALL' : 'LIVE CALL'}</span><h2>{currentCall.from || 'Your partner'}</h2><p>{active ? formatDuration(elapsed) : 'Your partner is waiting.'}</p></div></div><div className="line-actions">{ringing ? <><button className="button secondary" disabled={!!busy} onClick={() => action('end', () => api.end(currentCall.id))}>Decline</button><button className="button answer" disabled={!!busy} onClick={() => action('answer', async () => { await enableAudio(); return api.answer(currentCall.id); })}>{busy === 'answer' ? <Spinner /> : <Phone size={17} />}Answer call</button></> : <><button type="button" className={`button secondary desk-mute-button ${microphoneMuted ? 'is-muted' : ''}`} aria-pressed={microphoneMuted} aria-label={microphoneMuted ? 'Unmute microphone' : 'Mute microphone'} onClick={toggleMicrophone}>{microphoneMuted ? <MicOff size={17} /> : <Mic size={17} />}{microphoneMuted ? 'Unmute' : 'Mute'}</button><button className="button end-call" disabled={busy === 'end'} onClick={() => { capture.stop(true); clearAudio(); action('end', () => api.end(currentCall.id)); }}><PhoneOff size={17} />End call</button></>}</div></> : <><h2>{currentCall ? 'Call ended. Transcript saved.' : 'Invite your partner'}</h2><p>{invitation && !inviteExpired ? 'Send this link to your partner. Keep this desk open and answer when it rings.' : 'Create a link. Your partner opens it on their phone and taps Call.'}</p>
           {invitation && !inviteExpired ? <div className="demo-share-link"><label className="field"><span className="sr-only">Caller invitation link</span><input readOnly aria-label="Caller invitation link" value={invitation.url} onFocus={event => event.target.select()} /></label><button className="button primary full-width" onClick={copyInvitation}><Copy size={16} />Copy call link</button><div className="demo-link-secondary"><span>One use · Expires {stamp(invitation.expiresAt)}</span>{typeof navigator.share === 'function' && <button className="text-button" onClick={shareInvitation}><Share2 size={14} />Share</button>}</div><button className="text-button" disabled={!browserReady || inviteBusy} onClick={createInvitation}>Create a new link</button></div> : <><button className="button primary full-width" disabled={!browserReady || inviteBusy} onClick={createInvitation}>{inviteBusy ? <Spinner /> : <Link2 size={17} />}{inviteBusy ? 'Preparing your call…' : 'Create call link'}</button>{inviteExpired && <p className="call-link-help">Your previous link expired. Create a fresh one.</p>}</>}
           {!browserReady && <p className="call-link-help">{!voice ? 'Select a ready voice to start, or record your own above.' : connection !== 'connected' ? 'Reconnecting to the desk…' : data.setup?.blockers?.[0] || 'Finishing call setup…'}</p>}</>}
           {!audioReady && (active || ringing) && <button className="text-button" disabled={busy === 'audio'} onClick={() => action('audio', enableAudio)}><Volume2 size={15} />Enable sound</button>}
         </section>
         <section className={`talk-panel demo-talk-panel ${capture.recording ? 'recording' : ''}`} aria-label="Speak to your partner">
-          <div className="talk-info"><div><h3 role="status">{phaseLabel}</h3><p>{capture.recording ? `${formatDuration(capture.seconds)} · Release to send. Esc to cancel.` : active ? `Hold to speak ${languageName(data.settings.agentLanguage)}. Release to send ${languageName(data.settings.customerLanguage)}.` : 'Once connected, hold the button to speak. Release to send your translated voice.'}</p></div></div>
+          <div className="talk-info"><div><h3 role="status">{active && microphoneMuted && !processing && busy !== 'reply' ? 'Your microphone is muted' : phaseLabel}</h3><p>{active && microphoneMuted ? 'You can still hear your partner. Unmute to record a reply, or type one below.' : capture.recording ? `${formatDuration(capture.seconds)} · Release to send. Esc to cancel.` : active ? `Hold to speak ${languageName(data.settings.agentLanguage)}. Release to send ${languageName(data.settings.customerLanguage)}.` : 'Once connected, hold the button to speak. Release to send your translated voice.'}</p></div></div>
           {capture.recording && <AudioWaveform stream={capture.stream} active={!capture.interrupted} height={34} label="Your microphone level" />}
-          <div className="talk-actions">{processing || busy === 'reply' ? <button className="button secondary full-width" onClick={() => action('stop', () => api.stop(currentCall.id))} disabled={busy === 'stop'}><Square size={15} />{phase === 'playing' ? 'Stop playback' : 'Cancel reply'}</button> : <button className={`ptt-button ${capture.recording ? 'pressed' : ''}`} data-ptt="true" disabled={!canTalk && !capture.recording && !capture.requesting} onPointerDown={event => { if (event.button !== 0) return; event.preventDefault(); pointerHeld.current = true; event.currentTarget.setPointerCapture(event.pointerId); startTalk(); }} onPointerUp={() => { pointerHeld.current = false; capture.stop(); }} onPointerCancel={() => { pointerHeld.current = false; capture.stop(true); }} onLostPointerCapture={() => { if (pointerHeld.current) { pointerHeld.current = false; capture.stop(true); } }}><Mic size={20} />{capture.recording ? 'Release to send' : 'Hold to speak'}<kbd>space</kbd></button>}
+          <div className="talk-actions">{processing || busy === 'reply' ? <button className="button secondary full-width" onClick={() => action('stop', () => api.stop(currentCall.id))} disabled={busy === 'stop'}><Square size={15} />{phase === 'playing' ? 'Stop playback' : 'Cancel reply'}</button> : <button className={`ptt-button ${capture.recording ? 'pressed' : ''}`} data-ptt="true" disabled={microphoneMuted || (!canTalk && !capture.recording && !capture.requesting)} onPointerDown={event => { if (event.button !== 0) return; event.preventDefault(); pointerHeld.current = true; event.currentTarget.setPointerCapture(event.pointerId); startTalk(); }} onPointerUp={() => { pointerHeld.current = false; capture.stop(); }} onPointerCancel={() => { pointerHeld.current = false; capture.stop(true); }} onLostPointerCapture={() => { if (pointerHeld.current) { pointerHeld.current = false; capture.stop(true); } }}><>{microphoneMuted ? <MicOff size={20} /> : <Mic size={20} />}</>{microphoneMuted ? 'Microphone muted' : capture.recording ? 'Release to send' : 'Hold to speak'}<kbd>space</kbd></button>}
           <button className="text-button" onClick={() => setTyped(!typed)} aria-expanded={typed}>{typed ? 'Hide typed reply' : 'Type a reply'}<ChevronDown size={13} /></button></div>
           {typed && <form className="typed-reply" onSubmit={event => { event.preventDefault(); if (!reply.trim() || !canTalk) return; action('reply', async () => { const result = await api.say(currentCall.id, reply.trim()); setReply(''); return result; }); }}><label className="field"><span>Reply in {languageName(data.settings.agentLanguage)}</span><textarea rows={3} maxLength={3000} value={reply} onChange={event => setReply(event.target.value)} placeholder="What would you like to say?" /></label><button className="button primary" disabled={!canTalk || !reply.trim()}><Send size={15} />Translate & speak</button></form>}
         </section>
