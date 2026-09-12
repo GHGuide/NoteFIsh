@@ -32,13 +32,19 @@ Open `http://127.0.0.1:3001`. For frontend development, run `npm run dev` and `n
 | `/admin` | Demo setup, language/voice settings, and integration readiness |
 | `/caller` | Invitation-only phone calling, microphone, translated playback, and end call |
 
-Generate a private caller link in the desk and open it on the phone. Hold Space records the agent's reply. Release submits it for transcription, translation, Fish synthesis, and playback on the phone. Only generated Fish speech reaches the caller. The desk receives the caller's original microphone audio and translated captions over a separate authenticated connection.
+Generate a caller invitation in the desk and open it on the phone. Hold Space records the agent's reply. Release submits it for transcription, translation, Fish synthesis, and playback on the phone. Only generated Fish speech reaches the caller. The desk receives the caller's original microphone audio and translated captions over a separate desk connection.
+
+## Create and keep your voice
+
+Open **Create voice** from the sidebar or call desk. Give the voice a name, then record a clear 15–30-second sample or upload an audio file. Confirm that it is your voice or that you have the speaker's permission, then choose **Create voice**. Fish processes the sample and the named voice is saved in the library; training status continues updating when you switch pages. Once ready, preview it and choose **Use at call desk**. You can rename it later, and the library and selected voice survive service restarts.
+
+The current no-login demo is a **shared workspace**. Everyone who can open the site can access its voice library, settings, and saved calls. Fish models are created with private provider visibility, but this does not make the demo's library private to an individual visitor.
 
 ## Deploy
 
 Use [the complete Render deployment guide](docs/render-deployment.md), [Dockerfile](Dockerfile), and [Render Blueprint](render.yaml).
 
-One Docker web service includes Node and FFmpeg, serves the built website/API/WebSockets on Render's `PORT`, listens on `0.0.0.0`, and stores state on a persistent disk at **`/var/data`**. Workspace access requires the `desk` login. The caller page uses a short-lived invitation instead of sharing that password. Provider keys belong in Render Environment, never frontend code or build arguments.
+One Docker web service includes Node and FFmpeg, serves the built website/API/WebSockets on Render's `PORT`, listens on `0.0.0.0`, and stores state on a persistent disk at **`/var/data`**. The Docker demo sets `NOTEFISH_PUBLIC_DEMO=true` to open the workspace without a sign-in popup. Set it to `false` in Render Environment to restore the `desk` login using the existing password. The caller page still uses a short-lived invitation. Provider keys belong in Render Environment, never frontend code or build arguments.
 
 ## Verification
 

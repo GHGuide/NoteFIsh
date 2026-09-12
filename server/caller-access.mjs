@@ -16,7 +16,7 @@ export function createCallerAccess(config, { now = Date.now, lifetimeMs = 10 * 6
   const prune = () => { for (const invitation of invitations) if (invitation.expires <= now()) invitations.delete(invitation); };
   return {
     issue() {
-      if (!config.publicBaseUrl || !config.deskPassword) throw new CallerAccessError('Configure the public HTTPS address and desk password before creating a caller link.', 503);
+      if (!config.publicBaseUrl || (!config.deskPassword && !config.publicDemo)) throw new CallerAccessError('Configure the public HTTPS address and workspace access before creating a caller link.', 503);
       prune();
       if (invitations.size >= 8) throw new CallerAccessError('There are already eight active caller links. Use an existing link or wait ten minutes.', 429);
       // Existing Node randomUUID supplies independent cryptographically random IDs;

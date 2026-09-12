@@ -23,7 +23,7 @@ Read `finalidea.md` and `docs/hold-project.md` before changing anything.
 - Clone only enrolled / licensed `reference_id`s. Never clone callers or coworkers from the live line.
 - OpenAI = words. Fish = who it sounds like. Browser audio = current demo transport. Twilio remains an optional future phone-number transport.
 - If you drop Fish, you sound like every Twilio demo. Do not drop Fish.
-- Pages: `/voices` (library), `/enroll` (create), `/desk` (call), `/admin` (setup), and `/caller` (phone caller). The user explicitly approved the caller page and browser-call demo without Twilio. Caller access is scoped to an expiring invitation and must not expose desk APIs or transcripts.
+- Pages: `/voices` (library), `/enroll` (create), `/desk` (call), `/admin` (setup), and `/caller` (phone caller). The user explicitly approved the caller page and browser-call demo without Twilio. Caller transport is scoped to an expiring invitation; its UI/socket must not load or broadcast desk APIs or transcripts. The temporary shared workspace is separately public by user request.
 - Done means: a real phone browser calls a laptop, rings/answers, caller microphone is audible at the desk with translated captions, a real agent microphone reply is heard in the selected Fish voice on the phone, end works, transcript persists. Synthetic audio and same-laptop tabs are intermediate checks only.
 
 ## How to work
@@ -37,5 +37,5 @@ Read `finalidea.md` and `docs/hold-project.md` before changing anything.
 - First demo: English-speaking agent, French-speaking caller. Keep other supported languages selectable.
 - One Render Docker web service; Node 22+, FFmpeg, built frontend + API + WebSockets on the same server.
 - Read `docs/implementation-contract.md` and `docs/render-deployment.md` for the current topology and deployment. They supersede the earlier unverified conference/SDK sketch.
-- Server uses Render's `PORT`, listens on `0.0.0.0`, persists state under `DATA_DIR=/var/data`, and requires login on public access. Keys stay server-side in ignored local files or Render environment variables.
+- Server uses Render's `PORT`, listens on `0.0.0.0`, and persists state under `DATA_DIR=/var/data`. The user explicitly requested a temporary shared demo without sign-in. `NOTEFISH_PUBLIC_DEMO=true` opts the Render image into public workspace/API/desk access; absent/false keeps protected mode, and a Render environment override of false restores the existing login. Anyone with the site URL can use this shared library and desk. Keys stay server-side; Origin checks, caller invitations, upload limits and voice permission checks remain enabled.
 - Provider checks and container tests are bounded evidence. Do not mark the goal complete without the actual phone conversation.

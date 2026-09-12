@@ -44,7 +44,7 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     try { await handler(req, res); } catch (error) { next(error); } finally { activeExpensive--; }
   };
   const stateEvent = () => broadcast({ type: 'snapshot', calls: calls.snapshot(), settings: store.snapshot().settings });
-  router.get('/session', (req, res) => res.json({ authenticated: true, loginRequired: false, method: !config.production && isLocalRequest(req) ? 'local' : 'basic' }));
+  router.get('/session', (req, res) => res.json({ authenticated: !config.publicDemo, loginRequired: false, method: config.publicDemo ? 'shared-demo' : !config.production && isLocalRequest(req) ? 'local' : 'basic' }));
   router.post('/caller-invitations', (req, res) => {
     if (req.body !== undefined) allowed(req.body, []);
     res.status(201).json(callerAccess.issue());

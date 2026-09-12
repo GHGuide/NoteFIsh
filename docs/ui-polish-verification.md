@@ -1,10 +1,10 @@
 # UI polish verification
 
-Verified on 12 September 2026. This receipt covers the NoteFIsh interface update and its regression checks; it is not a complete live-call acceptance result.
+Verified on 12 September 2026. This receipt covers the NoteFIsh interface update and its regression checks; it is not a complete live-call acceptance result. The original release checks below predate the later, explicitly requested shared-demo access change.
 
 ## Changes
 
-The voice library, enrollment, call desk, setup and invitation-only caller share the updated visual style. Radix composition, Motion transitions, local unDraw SVGs and Lucide icons provide the interface. Microphone and playback waveforms use real audio samples. Voice imports still require a licensed or enrolled reference and explicit permission. Call transport, server authentication and transcript persistence contracts are unchanged.
+The voice library, enrollment, call desk, setup and invitation-only caller share the updated visual style. Radix composition, Motion transitions, local unDraw SVGs and Lucide icons provide the interface. Microphone and playback waveforms use real audio samples. Voice imports still require a licensed or enrolled reference and explicit permission. That original visual release preserved call transport, server authentication and transcript persistence.
 
 ## Verified
 
@@ -15,6 +15,17 @@ The voice library, enrollment, call desk, setup and invitation-only caller share
 - The approved stock licensed Kyoko voice produced a real Fish French preview. The final browser preview completed: duration 3.082375 seconds, currentTime equalled duration, the native audio element reached its ended state, and readyState was 4. The recorded waveform showed 39 of 48 bars above the silent baseline; the modal Close control remained visible while scrolling. English agent / French caller remains the demo pair. This does not attest ownership of, or permission for, any personal voice.
 
 Screenshots and provider/container receipts are kept in the ignored `data/evidence/` directory. Third-party sources and notices are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Shared-demo and voice-creation follow-up
+
+The user subsequently requested removal of the sign-in popup and direct access to creating and naming a voice. The Docker demo now explicitly enables shared access with `NOTEFISH_PUBLIC_DEMO=true`; setting it to false restores the existing password gate. The interface labels the shared library, links directly from the desk to creation/library pages, and keeps checking training status across page navigation. Creation success shows the saved name and provides preview and desk-selection actions when ready.
+
+- Backend and enrollment regression checks pass, including anonymous workspace/desk WebSocket access, rejected cross-origin changes, and unchanged caller invitation checks. Missing audio or consent returns a validation error before a provider call.
+- Multipart enrollment tests cover chosen name, training, readiness, selection, and persistence after reopening the HTTP server and store. These tests use a provider fixture, not a new personal Fish clone.
+- The updated Docker smoke passes in both protected and shared modes, including no `WWW-Authenticate` challenge in shared mode, FFmpeg, non-root startup, and persistent settings.
+- The existing Fish multipart creation fields were checked against the current [official voice-cloning documentation](https://docs.fish.audio/features/voice-cloning). No personal voice was created without a supplied sample and the speaker's permission.
+
+The live deployment and browser checks for this follow-up are recorded separately under ignored `data/evidence/` release receipts. They do not replace the physical-device acceptance test below.
 
 ## Still unverified
 

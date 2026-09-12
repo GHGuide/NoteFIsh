@@ -2,6 +2,8 @@
 
 First demo: the agent speaks **English**, the caller speaks **French**. One Docker web service serves the website, HTTP API, and WebSocket endpoints. The caller opens a private link on their phone; the agent answers in the laptop desk. Fish speaks the translated replies; OpenAI transcribes/translates. Twilio is not required for this demo.
 
+The user requested a temporary shared demo without sign-in. The Docker image explicitly opts in with `NOTEFISH_PUBLIC_DEMO=true`. Anyone with the website URL can access the shared voice library, create/name voices with permission, change settings, and use the desk. Keys stay on the server. To restore login, set the Render environment variable `NOTEFISH_PUBLIC_DEMO=false`; the existing desk password remains available. No infrastructure, disk, billing or account schema changes are needed.
+
 ## Files
 
 - `Dockerfile`: builds the website and includes Node 22+, production dependencies, and FFmpeg.
@@ -40,7 +42,8 @@ Set secrets in Render's Environment page, never in Git, the Dockerfile, frontend
 | `HOST` | `0.0.0.0` |
 | `PORT` | Supplied by Render; server reads it directly |
 | `DATA_DIR` | `/var/data` |
-| `NOTEFISH_DESK_PASSWORD` | A unique random password, at least 16 characters; browser login username is `desk` |
+| `NOTEFISH_PUBLIC_DEMO` | `true` for the approved shared demo; `false` restores protected access. Source defaults to false; Docker/Blueprint explicitly opt in. |
+| `NOTEFISH_DESK_PASSWORD` | Existing unique password retained for protected mode, at least 16 characters; username `desk`. Not required to open shared-demo mode. |
 | `FISH_API_KEY` | Your Fish Audio API key |
 | `OPENAI_API_KEY` | Your OpenAI API key |
 | `TWILIO_ACCOUNT_SID` | Optional future phone-number transport; leave unset for browser demo |
@@ -53,15 +56,15 @@ Set secrets in Render's Environment page, never in Git, the Dockerfile, frontend
 
 `RENDER_EXTERNAL_URL` is supplied by Render and is used when `PUBLIC_BASE_URL` is unset. If you add a custom domain, set `PUBLIC_BASE_URL` to that HTTPS origin. Invitation links and origin validation use this URL.
 
-Browser readiness requires Fish, OpenAI, FFmpeg, login, a public HTTPS URL, and an approved selected voice. Twilio configuration does not block this demo. Presence of keys is not verification of a real conversation. No `VITE_*` key variables are used.
+Browser readiness requires Fish, OpenAI, FFmpeg, a public HTTPS URL, an approved selected voice, and a configured access mode. Protected mode additionally requires the desk password. Twilio configuration does not block this demo. Presence of keys is not verification of a real conversation. No `VITE_*` key variables are used. Same-origin checks, caller invitation verification, bounded uploads/audio requests, and voice permission checks apply in both modes.
 
 ## Deployment steps
 
 1. Put the source in a private Git repository that Render can access. Keep `.env`, `data/`, and credentials excluded.
 2. In Render, choose **New → Blueprint** and select the repository to use `render.yaml`. Alternatively create a **Web Service**, choose **Docker**, and enter the service settings above.
-3. Set `NOTEFISH_DESK_PASSWORD`, `FISH_API_KEY`, and `OPENAI_API_KEY` in Render's secret environment fields. Leave Twilio variables unset. Confirm the paid service and disk cost before creation.
+3. Set `FISH_API_KEY` and `OPENAI_API_KEY` in Render's secret environment fields. Retain `NOTEFISH_DESK_PASSWORD` to allow restoring protected mode. Leave Twilio variables unset. Confirm the paid service and disk cost before creating a new service.
 4. Deploy the service. Docker builds the website and starts one Node server with FFmpeg. No separate static site, Redis, or database service is needed for this single-agent demo.
-5. Open `/desk` at the Render HTTPS URL. Login username is **`desk`** with your configured password. `/healthz` and the caller shell are public; desk data and management APIs require login.
+5. Open `/voices` or `/desk` at the Render HTTPS URL. The approved shared demo opens directly. If `NOTEFISH_PUBLIC_DEMO=false`, the workspace/API/desk socket require login with username **`desk`** and the configured password. `/healthz` and the caller shell remain public in either mode; the caller connection still requires an invitation.
 6. Open **Create voice**, record/upload your own or licensed speech with permission, and wait for Fish readiness. Alternatively import an approved Fish voice from your account. Preview it in French and select **Use for calls**.
 7. Set agent language **English** and caller language **French** in the desk. Enable desk audio. Generate a new caller invitation and copy its complete link, including the `#` fragment.
 8. Open that link in Safari or Chrome on a real phone. Tap **Call** and allow microphone access. Keep the page in the foreground. The invitation expires after ten minutes and is consumed by one call; create a new link for another call.
@@ -94,12 +97,13 @@ docker build -t notefish:demo .
 npm run test:docker
 ```
 
-The container check uses a temporary password and temporary Docker volume, without real API keys. It checks a non-default `PORT`, login, FFmpeg, the application process user, and persistence across container replacement. It cleans up its temporary resources and writes a redacted receipt under `data/evidence/`. It does not call a person or verify real provider audio.
+The container check uses a temporary password and temporary Docker volume, without real API keys. It checks a non-default `PORT`, protected mode, shared-demo access without a login challenge, FFmpeg, the application process user, and persistence across container replacement. It cleans up its temporary resources and writes a redacted receipt under `data/evidence/`. It does not call a person or verify real provider audio.
 
 ## Troubleshooting
 
 - **No port detected:** confirm `HOST=0.0.0.0`, preserve the image command, and use Render's `PORT`.
-- **Startup refuses public access:** set a `NOTEFISH_DESK_PASSWORD` with at least 16 characters.
+- **Startup refuses access:** protected mode needs a `NOTEFISH_DESK_PASSWORD` of at least 16 characters; shared mode needs the explicit `NOTEFISH_PUBLIC_DEMO=true` and a valid public HTTPS origin.
+- **Unexpected sign-in prompt:** inspect `/api/status` access mode or the Render `NOTEFISH_PUBLIC_DEMO` override. The approved shared demo uses true; false deliberately restores login.
 - **Caller cannot connect:** generate a fresh invitation, copy the complete fragment, and use the configured HTTPS origin. An invitation is single-use and expires after ten minutes.
 - **Data disappears:** attach the disk at `/var/data` and set `DATA_DIR=/var/data`; an ordinary container directory is ephemeral.
 - **French speech fails:** inspect the page's provider error, refresh the selected voice, and preview it before calling. Confirm the account permits the selected Fish model and OpenAI models.

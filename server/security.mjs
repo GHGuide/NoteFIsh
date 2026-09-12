@@ -32,6 +32,12 @@ export function isAuthenticated(req, config) {
   return constantTimeEqual(credentials.slice(0, colon), 'desk') && constantTimeEqual(credentials.slice(colon + 1), config.deskPassword);
 }
 
+// Shared demo access is an explicit deployment choice. It grants workspace
+// access without pretending that an anonymous visitor authenticated.
+export function canAccessDesk(req, config) {
+  return (config.publicDemo === true && Boolean(config.publicBaseUrl)) || isAuthenticated(req, config);
+}
+
 export function validOrigin(req, config) {
   const value = req.headers.origin;
   if (typeof value !== 'string' || value.length > 2048) return false;
@@ -63,7 +69,7 @@ export function createSecurity(config) {
     const ip = req.socket.remoteAddress || 'unknown';
     const attempt = attempts.get(ip);
     if (attempt?.until > now && attempt.count >= 20) return res.status(429).json({ error: 'Too many sign-in attempts. Try again in one minute.', code: 'AUTH_RATE_LIMIT' });
-    if (!isAuthenticated(req, config)) {
+    if (!canAccessDesk(req, config)) {
       if (attempt?.until > now) attempt.count++; else attempts.set(ip, { count: 1, until: now + 60_000 });
       if (!config.deskPassword || !config.publicBaseUrl) return res.status(503).json({ error: 'Public desk access requires PUBLIC_BASE_URL and NOTEFISH_DESK_PASSWORD on the server.', code: 'PUBLIC_ACCESS_UNCONFIGURED' });
       res.set('WWW-Authenticate', 'Basic realm="NoteFIsh desk", charset="UTF-8"');

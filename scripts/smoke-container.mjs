@@ -77,11 +77,22 @@ async function startContainer(name, envFile) {
   throw new Error('The container did not become healthy within the startup window.');
 }
 
-async function verifyRuntime(name, base) {
+async function verifyRuntime(name, base, { sharedDemo = false } = {}) {
   let response = await request(base, '/healthz');
   check(response.status === 200, 'Health endpoint returns 200.'); await response.body?.cancel();
   response = await request(base, '/api/settings');
-  check(response.status === 401, 'Anonymous settings requests are denied with 401.'); await response.body?.cancel();
+  check(response.status === (sharedDemo ? 200 : 401), sharedDemo ? 'Shared-demo settings open without credentials.' : 'Protected-mode anonymous settings requests are denied with 401.');
+  if (sharedDemo) check(!response.headers.has('www-authenticate'), 'Shared demo does not send a browser login challenge.');
+  await response.body?.cancel();
+  if (sharedDemo) {
+    response = await request(base, '/api/session');
+    check(response.status === 200 && (await response.json()).method === 'shared-demo', 'Session reports shared-demo access.');
+    for (const route of ['/', '/voices', '/enroll', '/desk']) {
+      response = await request(base, route);
+      check(response.status === 200 && !response.headers.has('www-authenticate'), `Shared demo opens ${route} without a login challenge.`);
+      await response.body?.cancel();
+    }
+  }
   response = await request(base, '/api/settings', { authenticated: true });
   check(response.status === 200, 'Authenticated settings requests return 200.');
   const { settings } = await response.json();
@@ -114,12 +125,14 @@ async function main() {
   try { metadata = JSON.parse(metadataRaw); } catch { throw new Error('Docker returned invalid image metadata.'); }
   check(Array.isArray(metadata) && metadata.every(entry => typeof entry === 'string' && !secretKeys.has(entry.split('=', 1)[0])),
     'Image environment contains no provider credentials or desk password.');
+  check(metadata.includes('NOTEFISH_PUBLIC_DEMO=true'), 'Image explicitly opts into the approved temporary shared demo.');
   temporaryDirectory = await mkdtemp(path.join(tmpdir(), `${prefix}-`));
   const envFile = path.join(temporaryDirectory, 'smoke.env');
-  await writeFile(envFile, [
+  const environment = [
     'NODE_ENV=production', 'HOST=0.0.0.0', 'PORT=18080', 'DATA_DIR=/var/data',
-    `PUBLIC_BASE_URL=${publicOrigin}`, `NOTEFISH_DESK_PASSWORD=${password}`, '',
-  ].join('\n'), { mode: 0o600, flag: 'wx' });
+    `PUBLIC_BASE_URL=${publicOrigin}`, `NOTEFISH_DESK_PASSWORD=${password}`,
+  ];
+  await writeFile(envFile, [...environment, 'NOTEFISH_PUBLIC_DEMO=false', ''].join('\n'), { mode: 0o600, flag: 'wx' });
   volumeCreated = true;
   await docker(['volume', 'create', volume], 'The temporary Docker volume could not be created.');
   const firstBase = await startContainer(names[0], envFile);
@@ -127,8 +140,9 @@ async function main() {
   const changed = await request(firstBase, '/api/settings', { authenticated: true, method: 'PUT', body: { ...settings, queueName } });
   check(changed.status === 200, 'An authenticated same-origin settings update succeeds.'); await changed.body?.cancel();
   await docker(['rm', '--force', names[0]], 'The first smoke container could not be removed.'); containers.delete(names[0]);
+  await writeFile(envFile, [...environment, 'NOTEFISH_PUBLIC_DEMO=true', ''].join('\n'), { mode: 0o600 });
   const restartedBase = await startContainer(names[1], envFile);
-  const restored = await verifyRuntime(names[1], restartedBase);
+  const restored = await verifyRuntime(names[1], restartedBase, { sharedDemo: true });
   check(restored.queueName === queueName, 'Queue settings survive container recreation on the same persistent volume.');
   report.success = true;
 }

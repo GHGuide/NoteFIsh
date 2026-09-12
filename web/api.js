@@ -19,7 +19,7 @@ export const api = {
   importVoice: (body) => request('/voices/import', { method: 'POST', body: JSON.stringify(body) }),
   editVoice: (id, body) => request(`/voices/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) }),
   archiveVoice: (id) => request(`/voices/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ archived: true }) }),
-  refreshVoice: (id) => request(`/voices/${encodeURIComponent(id)}/refresh`, { method: 'POST' }),
+  refreshVoice: (id, options = {}) => request(`/voices/${encodeURIComponent(id)}/refresh`, { method: 'POST', signal: options.signal }),
   previewVoice: (id, body) => request(`/voices/${encodeURIComponent(id)}/preview`, { method: 'POST', body: JSON.stringify(body), audio: true }),
   settings: (body) => request('/settings', { method: 'PUT', body: JSON.stringify(body) }),
   setup: () => request('/status'),

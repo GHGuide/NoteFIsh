@@ -2,7 +2,7 @@
 
 > **Latest demo direction — 12 Sep 2026:** The user explicitly approved a browser caller page and removed Twilio from the first demo. A real phone opens an invitation link, taps Call, and speaks French; a laptop desk answers, hears the caller, and displays English captions. Holding/releasing the agent microphone produces French Fish speech in the selected approved voice. Ending retains the transcript. This supersedes older “customer never uses the site” and mandatory Twilio passages below. See the current implementation contract and Render deployment guide.
 
-> **Current implementation update — 12 Sep 2026:** The user now requests a Fish Audio-style voice library with cloning, previews, editing, archiving, and voice selection, alongside the call desk. Routes are `/voices`, `/enroll`, `/desk`, and `/admin`. First phone demo: English agent ↔ French caller. Deployment is one Render Docker service with FFmpeg, login, and persistent storage. The implementation uses a bidirectional caller stream plus a separate browser audio connection, not the earlier speculative SDK/conference combination. See [implementation contract](implementation-contract.md) and [Render deployment](render-deployment.md) for the current contract. Older “desk only,” three-route, and SDK/conference passages below describe the earlier concept and are superseded by this update.
+> **Current implementation update — 12 Sep 2026:** The user now requests a Fish Audio-style voice library with cloning, previews, editing, archiving, and voice selection, alongside the call desk. Routes are `/voices`, `/enroll`, `/desk`, and `/admin`. First phone demo: English agent ↔ French caller. Deployment is one Render Docker service with FFmpeg and persistent storage. The user now explicitly requests a temporary shared workspace without sign-in: NOTEFISH_PUBLIC_DEMO=true enables public library, voice creation and desk access; false restores the retained desk login. Keys, voice-permission checks and caller invitation verification stay server-side. The implementation uses a bidirectional caller stream plus a separate browser audio connection, not the earlier speculative SDK/conference combination. See [implementation contract](implementation-contract.md) and [Render deployment](render-deployment.md) for the current contract. Older “desk only,” three-route, and SDK/conference passages below describe the earlier concept and are superseded by this update.
 
 
 **Canonical vision:** [`../finalidea.md`](../finalidea.md)  
@@ -262,7 +262,7 @@ web/             # SPA: /desk /admin /enroll
 
 **Twilio capability token** is minted by `voice/` for the logged-in agent. The JS SDK uses that token to Answer.
 
-Auth for v1 can be a single shared desk password or Twilio-recommended identity per agent. Do not build SSO as the first milestone.
+The current user-approved demo uses explicit shared access without sign-in. Protected mode remains available with the retained desk password by setting NOTEFISH_PUBLIC_DEMO=false. Do not build SSO as the first milestone.
 
 Persistence: SQLite is enough (tickets, voices, queue map). Postgres later.
 

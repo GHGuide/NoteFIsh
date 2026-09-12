@@ -211,12 +211,19 @@ input::placeholder, textarea::placeholder { color: #726C62; opacity: 1; }
 .checkbox-label input { accent-color: #242424; width: 17px; height: 17px; flex-shrink: 0; margin: 2px 0 0; cursor: pointer; }
 .consent-section { display: grid; gap: 20px; }
 .creation-success { min-height: 540px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 20px; max-width: 560px; margin: 0 auto; }
-.creation-success h1 { font: 400 43px/1.15 var(--serif); letter-spacing: -1px; }
+.creation-success h1 { font: 400 43px/1.15 var(--serif); letter-spacing: -1px; overflow-wrap: anywhere; max-width: 100%; }
 .creation-success p { color: var(--muted); max-width: 460px; }
-.success-actions { display: flex; gap: 10px; margin-top: 8px; }
+.success-actions { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; justify-content: center; }
+.success-links { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+.shared-demo-note, .creation-success .shared-demo-note { color: var(--muted); font-size: 11px; line-height: 1.6; }
+.voice-card .voice-training-note, .creation-success .voice-training-note { font-size: 11px; color: var(--muted); line-height: 1.5; }
 /* The desk keeps the transcript and talk control stable while call state changes. */
 .desk-connection { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); white-space: nowrap; }
-.desk-settings { display: grid; grid-template-columns: minmax(180px,1.25fr) minmax(130px,1fr) 24px minmax(130px,1fr); gap: 18px; align-items: end; padding: 23px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.desk-settings { display: grid; grid-template-columns: minmax(180px,1.25fr) minmax(130px,1fr) 24px minmax(130px,1fr); gap: 18px; align-items: start; padding: 23px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.desk-voice-field { min-width: 0; }
+.desk-voice-actions { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+.desk-voice-actions .text-button { font-size: 11px; }
+.desk-settings .language-direction { margin-top: 26px; }
 .language-direction { display: grid; place-items: center; height: 44px; color: var(--muted); }
 .desk-advice { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; padding: 12px 4px; }
 .desk-advice .text-button { margin-left: auto; white-space: nowrap; }

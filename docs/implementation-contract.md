@@ -6,12 +6,15 @@
 
 Node 22+ ESM, local Express on 127.0.0.1:3001, Vite dev on 5173; built site served by Express from dist. Render binds 0.0.0.0 on process.env.PORT and persists under DATA_DIR=/var/data. Local state is in gitignored data/. Provider keys server-side only. Audio conversion uses ffmpeg. First demo defaults to English agent and French caller.
 
+Latest access update: the user explicitly requests no sign-in for the temporary shared demo. The deployed Docker image sets `NOTEFISH_PUBLIC_DEMO=true`; anyone with the site URL can create/name voices, use the shared library, and access the desk. The source defaults to protected mode, and a Render environment value of `NOTEFISH_PUBLIC_DEMO=false` restores the existing desk password. This is a shared workspace, not separate private user accounts.
+
 ## Browser API (JSON except audio/multipart)
 
 All API errors: `{error: string, code?: string}`. Server may add fields; retain these names for client compatibility.
 
-- Workspace/API/desk WebSocket: HTTP Basic login, username `desk`, password from `NOTEFISH_DESK_PASSWORD`. Strict local-only access can be passwordless for development. Public `/caller` serves only the caller shell; a single-use capability authorizes a caller connection. API keys never reach either browser.
-- GET /api/status -> `{providers:{fish:{configured},openai:{configured},twilio:{configured}}, phoneNumber, publicUrl, webhookUrl, streamUrl, ready, blockers: string[], model}`. Configured does not mean verified.
+- Workspace/API/desk WebSocket: shared access without a Basic challenge when `NOTEFISH_PUBLIC_DEMO=true`. Otherwise HTTP Basic login uses username `desk` and `NOTEFISH_DESK_PASSWORD`; strict local-only development can be passwordless. Mutations and desk/caller WebSockets still require an allowed Origin. Public `/caller` serves the caller shell, and a single-use capability authorizes caller transport. API keys never reach either browser.
+- GET /api/session -> `{authenticated,loginRequired:false,method:'shared-demo'|'basic'|'local'}` after the access gate. Shared demo visitors are not represented as authenticated users.
+- GET /api/status -> `{providers:{fish:{configured},openai:{configured},twilio:{configured}}, access:{mode:'shared-demo'|'protected',loginRequired}, phoneNumber, publicUrl, webhookUrl, streamUrl, ready, blockers: string[], model}`. Configured does not mean verified.
 - GET /api/voices?archived=true -> `{voices: Voice[]}` (include archived when requested).
 - POST /api/voices/clone multipart: `audio` file, `name`, `description`, `transcript`, `language`, `consent=true` -> `{voice}`. Min 3s audio, recommend 15-30s, max 30MB and bounded duration.
 - POST /api/voices/import `{referenceId,name,description,language,consent:true}` -> `{voice}`. Only enrolled/licensed voices, verified model lookup; user attestation required.
@@ -20,7 +23,7 @@ All API errors: `{error: string, code?: string}`. Server may add fields; retain 
 - POST /api/voices/:id/preview `{text,language}` -> audio/mpeg (or audio/wav).
 - GET /api/settings -> `{settings:{voiceId,agentLanguage,customerLanguage,queueName}}`.
 - PUT /api/settings same settings object -> `{settings}`.
-- POST /api/caller-invitations -> `{url,expiresAt}`. Authenticated desk issues a ten-minute, single-use caller link with the token in its fragment. Up to eight outstanding links; no token in logs, API query strings, persisted calls, or desk broadcasts.
+- POST /api/caller-invitations -> `{url,expiresAt}`. A same-origin workspace visitor issues a ten-minute, single-use caller link with the token in its fragment. Protected mode also requires desk login. Up to eight outstanding links; no token in logs, API query strings, persisted calls, or desk broadcasts.
 - GET /api/calls -> `{calls: Call[]}`.
 - POST /api/calls/:id/answer -> `{call}`.
 - POST /api/calls/:id/end -> `{call}`.
@@ -34,7 +37,7 @@ Call: `{id,callSid,transport:'browser'|'twilio',from,state:'ringing'|'in_call'|'
 
 ## WebSockets and audio
 
-Authenticated browser /ws/desk: server JSON `{type:'snapshot',calls:[...],settings:{...}}`, `{type:'call',call}`, `{type:'audio',callId,payload}` (base64 mulaw 8k mono from caller, browser decodes/plays after user gesture), `{type:'error',error}`. No agent raw audio can enter the Twilio socket. Optional `{type:'ping'}` heartbeat.
+Same-origin browser /ws/desk, subject to the configured workspace access mode: server JSON `{type:'snapshot',calls:[...],settings:{...}}`, `{type:'call',call}`, `{type:'audio',callId,payload}` (base64 mulaw 8k mono from caller, browser decodes/plays after user gesture), `{type:'error',error}`. No agent raw audio can enter the Twilio socket. Optional `{type:'ping'}` heartbeat.
 
 Public caller `/ws/caller`: same-origin, first JSON message `{type:'join',token}` within a short deadline. Consume an unexpired invitation and create one ringing call. Caller then sends binary signed PCM16LE, mono16kHz, chunks up to3200bytes (100ms). The server converts caller audio for desk playback and uses original16k audio for OpenAI transcription/translation. No microphone audio is forwarded before Answer or during translated reply playback.
 

@@ -11,7 +11,7 @@ import { loadConfig } from './config.mjs';
 import { createStore } from './store.mjs';
 import { createProviders } from './providers.mjs';
 import { createCallService } from './calls.mjs';
-import { createSecurity, securityHeaders, isAuthenticated, validOrigin, validateTwilio } from './security.mjs';
+import { createSecurity, securityHeaders, canAccessDesk, validOrigin, validateTwilio } from './security.mjs';
 import { createApiRouter, createTwilioRouter, errorHandler } from './routes.mjs';
 import { createCallerAccess, CallerAccessError } from './caller-access.mjs';
 
@@ -44,8 +44,8 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
   app.get('/healthz', (req, res) => res.json({ status: 'ok' }));
   let hasBuild = false;
   try { await access(path.join(config.distPath, 'index.html')); hasBuild = true; } catch { /* Dev uses Vite on localhost. */ }
-  // The caller can load only its page and public build assets without desk login.
-  // No API, voice list, ticket, transcript, or provider configuration is public.
+  // Caller transport stays invitation-scoped. Workspace access below follows
+  // the explicit protected/shared-demo deployment mode.
   if (hasBuild) {
     app.get('/caller', (req, res) => res.sendFile(path.join(config.distPath, 'index.html')));
     app.use('/assets', express.static(path.join(config.distPath, 'assets'), { dotfiles: 'deny', index: false, fallthrough: false }));
@@ -70,7 +70,7 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
   const denyUpgrade = (socket, status = 403) => { socket.write(`HTTP/1.1 ${status} Forbidden\r\nConnection: close\r\n\r\n`); socket.destroy(); };
   server.on('upgrade', (req, socket, head) => {
     if (req.url === '/ws/desk') {
-      if (!isAuthenticated(req, config) || !validOrigin(req, config)) return denyUpgrade(socket);
+      if (!canAccessDesk(req, config) || !validOrigin(req, config)) return denyUpgrade(socket);
       if (clients.size >= 5) return denyUpgrade(socket, 429);
       deskWss.handleUpgrade(req, socket, head, ws => deskWss.emit('connection', ws, req));
     } else if (req.url === '/ws/caller') {

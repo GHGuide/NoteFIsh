@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import twilio from 'twilio';
 import { loadConfig, getStatus } from '../server/config.mjs';
-import { isLocalRequest, isAuthenticated, validOrigin, validateTwilio } from '../server/security.mjs';
+import { isLocalRequest, isAuthenticated, canAccessDesk, validOrigin, validateTwilio } from '../server/security.mjs';
 
 const config = loadConfig({ NOTEFISH_DESK_PASSWORD: 'test-only-password-12345', PUBLIC_BASE_URL: 'https://example.test', TWILIO_AUTH_TOKEN: 'test-only-auth-token' });
 const req = (headers = {}, remoteAddress = '127.0.0.1') => ({ headers: { host: 'localhost:3001', ...headers }, socket: { remoteAddress } });
@@ -21,6 +21,24 @@ test('public HTTP Basic validates the complete password and fails closed when co
   assert.equal(isAuthenticated(req({ host: 'example.test', authorization: credentials(`${config.deskPassword}x`) }), config), false);
   assert.equal(isAuthenticated(req({ host: 'example.test', authorization: credentials(config.deskPassword) }), { ...config, publicBaseUrl: '' }), false);
   assert.equal(isAuthenticated(req({ host: 'example.test', authorization: 'Basic !!!' }), config), false);
+});
+
+test('shared demo access requires explicit validated opt-in and can be returned to protected mode', () => {
+  const request = req({ host: 'example.test' }, '203.0.113.1');
+  assert.equal(canAccessDesk(request, config), false);
+  const demo = loadConfig({ NODE_ENV: 'production', NOTEFISH_PUBLIC_DEMO: 'true', PUBLIC_BASE_URL: 'https://example.test' });
+  assert.equal(demo.publicDemo, true);
+  assert.equal(canAccessDesk(request, demo), true);
+  assert.equal(isAuthenticated(request, demo), false);
+  assert.equal(canAccessDesk(request, { ...demo, publicBaseUrl: '' }), false);
+  assert.equal(canAccessDesk(request, { ...demo, publicDemo: 'true' }), false);
+  const protectedConfig = loadConfig({ NODE_ENV: 'production', NOTEFISH_PUBLIC_DEMO: 'false', PUBLIC_BASE_URL: 'https://example.test', NOTEFISH_DESK_PASSWORD: config.deskPassword });
+  assert.equal(canAccessDesk(request, protectedConfig), false);
+  for (const value of ['1', 'TRUE', 'yes']) assert.throws(() => loadConfig({ NOTEFISH_PUBLIC_DEMO: value }), /Invalid NOTEFISH_PUBLIC_DEMO/);
+  assert.throws(() => loadConfig({ NOTEFISH_PUBLIC_DEMO: 'true' }), /PUBLIC_BASE_URL/);
+  const status = getStatus(demo, { audioAvailable: true });
+  assert.deepEqual(status.access, { mode: 'shared-demo', loginRequired: false });
+  assert.equal(status.missing.includes('NOTEFISH_DESK_PASSWORD'), false);
 });
 
 test('Origin checks reject cross-site commands and accept same-origin or local development', () => {

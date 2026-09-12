@@ -21,8 +21,12 @@ export function loadConfig(env = process.env, root = process.cwd()) {
     if (url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash || url.port) throw new Error('PUBLIC_BASE_URL must be an HTTPS origin without credentials, a path, or a custom port');
   }
   const deskPassword = read('NOTEFISH_DESK_PASSWORD', 256);
+  const publicDemoValue = read('NOTEFISH_PUBLIC_DEMO', 5);
+  if (!['', 'true', 'false'].includes(publicDemoValue)) throw new Error('Invalid NOTEFISH_PUBLIC_DEMO');
+  const publicDemo = publicDemoValue === 'true';
+  if (publicDemo && !publicBaseUrl) throw new Error('PUBLIC_BASE_URL is required for NOTEFISH_PUBLIC_DEMO');
   if (deskPassword && deskPassword.length < 16) throw new Error('NOTEFISH_DESK_PASSWORD must contain at least 16 characters');
-  if (!['127.0.0.1', '::1'].includes(host) && !deskPassword) throw new Error('NOTEFISH_DESK_PASSWORD is required for a non-loopback HOST');
+  if (!['127.0.0.1', '::1'].includes(host) && !deskPassword && !publicDemo) throw new Error('NOTEFISH_DESK_PASSWORD is required for a non-loopback HOST');
   const twilioAccountSid = read('TWILIO_ACCOUNT_SID');
   if (twilioAccountSid && !SID.test(twilioAccountSid)) throw new Error('Invalid TWILIO_ACCOUNT_SID');
   const twilioNumber = read('TWILIO_PHONE_NUMBER') || read('TWILIO_CALLER_ID');
@@ -35,7 +39,7 @@ export function loadConfig(env = process.env, root = process.cwd()) {
     return value;
   };
   return Object.freeze({
-    root, port: Number(portText), host, publicBaseUrl, deskPassword,
+    root, port: Number(portText), host, publicBaseUrl, deskPassword, publicDemo,
     production, dataPath: path.join(dataDir, 'notefish.json'), distPath: path.join(root, 'dist'),
     openaiApiKey: read('OPENAI_API_KEY'), fishApiKey: read('FISH_API_KEY'),
     twilioAccountSid, twilioAuthToken: read('TWILIO_AUTH_TOKEN'), twilioNumber,
@@ -49,7 +53,7 @@ export function getStatus(config, { audioAvailable = false } = {}) {
   const keys = {
     OPENAI_API_KEY: config.openaiApiKey, FISH_API_KEY: config.fishApiKey,
     PUBLIC_BASE_URL: config.publicBaseUrl,
-    NOTEFISH_DESK_PASSWORD: config.deskPassword,
+    ...(!config.publicDemo ? { NOTEFISH_DESK_PASSWORD: config.deskPassword } : {}),
   };
   const missing = Object.entries(keys).filter(([, value]) => !value).map(([key]) => key);
   const blockers = missing.map(key => `Set ${key} in the server environment.`);
@@ -66,6 +70,7 @@ export function getStatus(config, { audioAvailable = false } = {}) {
     streamUrl: config.publicBaseUrl ? `${config.publicBaseUrl.replace(/^https:/, 'wss:')}/ws/twilio` : null,
     ready: blockers.length === 0, verified: false, blockers, missing, model: config.fishModel,
     audioAvailable, demoVerified: false, demoTransport: 'browser',
+    access: { mode: config.publicDemo ? 'shared-demo' : 'protected', loginRequired: !config.publicDemo },
     callerUrl: config.publicBaseUrl ? `${config.publicBaseUrl}/caller` : null,
   };
 }
