@@ -62,16 +62,26 @@ function Workspace({ data, setup, readyVoices, saveSettings, roster, setTab }) {
   </Body>;
 }
 
-function Agents({ setup, readyVoices, roster, multiAgent, refreshFloor, setNotice, setError }) {
+const ROLE_OPTIONS = [{ value: 'admin', label: 'Admin' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'agent', label: 'Agent' }];
+function Agents({ setup, readyVoices, roster, multiAgent, refreshFloor, setNotice, setError, user }) {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  // Roles live on accounts. A seat that someone joined shows their role and can be offboarded.
+  const [people, setPeople] = useState([]);
+  const loadPeople = () => api.users().then(result => setPeople(result.users)).catch(() => setPeople([]));
+  useEffect(() => { loadPeople(); }, []);
+  const accountOf = agent => agent.userId ? people.find(person => person.id === agent.userId) : null;
   const run = async (work, message) => { setBusy(true); try { await work(); await refreshFloor(); if (message) setNotice(message); } catch (failure) { setError(failure.message); } finally { setBusy(false); } };
   const copyLink = async (url, who) => { try { await navigator.clipboard.writeText(url); setNotice(`Invitation link copied. Send it to ${who}.`); } catch { setNotice(`Invitation link: ${url}`); } };
   // An email invites: the link signs them up as this seat. A bare name is a seat anyone here can take.
   const add = () => { const trimmed = name.trim(); if (!trimmed || busy) return; const email = /@/.test(trimmed); run(async () => { const result = await api.createAgent(email ? { email: trimmed } : { name: trimmed }); setName(''); if (result.inviteUrl) await copyLink(result.inviteUrl, trimmed); }, email ? '' : `${trimmed} added to the roster.`); };
   const reinvite = agent => run(async () => { const result = await api.reinvite(agent.id); await copyLink(result.inviteUrl, agent.email); });
   const mailto = agent => `mailto:${agent.email}?subject=${encodeURIComponent('Join our NoteFish desk')}&body=${encodeURIComponent(`Hi ${agent.name.split(' ')[0]},\n\nYou have a seat on our NoteFish desk. Open this link, set a password, and you are in:\n${agent.inviteUrl}\n\nThe link works for a week.`)}`;
-  const remove = agent => { if (window.confirm(`Remove ${agent.name} from the roster?`)) run(() => api.removeAgent(agent.id), `${agent.name} removed from the roster.`); };
+  const remove = agent => {
+    const account = accountOf(agent);
+    if (account) { if (window.confirm(`Offboard ${agent.name}? Their account and seat go, and every voice they recorded is deleted at Fish. This cannot be undone.`)) run(async () => { await api.removeUser(account.id); await api.removeAgent(agent.id); await loadPeople(); }, `${agent.name} offboarded.`); }
+    else if (window.confirm(`Remove ${agent.name} from the roster?`)) run(() => api.removeAgent(agent.id), `${agent.name} removed from the roster.`);
+  };
   if (!multiAgent) return <Body><div className="ds-info">{setup.floor?.reason || 'This deployment runs a single desk.'}</div></Body>;
   return <>
     <ReadBar right={<Btn small disabled={busy || !name.trim()} onClick={add}>Add</Btn>}><Plus size={14} /><input value={name} maxLength={100} placeholder="Invite by email, or add a name" aria-label="Email or name" onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') add(); }} /></ReadBar>
@@ -79,12 +89,14 @@ function Agents({ setup, readyVoices, roster, multiAgent, refreshFloor, setNotic
       {roster.length ? roster.map(agent => <Row key={agent.id} lead={<Avatar who={agent} />} main={agent.name}
         sub={agent.email ? `${agent.email} · ${agent.userId ? 'joined' : agent.inviteUrl ? 'invited, not joined yet' : 'invitation expired'}` : 'Name only · anyone at this desk can take this seat'}
         right={<>
+          {accountOf(agent) && <SelectPill aria-label={`Role for ${agent.name}`} value={accountOf(agent).role} disabled={busy || accountOf(agent).id === user?.id} onChange={role => run(async () => { await api.setRole(accountOf(agent).id, role); await loadPeople(); }, `${agent.name} is now ${role === 'admin' ? 'an admin' : role === 'supervisor' ? 'a supervisor' : 'an agent'}.`)} options={ROLE_OPTIONS} />}
           {agent.email && !agent.userId && (agent.inviteUrl ? <><TextBtn icon={<Copy size={13} />} disabled={busy} onClick={() => copyLink(agent.inviteUrl, agent.email)}>Copy link</TextBtn><a className="ds-text muted" href={mailto(agent)}><Send size={13} />Send</a></> : <TextBtn icon={<Send size={13} />} disabled={busy} onClick={() => reinvite(agent)}>Invite</TextBtn>)}
           <SelectPill aria-label={`Voice for ${agent.name}`} value={agent.voiceId || ''} disabled={busy} onChange={value => run(() => api.editAgent(agent.id, { voiceId: value || null }))} options={[{ value: '', label: 'Workspace voice' }, ...readyVoices.map(voice => ({ value: voice.id, label: voice.name }))]} />
           <SelectPill aria-label={`Caller language for ${agent.name}`} value={agent.customerLanguage || ''} disabled={busy} onChange={value => run(() => api.editAgent(agent.id, { customerLanguage: value || null }))} options={[{ value: '', label: 'Workspace default' }, { value: 'auto', label: 'Detect automatically' }, ...LANGS]} />
           <button type="button" className="ds-tool" aria-label={`Remove ${agent.name}`} disabled={busy} onClick={() => remove(agent)}><Trash2 size={14} /></button>
         </>} />) : <Empty title="Nobody on the floor yet.">With an empty roster this stays a single desk and anyone can answer.</Empty>}
       <p className="ds-note" style={{ marginTop: 14 }}>Invite by email and the link signs them up as their seat. A name on its own is a seat anyone at this desk can take.</p>
+      <p className="ds-note">Admins run the desk. Supervisors keep the glossary and watch the floor. Agents answer calls with their own seat and voice; a voice belongs to whoever recorded it.</p>
     </Body>
   </>;
 }

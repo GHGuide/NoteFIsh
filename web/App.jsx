@@ -57,7 +57,7 @@ function Gate() {
   const skip = value => { setSkipped(value); try { value ? localStorage.setItem('notefish.skipAuth', '1') : localStorage.removeItem('notefish.skipAuth'); } catch { /* fine */ } };
   if (!me || invite === undefined) return null;
   if (invite && !me.user) return <AuthPage users={me.users} invite={invite} onSignedIn={user => { history.replaceState({}, '', '/desk'); setMe({ ...me, user }); }} />;
-  if (!me.user && !(skipped && me.local)) return <AuthPage users={me.users} local={me.local} onSignedIn={user => setMe({ ...me, user })} onSkip={() => skip(true)} />;
+  if (!me.user && !(skipped && me.local)) return <AuthPage users={me.users} open={me.open !== false} local={me.local} onSignedIn={user => setMe({ ...me, user })} onSkip={() => skip(true)} />;
   return <WorkspaceApp user={me.user} onSignedOut={() => { skip(false); setMe({ ...me, user: null, users: Math.max(1, me.users) }); }} />;
 }
 
@@ -85,6 +85,7 @@ function parseRoute(route) {
 }
 
 function WorkspaceApp({ user, onSignedOut }) {
+  const role = user?.role || 'admin'; // no account means this desk is yours
   const [route, setRoute] = useState(location.pathname + location.search);
   const [mobileNav, setMobileNav] = useState(false);
   const [focus, setFocus] = useState(false);
@@ -182,10 +183,10 @@ function WorkspaceApp({ user, onSignedOut }) {
   const owned = key => (seat ? seat[key] : data.settings[key]);
   const [seatBusy, setSeatBusy] = useState(false);
   const takeSeat = id => { if (!id) return; setSeatBusy(true); seatActions.take(id).catch(failure => setError(failure.message)).finally(() => setSeatBusy(false)); };
-  const common = { data, navigate, route: parsed, loading, error, setError, setNotice, saveSettings, saveOwned, owned, refreshVoices, updateCall, sharedDemo, trainingNotes, multiAgent, hasFloor, roster, seat, seatActions, refreshFloor, partialCaption, connection, invitation, setInvitation, audioReady, enableAudio, clearAudio: () => player.current.clear(), setAudioMuted: muted => { player.current.muted = muted; if (muted) player.current.clear(); }, reload, focus, setFocus, openFree: () => setFree(true) };
+  const common = { user, role, data, navigate, route: parsed, loading, error, setError, setNotice, saveSettings, saveOwned, owned, refreshVoices, updateCall, sharedDemo, trainingNotes, multiAgent, hasFloor, roster, seat, seatActions, refreshFloor, partialCaption, connection, invitation, setInvitation, audioReady, enableAudio, clearAudio: () => player.current.clear(), setAudioMuted: muted => { player.current.muted = muted; if (muted) player.current.clear(); }, reload, focus, setFocus, openFree: () => setFree(true) };
   // First run: setup until it is finished, unless paused to go record a voice.
   const [setupPaused, setSetupPaused] = useState(() => { try { return sessionStorage.getItem(PAUSE_KEY) === '1'; } catch { return false; } });
-  const needsSetup = !loading && !data.settings.onboardedAt && !sharedDemo;
+  const needsSetup = !loading && !data.settings.onboardedAt && !sharedDemo && role === 'admin';
   const resumeSetup = () => { try { sessionStorage.removeItem(PAUSE_KEY); } catch { /* fine */ } setSetupPaused(false); navigate('/desk'); };
   if (needsSetup && !setupPaused) return <Onboarding {...common} onDone={() => { try { setSetupPaused(sessionStorage.getItem(PAUSE_KEY) === '1'); } catch { /* fine */ } }} />;
   const Page = { '/desk': DeskPage, '/calls': CallsPage, '/insights': InsightsPage, '/glossary': GlossaryPage, '/phrases': PhrasesPage, '/voice': VoicePage, '/floor': FloorPage, '/settings': SettingsPage }[parsed.path] || DeskPage;
@@ -202,7 +203,7 @@ function WorkspaceApp({ user, onSignedOut }) {
       <nav className="ds-nav" aria-label="Main navigation">{NAV.filter(item => !item.floorOnly || hasFloor).map(item => <a href={item.path} key={item.path} className={parsed.path === item.path ? 'active' : ''} aria-current={parsed.path === item.path ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate(item.path); }}><item.icon size={16} strokeWidth={1.7} />{item.label}{item.path === '/desk' && incoming && <span className="ring" aria-label="Incoming call" />}{item.path === '/floor' && data.floor?.waiting?.length > 0 && <span className="badge">{data.floor.waiting.length}</span>}</a>)}</nav>
       <nav className="ds-nav bottom" aria-label="More">
         <button type="button" onClick={() => setFree(true)}><Gift size={16} strokeWidth={1.7} />Get a free month</button>
-        <a href="/settings" className={parsed.path === '/settings' ? 'active' : ''} onClick={event => { event.preventDefault(); navigate('/settings'); }}><Settings size={16} strokeWidth={1.7} />Settings</a>
+        {role === 'admin' && <a href="/settings" className={parsed.path === '/settings' ? 'active' : ''} onClick={event => { event.preventDefault(); navigate('/settings'); }}><Settings size={16} strokeWidth={1.7} />Settings</a>}
         <a href={HELP_URL} target="_blank" rel="noreferrer"><CircleHelp size={16} strokeWidth={1.7} />Help</a>
         <button type="button" title={user?.email || ''} onClick={() => api.signOut().catch(() => {}).finally(onSignedOut)}><LogOut size={16} strokeWidth={1.7} />{user ? `Sign out · ${user.name.split(' ')[0]}` : 'Sign in'}</button>
         <div className="ds-side-foot"><i className={connection === 'connected' ? 'connected' : ''} />{connection === 'connected' ? 'Desk connected' : connection === 'connecting' ? 'Connecting…' : 'Reconnecting…'}</div>

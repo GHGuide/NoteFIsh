@@ -1,7 +1,7 @@
 // Voice: the voice callers hear (the one in use, one take per feeling, the
 // library), the puff you are on the floor, and how formal replies are.
 import React, { useEffect, useRef, useState } from 'react';
-import { Share2, Archive, ArrowDownToLine, AudioLines, Check, Globe2, Mic, MoreHorizontal, Play, RefreshCw, Search, Settings2, Square } from 'lucide-react';
+import { Share2, Trash2, Archive, ArrowDownToLine, AudioLines, Check, Globe2, Mic, MoreHorizontal, Play, RefreshCw, Search, Settings2, Square } from 'lucide-react';
 import { api } from '../api.js';
 import { Toolbar, Title, Tabs, ReadBar, Body, Col, Label, Status, Chip, Row, Btn, TextBtn, Pill, SelectPill, Field, Switch, Option, Setting, Empty, Spinner, Ask, Avatar, Puff, PUFFS, SWATCHES, avatarOf } from '../shell.jsx';
 import { useCapture, VoiceModal, ImportModal, REGISTERS, READING_SCRIPTS, downloadJson, isArchived, languageName, formatDuration, callState } from '../lib.jsx';
@@ -38,7 +38,7 @@ export default function VoicePage(common) {
       setNotice(`${result.imported.length} voice${result.imported.length === 1 ? '' : 's'} imported${result.skipped.length ? `, ${result.skipped.length} already here` : ''}.`);
     } catch (failure) { setError(failure.message.startsWith('Unexpected') ? 'That is not a NoteFish voice file.' : failure.message); }
   };
-  const shared = { share, importFile, ...common, setTab, setSelectedId, setImporting, use, voiceId, me: seat || { name: 'workspace', avatar: data.settings.avatar }, voice: data.voices.find(item => item.id === voiceId), ready: data.voices.filter(item => item.status === 'ready' && !isArchived(item)), registers: owned('registers') || {} };
+  const shared = { share, importFile, ...common, setTab, setSelectedId, setImporting, use, voiceId, me: seat || { name: 'workspace', avatar: data.settings.avatar }, voice: data.voices.find(item => item.id === voiceId), ready: data.voices.filter(item => item.status === 'ready' && !isArchived(item) && (item.usable ?? true)), registers: owned('registers') || {} };
   const Section = { voice: YourVoice, takes: Takes, avatar: AvatarTab, register: Register, library: Library }[tab];
   return <>
     <Toolbar />
@@ -59,7 +59,7 @@ function YourVoice({ data, seat, owned, saveOwned, me, voice, ready, registers, 
   const taken = REGISTERS.filter(item => registers[item.key]);
   return <Body>
     <div className="ds-card"><Avatar who={me} size={54} /><div><strong>{voice ? `${voice.name} · ${voice.kind === 'licensed' ? 'licensed voice' : 'your voice'}` : 'No voice yet'}</strong><span>{voice ? [voice.createdAt && `Recorded ${dateOf(voice.createdAt)}`, languageName(voice.language || 'en'), kindOf(voice)].filter(Boolean).join(' · ') : 'Read one short passage and callers hear you in their language.'}</span></div>
-      <div className="actions">{voice && <Btn pill kind="ghost" icon={<Play size={12} />} onClick={() => setSelectedId(voice.id)}>Hear it</Btn>}{voice && <Btn pill kind="ghost" icon={<Share2 size={12} />} onClick={() => share(voice)}>Share</Btn>}<Btn pill icon={<Mic size={13} />} onClick={() => setTab('takes')}>{voice ? 'Re-record' : 'Record'}</Btn></div></div>
+      <div className="actions">{voice && <Btn pill kind="ghost" icon={<Play size={12} />} onClick={() => setSelectedId(voice.id)}>Hear it</Btn>}{voice && (voice.mine ?? true) && <Btn pill kind="ghost" icon={<Share2 size={12} />} onClick={() => share(voice)}>Share</Btn>}<Btn pill icon={<Mic size={13} />} onClick={() => setTab('takes')}>{voice ? 'Re-record' : 'Record'}</Btn></div></div>
     <h3>Voice for calls</h3>
     <Setting main="Which voice answers" sub={seat ? 'Your own voice on calls, or the workspace voice when you have none.' : 'The voice every reply is spoken in.'}><SelectPill aria-label="Which voice answers" value={own} onChange={id => saveOwned({ voiceId: id || null })} options={options} /></Setting>
     <h3>Takes</h3>
@@ -174,20 +174,22 @@ function Library({data, loading, voiceId, trainingNotes, setError, setNotice, re
   const matches = voice => `${voice.name} ${voice.description || ''} ${languageName(voice.language || 'en')}`.toLowerCase().includes(query.trim().toLowerCase());
   const shown = data.voices.filter(voice => !isArchived(voice) && matches(voice));
   const archived = data.voices.filter(voice => isArchived(voice) && matches(voice));
-  const menu = voice => [
-    { id: 'preview', label: 'Preview voice', icon: Play, disabled: voice.status !== 'ready' || isArchived(voice), opensDialog: true, onSelect: () => setSelectedId(voice.id) },
-    { id: 'edit', label: 'Edit voice details', icon: Settings2, opensDialog: true, onSelect: () => setSelectedId(voice.id) },
+  // What you may do to a voice: preview anything you can use; edit, share, archive and delete only what is yours (or everything, as an admin).
+  const menu = voice => { const mine = voice.mine ?? true; return [
+    { id: 'preview', label: 'Preview voice', icon: Play, disabled: voice.status !== 'ready' || isArchived(voice) || !(voice.usable ?? true), opensDialog: true, onSelect: () => setSelectedId(voice.id) },
+    mine && { id: 'edit', label: 'Edit voice details', icon: Settings2, opensDialog: true, onSelect: () => setSelectedId(voice.id) },
     { separator: true },
     { id: 'refresh', label: 'Refresh voice status', icon: RefreshCw, onSelect: () => act(voice, async () => { await api.refreshVoice(voice.id); await refreshVoices(); setNotice('Voice status refreshed.'); }) },
-    { id: 'export', label: 'Share voice file', icon: ArrowDownToLine, onSelect: () => act(voice, async () => { downloadJson(`${voice.name}.notefish-voice.json`, await api.exportVoice(voice.id)); setNotice('Voice file downloaded. Import it on any other desk.'); }) },
-    { separator: true },
-    { id: 'archive', label: isArchived(voice) ? 'Restore voice' : 'Archive voice', icon: Archive, onSelect: () => act(voice, async () => { await api.editVoice(voice.id, { archived: !isArchived(voice) }); await refreshVoices(); setNotice(isArchived(voice) ? 'Voice restored.' : 'Voice archived. You can restore it from Archived.'); }) },
-  ];
+    mine && { id: 'export', label: 'Share voice file', icon: ArrowDownToLine, onSelect: () => act(voice, async () => { downloadJson(`${voice.name}.notefish-voice.json`, await api.exportVoice(voice.id)); setNotice('Voice file downloaded. Import it on any other desk.'); }) },
+    mine && { separator: true },
+    mine && { id: 'archive', label: isArchived(voice) ? 'Restore voice' : 'Archive voice', icon: Archive, onSelect: () => act(voice, async () => { await api.editVoice(voice.id, { archived: !isArchived(voice) }); await refreshVoices(); setNotice(isArchived(voice) ? 'Voice restored.' : 'Voice archived. You can restore it from Archived.'); }) },
+    mine && voice.kind === 'enrolled' && { id: 'delete', label: 'Delete for good', icon: Trash2, onSelect: () => { if (window.confirm(`Delete ${voice.name} at Fish and from this library? This cannot be undone.`)) act(voice, async () => { await api.deleteVoice(voice.id); await refreshVoices(); setNotice(`${voice.name} deleted at Fish and removed here.`); }); } },
+  ].filter(Boolean); };
   const line = voice => {
     const [tone, word] = toneOf(voice);
-    const usable = voice.status === 'ready' && !isArchived(voice);
+    const usable = voice.status === 'ready' && !isArchived(voice) && (voice.usable ?? true);
     return <Row key={voice.id} lead={<span className="lead"><Avatar who={voice.name} size={30} /></span>}
-      main={<>{voice.name}{voice.id === voiceId && <Chip tone="ink">Desk voice</Chip>}{voice.register && <Chip>{feelingOf(voice.register)?.label} take</Chip>}</>}
+      main={<>{voice.name}{voice.id === voiceId && <Chip tone="ink">Desk voice</Chip>}{voice.register && <Chip>{feelingOf(voice.register)?.label} take</Chip>}{voice.kind === 'enrolled' && voice.owner && !(voice.mine ?? true) && <Chip>{voice.owner.split(' ')[0]}’s</Chip>}</>}
       sub={[kindOf(voice), languageName(voice.language || 'en'), voice.status === 'training' && !isArchived(voice) ? trainingNotes[voice.id] || 'Fish is creating this voice' : voice.status === 'failed' && !isArchived(voice) ? voice.error || word : word].join(' · ')}
       right={<><Status tone={tone}>{word}</Status>{usable && voice.id !== voiceId && <TextBtn disabled={busy === voice.id} onClick={() => act(voice, () => use(voice))}>Use</TextBtn>}<ActionMenu label={`Actions for ${voice.name}`} items={menu(voice)}><button type="button" className="ds-tool" aria-label={`Manage ${voice.name}`} disabled={busy === voice.id}>{busy === voice.id ? <Spinner size={15} /> : <MoreHorizontal size={16} />}</button></ActionMenu></>} />;
   };

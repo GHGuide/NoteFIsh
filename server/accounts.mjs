@@ -12,6 +12,8 @@ const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,24}$/;
 const MAX_USERS = 500;
 const ID = /^[0-9a-f-]{36}$/;
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000;
+// admin runs the desk; supervisor watches the floor and keeps the glossary; agent answers calls with their own seat and voice.
+export const ROLES = ['admin', 'supervisor', 'agent'];
 
 export function hashPassword(password) {
   const salt = randomBytes(16);
@@ -27,7 +29,7 @@ export function verifyPassword(password, stored) {
 // Compared against when the email is unknown, so a miss costs the same time as a wrong password.
 const DECOY = hashPassword(randomBytes(12).toString('hex'));
 
-const publicUser = user => user ? { id: user.id, name: user.name, email: user.email, createdAt: user.createdAt } : null;
+const publicUser = user => user ? { id: user.id, name: user.name, email: user.email, role: user.role || 'admin', createdAt: user.createdAt } : null; // accounts from before roles ran the desk
 
 export function createAccounts(config, store, { now = Date.now } = {}) {
   // The cookie secret: the configured one, else one minted once and kept in the store,
@@ -72,12 +74,39 @@ export function createAccounts(config, store, { now = Date.now } = {}) {
     },
   };
   const seatOf = userId => store.snapshot().agents.find(agent => agent.userId === userId && !agent.archived)?.id || '';
+  const hasAdmin = () => users().some(user => (user.role || 'admin') === 'admin');
+  const roleOf = id => { const user = users().find(item => item.id === id); return user ? user.role || 'admin' : ''; };
 
   return {
     invites,
     seatOf,
+    hasAdmin,
+    roleOf,
     count: () => users().length,
     find: id => publicUser(users().find(user => user.id === id)),
+    list: () => users().map(publicUser),
+    async setRole(id, role) {
+      if (!ROLES.includes(role)) throw new AuthError('Choose admin, supervisor or agent.');
+      const user = await store.update(state => {
+        const item = state.users.find(user => user.id === id);
+        if (!item) throw new AuthError('Account not found.', 404);
+        if ((item.role || 'admin') === 'admin' && role !== 'admin' && !state.users.some(other => other.id !== id && (other.role || 'admin') === 'admin')) throw new AuthError('The desk needs at least one admin.', 409);
+        item.role = role; return item;
+      });
+      return publicUser(user);
+    },
+    // Offboarding: the account goes, its seats are freed for the next person. Their voices are the caller's job (routes), done before this.
+    async remove(id) {
+      const user = await store.update(state => {
+        const item = state.users.find(user => user.id === id);
+        if (!item) throw new AuthError('Account not found.', 404);
+        if ((item.role || 'admin') === 'admin' && !state.users.some(other => other.id !== id && (other.role || 'admin') === 'admin')) throw new AuthError('The desk needs at least one admin.', 409);
+        state.users = state.users.filter(user => user.id !== id);
+        for (const agent of state.agents) if (agent.userId === id) agent.userId = null;
+        return item;
+      });
+      return publicUser(user);
+    },
     read(req) {
       const token = readCookie(req.headers?.cookie, COOKIE);
       if (!token || token.length > 512 || !secret()) return '';
@@ -100,14 +129,15 @@ export function createAccounts(config, store, { now = Date.now } = {}) {
       if (config.production) flags.push('Secure');
       return `${COOKIE}=; ${flags.join('; ')}`;
     },
-    async signUp({ name, email, password }) {
+    async signUp({ name, email, password, role = 'agent' }) {
       name = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ').slice(0, 100) : '';
       email = typeof email === 'string' ? email.trim().toLowerCase() : '';
       if (!name) throw new AuthError('Tell us your name.');
       if (!EMAIL.test(email)) throw new AuthError('That email address does not look right.');
       if (typeof password !== 'string' || password.length < 10 || password.length > 200) throw new AuthError('Use a password of at least 10 characters.');
       await ensureSecret();
-      const user = { id: randomUUID(), name, email, passwordHash: hashPassword(password), createdAt: new Date(now()).toISOString() };
+      if (!ROLES.includes(role)) throw new AuthError('Choose admin, supervisor or agent.');
+      const user = { id: randomUUID(), name, email, role, passwordHash: hashPassword(password), createdAt: new Date(now()).toISOString() };
       await store.update(state => {
         state.users ||= [];
         if (state.users.length >= MAX_USERS) throw new AuthError('This desk has all the accounts it can hold.', 409);
@@ -134,7 +164,7 @@ export function createAccounts(config, store, { now = Date.now } = {}) {
 }
 
 export class AuthError extends Error {
-  constructor(message, status = 400) { super(message); this.status = status; }
+  constructor(message, status = 400) { super(message); this.name = 'AuthError'; this.status = status; }
 }
 
 /** /api/auth: reachable without being signed in, which is the point. */
@@ -147,7 +177,8 @@ export function createAuthRouter({ config, accounts, sessions = null }) {
   });
   router.get('/me', (req, res) => {
     const id = accounts.read(req);
-    res.json({ user: id ? accounts.find(id) : null, users: accounts.count(), local: isLocalRequest(req), google: false });
+    // open: nobody runs this desk yet, so signing up makes you its admin. After that it is invitation-only.
+    res.json({ user: id ? accounts.find(id) : null, users: accounts.count(), open: !accounts.hasAdmin(), local: isLocalRequest(req), google: false });
   });
   router.get('/invite/:token', (req, res) => {
     const invite = accounts.invites.find(req.params.token);
@@ -160,7 +191,8 @@ export function createAuthRouter({ config, accounts, sessions = null }) {
       const invite = body.invite ? accounts.invites.find(body.invite) : null;
       if (body.invite && !invite) throw new AuthError('This invitation is no longer valid. Ask for a new one.', 410);
       if (invite) { body.email = invite.email; body.name = body.name || invite.agent.name; }
-      const user = await accounts.signUp(body);
+      else if (accounts.hasAdmin()) throw new AuthError('This desk is invitation-only. Ask an admin to invite you.', 403);
+      const user = await accounts.signUp({ ...body, role: invite ? 'agent' : 'admin' });
       const agentId = invite ? await accounts.invites.accept(body.invite, user) : '';
       withSeat(res, user.id, agentId).status(201).json({ user, agentId: agentId || null });
     } catch (error) { next(error); }

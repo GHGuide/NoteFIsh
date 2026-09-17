@@ -77,6 +77,7 @@ const ref = value => {
   if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{8,128}$/.test(value)) throw new InputError('Provide a valid Fish reference ID.');
   return value;
 };
+const CONTENT_FIELDS = ['glossary', 'phrases', 'persona', 'formality'];
 const voiceState = value => value === 'trained' ? 'ready' : value === 'failed' ? 'failed' : 'training';
 const findVoice = (store, id, ready = false) => {
   const voice = store.snapshot().voices.find(item => item.id === id);
@@ -102,6 +103,32 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
   const rostered = () => multiAgent && store.snapshot().agents.some(agent => !agent.archived);
   const requireFloor = () => {
     if (!multiAgent) throw new InputError('The shared demo runs as one desk. Set NOTEFISH_PUBLIC_DEMO=false to use a roster of agents.', 409, 'SINGLE_DESK');
+  };
+  // Who is asking. An account carries a role. A desk reached without one (local development,
+  // the shared desk password, the demo) is run by whoever holds that access: admin.
+  const userOf = req => accounts?.read(req) || '';
+  const roleOf = req => { const id = userOf(req); return id ? accounts.roleOf(id) || 'admin' : 'admin'; };
+  const forbid = message => { throw new InputError(message, 403, 'FORBIDDEN'); };
+  const adminOnly = (req, res, next) => roleOf(req) === 'admin' ? next() : next(new InputError('Only an admin can do this.', 403, 'FORBIDDEN'));
+  const requireAccounts = () => { if (!accounts) throw new InputError('This desk has no accounts.', 409); };
+  const ownsSeat = (req, agent) => Boolean(agent.userId) && agent.userId === userOf(req);
+  // A recorded voice belongs to whoever recorded it: only they, or an admin, use, share or remove it.
+  // Licensed voices and voices from before ownership are shared; admins and supervisors look after those.
+  const manages = (req, voice) => roleOf(req) === 'admin' || (voice.ownerId ? voice.ownerId === userOf(req) : roleOf(req) !== 'agent');
+  const mayUse = (req, voice) => voice.kind !== 'enrolled' || !voice.ownerId || manages(req, voice);
+  const usableVoice = (req, id) => { const voice = findVoice(store, id, true); if (!mayUse(req, voice)) forbid(`${voice.name} belongs to someone else.`); return voice.id; };
+  const voiceView = (req, voice) => ({ ...voice, owner: voice.ownerId ? accounts?.find(voice.ownerId)?.name || null : null, mine: manages(req, voice), usable: mayUse(req, voice) });
+  // Deleting for good: the model goes at Fish first, then the library entry and every seat that pointed at it.
+  const purgeVoices = async ids => {
+    for (const id of ids) {
+      const voice = findVoice(store, id);
+      if (voice.kind === 'enrolled') await providers.deleteVoice({ referenceId: voice.referenceId });
+      await store.update(state => {
+        state.voices = state.voices.filter(item => item.id !== id);
+        const scrub = owner => { if (owner.voiceId === id) owner.voiceId = null; for (const key of Object.keys(owner.registers || {})) if (owner.registers[key] === id) owner.registers[key] = null; };
+        scrub(state.settings); state.agents.forEach(scrub);
+      });
+    }
   };
   const findAgent = (id, { active = true } = {}) => {
     const agent = store.snapshot().agents.find(item => item.id === id);
@@ -159,16 +186,17 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
   }));
   router.get('/voices', (req, res) => {
     if (req.query.archived !== undefined && !['true', 'false'].includes(req.query.archived)) throw new InputError('The archived filter must be true or false.');
-    res.json({ voices: store.snapshot().voices.filter(voice => req.query.archived === 'true' || !voice.archived) });
+    res.json({ voices: store.snapshot().voices.filter(voice => req.query.archived === 'true' || !voice.archived).map(voice => voiceView(req, voice)) });
   });
   // Voice files: the Fish reference plus what the library knows. Import re-attaches after Fish confirms the model.
   router.get('/voices/export', (req, res) => {
     const state = store.snapshot();
     res.setHeader('Content-Disposition', 'attachment; filename="notefish-voices.json"');
-    res.json(buildPack(state.voices.filter(voice => !voice.archived), { exportedBy: state.settings.queueName || '' }));
+    res.json(buildPack(state.voices.filter(voice => !voice.archived && manages(req, voice)), { exportedBy: state.settings.queueName || '' }));
   });
   router.get('/voices/:id/export', (req, res) => {
     const voice = findVoice(store, req.params.id);
+    if (!manages(req, voice)) forbid(`Only ${voice.owner ? voice.owner : 'the owner'} of ${voice.name}, or an admin, can share it.`);
     res.setHeader('Content-Disposition', `attachment; filename="${(voice.name.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'voice').slice(0, 60)}.notefish-voice.json"`);
     res.json(buildPack([voice]));
   });
@@ -183,7 +211,7 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
       if (store.snapshot().voices.length >= 1000) throw new InputError('The voice library is full.', 409);
       const result = await providers.getVoice({ referenceId: entry.referenceId });
       const voice = { id: randomUUID(), referenceId: entry.referenceId, name: entry.name, description: entry.description, language: languageCodes.has(entry.language) ? entry.language : 'en', kind: entry.kind,
-        status: voiceState(result.state), archived: false, createdAt: new Date().toISOString(), consent: true, consentAt: new Date().toISOString(),
+        status: voiceState(result.state), archived: false, createdAt: new Date().toISOString(), consent: true, consentAt: new Date().toISOString(), ownerId: userOf(req) || null,
         ...(entry.register ? { register: entry.register } : {}), ...(entry.baseline ? { baseline: entry.baseline } : {}) };
       await store.update(state => { if (!state.voices.some(item => item.referenceId === voice.referenceId)) state.voices.push(voice); });
       imported.push(voice);
@@ -217,7 +245,7 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
       baseline = { loudness: clip.loudness, rate: clip.rate, snr: clip.snr, seconds: clip.voicedSeconds };
     } catch (error) { if (error instanceof InputError) throw error; /* measurement is best-effort */ }
     const result = await providers.createVoice({ name, description, audio: req.file.buffer, mimeType: req.file.mimetype, transcript });
-    const voice = { id: randomUUID(), referenceId: ref(result.referenceId), name, description, language: selectedLanguage, kind: 'enrolled', status: voiceState(result.state), archived: false, createdAt: new Date().toISOString(), consent: true, consentAt: new Date().toISOString(), register, baseline };
+    const voice = { id: randomUUID(), referenceId: ref(result.referenceId), name, description, language: selectedLanguage, kind: 'enrolled', status: voiceState(result.state), archived: false, createdAt: new Date().toISOString(), consent: true, consentAt: new Date().toISOString(), ownerId: userOf(req) || null, register, baseline };
     const agentId = currentAgent(req);
     await store.update(state => {
       state.voices.push(voice);
@@ -242,14 +270,15 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     if (existing) throw new InputError('That voice is already in the library. Restore it if it is archived.', 409);
     if (store.snapshot().voices.length >= 1000) throw new InputError('The voice library is full.', 409);
     const result = await providers.getVoice({ referenceId });
-    const voice = { id: randomUUID(), referenceId, name, description, language: selectedLanguage, kind, status: voiceState(result.state), archived: false, createdAt: new Date().toISOString(), consent: true, consentAt: new Date().toISOString() };
+    const voice = { id: randomUUID(), referenceId, name, description, language: selectedLanguage, kind, status: voiceState(result.state), archived: false, createdAt: new Date().toISOString(), consent: true, consentAt: new Date().toISOString(), ownerId: userOf(req) || null };
     await store.update(state => { if (state.voices.some(item => item.referenceId === referenceId)) throw new InputError('That voice is already in the library.', 409); state.voices.push(voice); });
     res.status(201).json({ voice });
   }));
   async function updateVoice(req, res, archive = false) {
     const patch = archive ? { archived: true } : req.body;
     allowed(patch, ['name', 'description', 'archived']);
-    findVoice(store, req.params.id);
+    const target = findVoice(store, req.params.id);
+    if (!manages(req, target)) forbid(`${target.name} belongs to someone else.`);
     const changes = {};
     if ('name' in patch) changes.name = text(patch.name, 'voice name', 100);
     if ('description' in patch) changes.description = text(patch.description, 'description', 1000, true);
@@ -263,7 +292,13 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     stateEvent(); res.json({ voice });
   }
   router.patch('/voices/:id', (req, res) => updateVoice(req, res));
-  router.delete('/voices/:id', (req, res) => updateVoice(req, res, true));
+  router.delete('/voices/:id', async (req, res) => {
+    if (req.query.permanent !== 'true') return updateVoice(req, res, true);
+    const voice = findVoice(store, req.params.id);
+    if (!manages(req, voice)) forbid(`${voice.name} belongs to someone else.`);
+    await purgeVoices([voice.id]);
+    stateEvent(); res.json({ deleted: voice.id });
+  });
   router.post('/voices/:id/refresh', limited(async (req, res) => {
     const original = findVoice(store, req.params.id);
     const result = await providers.getVoice({ referenceId: original.referenceId });
@@ -273,6 +308,7 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
   router.post('/voices/:id/preview', limited(async (req, res) => {
     allowed(req.body, ['text', 'language', 'sourceLanguage']);
     const voice = findVoice(store, req.params.id, true);
+    if (!mayUse(req, voice)) forbid(`${voice.name} belongs to someone else.`);
     const previewText = text(req.body.text, 'preview text', 1000);
     const targetLanguage = language(req.body.language || voice.language);
     const sourceLanguage = language(req.body.sourceLanguage || store.snapshot().settings.agentLanguage);
@@ -305,6 +341,9 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
   router.get('/settings', (req, res) => res.json({ settings: store.snapshot().settings }));
   const saveSettings = async (req, res) => {
     allowed(req.body, ['voiceId', 'agentLanguage', 'customerLanguage', 'queueName', 'registers', 'layout', 'phrases', 'persona', 'glossary', 'formality', 'avatar', 'onboardedAt']);
+    const role = roleOf(req);
+    if (role === 'agent') forbid('Only an admin can change workspace settings. Your own seat is under Voice.');
+    if (role === 'supervisor' && Object.keys(req.body).some(key => !CONTENT_FIELDS.includes(key))) forbid('Supervisors keep the glossary, phrases and house style. Other settings need an admin.');
     const patch = {};
     if ('onboardedAt' in req.body) patch.onboardedAt = req.body.onboardedAt === null ? null : new Date().toISOString(); // true = now, null = run setup again
     if ('persona' in req.body) patch.persona = text(req.body.persona ?? '', 'house style', 300, true).trim();
@@ -330,7 +369,7 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
   const rosterView = () => roster(store, accounts, config);
   const joinUrl = token => `${config.publicBaseUrl || `http://127.0.0.1:${config.port}`}/join#${token}`;
   router.get('/agents', (req, res) => res.json({ agents: rosterView(), floor: queue ? queue.snapshot() : null, agentId: currentAgent(req) }));
-  router.post('/agents/:id/invite', async (req, res) => {
+  router.post('/agents/:id/invite', adminOnly, async (req, res) => {
     requireFloor();
     const agent = findAgent(req.params.id);
     if (!agent.email) throw new InputError('Give this agent an email first.');
@@ -339,7 +378,7 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     stateEvent();
     res.json({ inviteUrl: joinUrl(invite.token), expiresAt: invite.expiresAt });
   });
-  router.post('/agents', async (req, res) => {
+  router.post('/agents', adminOnly, async (req, res) => {
     requireFloor();
     allowed(req.body, ['name', 'voiceId', 'agentLanguage', 'customerLanguage', 'email']);
     // An email makes the seat an invitation: the person who opens the link signs up as that seat.
@@ -367,7 +406,11 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
   router.patch('/agents/:id', async (req, res) => {
     requireFloor();
     allowed(req.body, ['name', 'voiceId', 'agentLanguage', 'customerLanguage', 'archived', 'registers', 'layout', 'phrases', 'persona', 'formality', 'avatar']);
-    findAgent(req.params.id, { active: false });
+    const target = findAgent(req.params.id, { active: false });
+    if (roleOf(req) !== 'admin') {
+      if (!ownsSeat(req, target)) forbid('Only an admin can change another seat.');
+      if ('archived' in req.body) forbid('Only an admin can remove a seat.');
+    }
     const changes = {};
     if ('persona' in req.body) changes.persona = text(req.body.persona ?? '', 'style', 300, true).trim();
     if ('formality' in req.body) changes.formality = formalityInput(req.body.formality);
@@ -375,13 +418,13 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     if ('layout' in req.body) changes.layout = layoutInput(req.body.layout);
     if ('phrases' in req.body) changes.phrases = phrasesInput(req.body.phrases);
     if ('name' in req.body) changes.name = text(req.body.name, 'agent name', 100);
-    if ('voiceId' in req.body) changes.voiceId = req.body.voiceId ? findVoice(store, req.body.voiceId, true).id : null;
+    if ('voiceId' in req.body) changes.voiceId = req.body.voiceId ? usableVoice(req, req.body.voiceId) : null;
     if ('agentLanguage' in req.body) changes.agentLanguage = req.body.agentLanguage ? language(req.body.agentLanguage) : null;
     if ('customerLanguage' in req.body) changes.customerLanguage = req.body.customerLanguage ? callerLanguage(req.body.customerLanguage) : null;
     if ('registers' in req.body) {
       req.body.registers = Object.fromEntries(Object.entries(req.body.registers || {}).map(([k, v]) => [canonicalRegister(k), v]));
       allowed(req.body.registers, REGISTERS);
-      changes.registers = Object.fromEntries(Object.entries(req.body.registers).map(([k, v]) => [canonicalRegister(k), v ? findVoice(store, v, true).id : null]));
+      changes.registers = Object.fromEntries(Object.entries(req.body.registers).map(([k, v]) => [canonicalRegister(k), v ? usableVoice(req, v) : null]));
     }
     if ('archived' in req.body) {
       if (typeof req.body.archived !== 'boolean') throw new InputError('Archived must be true or false.');
@@ -398,7 +441,7 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     stateEvent(); floorEvent();
     res.json({ agent });
   });
-  router.delete('/agents/:id', async (req, res) => {
+  router.delete('/agents/:id', adminOnly, async (req, res) => {
     requireFloor();
     findAgent(req.params.id, { active: false });
     if (calls.snapshot().some(call => call.agentId === req.params.id && call.state !== 'ended')) throw new InputError('End this agent\'s call before removing them from the roster.', 409);
@@ -416,6 +459,7 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     requireFloor();
     if (req.body !== undefined) allowed(req.body, []);
     const agent = findAgent(req.params.id);
+    if (agent.userId && !ownsSeat(req, agent) && roleOf(req) !== 'admin') forbid(`That seat belongs to ${agent.name}.`);
     res.setHeader('Set-Cookie', sessions.cookie(agent.id));
     res.status(201).json({ agent: { id: agent.id, name: agent.name } });
   });
@@ -442,6 +486,24 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     queue.resume(agentId);
     floorEvent();
     res.json({ floor: queue.snapshot() });
+  });
+  // People. Roles live on accounts; a seat is what an account answers as.
+  router.get('/users', adminOnly, (req, res) => { requireAccounts(); res.json({ users: accounts.list() }); });
+  router.patch('/users/:id', adminOnly, async (req, res) => {
+    requireAccounts(); allowed(req.body, ['role']);
+    if (req.params.id === userOf(req)) throw new InputError('Ask another admin to change your own role.', 409);
+    res.json({ user: await accounts.setRole(req.params.id, req.body.role) });
+  });
+  // Offboarding: their recorded voices are deleted at Fish, their seats are freed, the account goes.
+  router.delete('/users/:id', adminOnly, async (req, res) => {
+    requireAccounts();
+    if (req.params.id === userOf(req)) throw new InputError('You cannot remove your own account.', 409);
+    if (!accounts.find(req.params.id)) throw new InputError('Account not found.', 404, 'NOT_FOUND');
+    const theirs = store.snapshot().voices.filter(voice => voice.ownerId === req.params.id).map(voice => voice.id);
+    await purgeVoices(theirs);
+    const user = await accounts.remove(req.params.id);
+    stateEvent(); floorEvent();
+    res.json({ user, voicesDeleted: theirs.length });
   });
   router.get('/floor', (req, res) => res.json({ floor: queue ? queue.snapshot() : { waiting: [], agents: [] } }));
   /** The ask bar. The question travels with a bounded slice of the desk's own data; the answer comes back as plain text. */
@@ -596,6 +658,6 @@ export function errorHandler(error, req, res, next) {
   if (error instanceof multer.MulterError) return res.status(400).json({ error: 'Use one audio file under 30 MB and complete the required fields.', code: 'INVALID_UPLOAD' });
   if (error.type === 'entity.too.large') return res.status(413).json({ error: 'Request is too large.', code: 'REQUEST_TOO_LARGE' });
   if (error instanceof SyntaxError && 'body' in error) return res.status(400).json({ error: 'Request JSON is invalid.', code: 'INVALID_JSON' });
-  if (['InputError', 'ProviderError', 'AudioError', 'CallError', 'CallerAccessError'].includes(error.name) && Number.isInteger(error.status) && error.status >= 400 && error.status <= 599) return res.status(error.status).json({ error: error.message, code: error.code || 'REQUEST_FAILED' });
+  if (['InputError', 'ProviderError', 'AudioError', 'CallError', 'CallerAccessError', 'AuthError'].includes(error.name) && Number.isInteger(error.status) && error.status >= 400 && error.status <= 599) return res.status(error.status).json({ error: error.message, code: error.code || 'REQUEST_FAILED' });
   res.status(500).json({ error: 'The request could not be completed. Try again.', code: 'INTERNAL_ERROR' });
 }

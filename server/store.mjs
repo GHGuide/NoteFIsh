@@ -51,6 +51,7 @@ export function validateState(state) {
   if (!Array.isArray(users) || users.length > 500) throw new Error('Stored account data is invalid');
   for (const user of users) {
     if (!plain(user) || !text(user.id, 128) || !text(user.name, 100) || !text(user.email, 254) || !text(user.passwordHash, 400) || !text(user.createdAt, 50)) throw new Error('Stored account data is invalid');
+    if (!([undefined].includes(user.role) || ['admin', 'supervisor', 'agent'].includes(user.role))) throw new Error('Stored account data is invalid');
   }
   if (!([undefined, null].includes(state.authSecret) || text(state.authSecret, 128))) throw new Error('Stored account data is invalid');
   const settings = state.settings;
@@ -63,6 +64,7 @@ export function validateState(state) {
   for (const voice of state.voices) {
     if (!plain(voice) || !text(voice.id, 128) || !text(voice.referenceId, 128) || !text(voice.name, 100) || !text(voice.description, 1000) || !text(voice.language, 40) || !['enrolled', 'licensed'].includes(voice.kind) || !['training', 'ready', 'failed'].includes(voice.status) || typeof voice.archived !== 'boolean' || !text(voice.createdAt, 50)) throw new Error('Stored voice data is invalid');
     if (!([undefined, null].includes(voice.register) || REGISTERS.includes(voice.register))) throw new Error('Stored voice data is invalid');
+    if (!([undefined, null].includes(voice.ownerId) || text(voice.ownerId, 128))) throw new Error('Stored voice data is invalid');
     if (!([undefined, null].includes(voice.baseline) || (plain(voice.baseline) && typeof voice.baseline.loudness === 'number' && typeof voice.baseline.rate === 'number'))) throw new Error('Stored voice data is invalid');
   }
   for (const call of state.calls) {

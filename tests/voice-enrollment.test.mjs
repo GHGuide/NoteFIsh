@@ -85,7 +85,7 @@ test('named multipart enrollment progresses from training to ready, selection an
   assert.deepEqual(app.invocations.create[0].audio, sample);
   assert.equal(app.invocations.create[0].mimeType, 'audio/wav');
   assert.equal(app.invocations.create[0].transcript, 'A test sample transcript.');
-  assert.deepEqual((await (await app.request('/voices')).json()).voices, [voice]);
+  assert.deepEqual((await (await app.request('/voices')).json()).voices, [{ ...voice, owner: null, mine: true, usable: true }], 'the list says who may use and manage each voice');
 
   assert.equal((await app.request('/settings', { method: 'PUT', body: { voiceId: voice.id } })).status, 409, 'an unfinished clone cannot be used for calls');
   assert.equal(app.snapshot().settings.voiceId, null);
@@ -103,7 +103,7 @@ test('named multipart enrollment progresses from training to ready, selection an
   await app.restart();
   const library = await app.request('/voices');
   assert.equal(library.status, 200);
-  assert.deepEqual((await library.json()).voices, [ready]);
+  assert.deepEqual((await library.json()).voices, [{ ...ready, owner: null, mine: true, usable: true }]);
   const settings = (await (await app.request('/settings')).json()).settings;
   assert.equal(settings.voiceId, voice.id);
   assert.equal(settings.agentLanguage, 'en');

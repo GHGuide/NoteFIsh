@@ -86,6 +86,7 @@ export function createProviders(config, { fetchImpl = globalThis.fetch } = {}) {
           if (data.length < 32 || /json|text\/|html/iu.test(contentType)) throw new ProviderError(`${provider} did not return playable speech.`);
           return data;
         }
+        if (!data.length) return null; // a delete answers with nothing
         try { return JSON.parse(data.toString('utf8')); }
         catch { throw new ProviderError(`${provider} returned an invalid response.`); }
       } catch (error) {
@@ -224,6 +225,11 @@ export function createProviders(config, { fetchImpl = globalThis.fetch } = {}) {
       if (transcript) form.append('texts', transcript);
       // Voice creation is a mutation: do not retry an uncertain response and create duplicate models.
       return voiceResult(await request('Fish', '/model', { body: form, signal, retries: 0 }));
+    },
+    // Removing a model at Fish is the only real deletion of a cloned voice; one that is already gone counts as deleted.
+    async deleteVoice({ referenceId, signal }) {
+      try { await request('Fish', `/model/${reference(referenceId)}`, { method: 'DELETE', signal, retries: 0 }); }
+      catch (error) { if (error.code !== 'provider_not_found') throw error; }
     },
     async getVoice({ referenceId, signal }) {
       return voiceResult(await request('Fish', `/model/${reference(referenceId)}`, { method: 'GET', signal }));

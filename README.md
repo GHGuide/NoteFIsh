@@ -51,6 +51,12 @@ Generate a caller invitation in the desk and open it on the phone. Hold Space re
 
 Any voice exports as a small JSON file (`⋯ › Export voice file`, or **Export library**) holding the Fish reference and what the library knows about it — the take it was recorded for, its baseline. Import it on another desk from **Import Fish voice › From a NoteFish voice file**; Fish confirms the model exists before it joins the library.
 
+## People, roles and who owns a voice
+
+The first account created on a desk is its **admin**; after that the desk is invitation-only. Admins invite people by email from **Settings › Agents** (the link signs them up as that seat), set roles, and offboard. **Supervisors** keep the glossary, phrases and house style and watch the floor. **Agents** answer calls with their own seat and voice. A desk reached without an account, on this Mac or with the shared desk password, is treated as admin.
+
+A recorded voice belongs to whoever recorded it. Only they, or an admin, can use it on a seat, share it as a file, archive it or delete it for good (**⋯ › Delete for good** removes the model at Fish). Licensed voices are shared by everyone. Offboarding an account deletes every voice they recorded at Fish, frees their seat and removes the account.
+
 ## Run a floor of agents
 
 Leave the roster empty and NoteFish is one desk, exactly as before. Add names
