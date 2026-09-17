@@ -1,6 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import twilio from 'twilio';
 import { languages, languageCodes, isCallerLanguage } from './languages.mjs';
 import { measureClip, REGISTERS, canonicalRegister } from './emotion.mjs';
@@ -138,7 +139,7 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     if (local && !isLocalRequest(req)) throw new InputError('The companion can only join from the machine running the desk.', 403);
     res.status(201).json(callerAccess.issue({ label, local }));
   });
-  router.get(['/status', '/setup'], (req, res) => res.json(getStatus(config, { audioAvailable })));
+  router.get(['/status', '/setup'], (req, res) => res.json(getStatus(config, { audioAvailable, driverInstalled: process.platform === 'darwin' ? existsSync('/Library/Audio/Plug-Ins/HAL/NoteFishVoice.driver') : null })));
   router.get('/languages', (req, res) => res.json({ languages }));
   /** The Mac app's pill has no console anyone can read; it reports here, and only from this machine. */
   router.post('/log', (req, res) => {
@@ -273,10 +274,33 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     const audio = await providers.synthesize({ text: spokenText, referenceId: voice.referenceId, format: 'mp3' });
     res.type('audio/mpeg').send(audio);
   }));
+  /** Setup's "hear yourself": a clip or a line in your language comes back spoken in the caller's, in the desk voice. */
+  router.post('/try', limited(async (req, res) => {
+    const settings = store.snapshot().settings;
+    const voice = settings.voiceId ? findVoice(store, settings.voiceId, true) : null;
+    if (!voice) throw new InputError('Choose a voice first.', 409, 'NO_VOICE');
+    const sourceLanguage = language(settings.agentLanguage);
+    const targetLanguage = settings.customerLanguage === 'auto' ? 'fr' : language(settings.customerLanguage);
+    let heard;
+    if (req.is('multipart/form-data')) {
+      await new Promise((resolve, reject) => upload(req, res, error => error ? reject(error) : resolve()));
+      if (!req.file) throw new InputError('Say something first.');
+      if (!providers.transcribe) throw new InputError('Transcription needs the OpenAI key on the server.', 503);
+      heard = await providers.transcribe({ audio: req.file.buffer, mimeType: req.file.mimetype, language: sourceLanguage });
+    } else {
+      allowed(req.body, ['text']);
+      heard = text(req.body.text, 'line', 1000);
+    }
+    if (!heard?.trim()) throw new InputError('Nothing was heard. Try again a little closer to the microphone.');
+    const said = sourceLanguage === targetLanguage ? heard : await providers.translate({ text: heard, sourceLanguage, targetLanguage });
+    const audio = await providers.synthesize({ text: said, referenceId: voice.referenceId, format: 'mp3' });
+    res.json({ heard, said, language: targetLanguage, audio: audio.toString('base64') });
+  }));
   router.get('/settings', (req, res) => res.json({ settings: store.snapshot().settings }));
   const saveSettings = async (req, res) => {
-    allowed(req.body, ['voiceId', 'agentLanguage', 'customerLanguage', 'queueName', 'registers', 'layout', 'phrases', 'persona', 'glossary', 'formality', 'avatar']);
+    allowed(req.body, ['voiceId', 'agentLanguage', 'customerLanguage', 'queueName', 'registers', 'layout', 'phrases', 'persona', 'glossary', 'formality', 'avatar', 'onboardedAt']);
     const patch = {};
+    if ('onboardedAt' in req.body) patch.onboardedAt = req.body.onboardedAt === null ? null : new Date().toISOString(); // true = now, null = run setup again
     if ('persona' in req.body) patch.persona = text(req.body.persona ?? '', 'house style', 300, true).trim();
     if ('glossary' in req.body) patch.glossary = glossaryInput(req.body.glossary);
     if ('formality' in req.body) patch.formality = formalityInput(req.body.formality);

@@ -2,7 +2,7 @@
 // the pages inside it. State (calls, settings, the desk socket, seats) lives
 // here and flows to every page as `common`; web/pages/* draw the sheets.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AudioLines, Bell, CheckCircle2, ChevronDown, LogOut, Maximize2, Menu, PhoneCall, X } from 'lucide-react';
+import { AudioLines, Bell, CheckCircle2, ChevronDown, LogOut, Maximize2, Menu, PanelLeft, PhoneCall, X } from 'lucide-react';
 import { api } from './api.js';
 import { mergeTrainingStatus, monitorVoiceTraining } from './voice-training.js';
 import { CallerAudio } from './audio.js';
@@ -21,6 +21,7 @@ import FloorPage from './pages/floor.jsx';
 import SettingsPage from './pages/settings.jsx';
 import FreeMonth from './pages/free.jsx';
 import AuthPage from './pages/auth.jsx';
+import Onboarding, { PAUSE_KEY } from './pages/onboarding.jsx';
 import { Mic, Disc, BarChart3, BookOpen, Quote, Users, Gift, Settings, CircleHelp } from 'lucide-react';
 
 const HELP_URL = 'https://github.com/GHGuide/NoteFish#readme';
@@ -177,6 +178,11 @@ function WorkspaceApp({ user, onSignedOut }) {
   const [seatBusy, setSeatBusy] = useState(false);
   const takeSeat = id => { if (!id) return; setSeatBusy(true); seatActions.take(id).catch(failure => setError(failure.message)).finally(() => setSeatBusy(false)); };
   const common = { data, navigate, route: parsed, loading, error, setError, setNotice, saveSettings, saveOwned, owned, refreshVoices, updateCall, sharedDemo, trainingNotes, multiAgent, hasFloor, roster, seat, seatActions, refreshFloor, partialCaption, connection, invitation, setInvitation, audioReady, enableAudio, clearAudio: () => player.current.clear(), setAudioMuted: muted => { player.current.muted = muted; if (muted) player.current.clear(); }, reload, focus, setFocus, openFree: () => setFree(true) };
+  // First run: setup until it is finished, unless paused to go record a voice.
+  const [setupPaused, setSetupPaused] = useState(() => { try { return sessionStorage.getItem(PAUSE_KEY) === '1'; } catch { return false; } });
+  const needsSetup = !loading && !data.settings.onboardedAt && !sharedDemo;
+  const resumeSetup = () => { try { sessionStorage.removeItem(PAUSE_KEY); } catch { /* fine */ } setSetupPaused(false); navigate('/desk'); };
+  if (needsSetup && !setupPaused) return <Onboarding {...common} onDone={() => { try { setSetupPaused(sessionStorage.getItem(PAUSE_KEY) === '1'); } catch { /* fine */ } }} />;
   const Page = { '/desk': DeskPage, '/calls': CallsPage, '/insights': InsightsPage, '/glossary': GlossaryPage, '/phrases': PhrasesPage, '/voice': VoicePage, '/floor': FloorPage, '/settings': SettingsPage }[parsed.path] || DeskPage;
   const seatState = !seat ? null : mine?.state === 'on_call' ? ['On a call', 'amber'] : mine?.paused ? [mine.pauseReason ? `Paused · ${mine.pauseReason}` : 'Paused', 'muted'] : ['On the floor', ''];
   return <div className={`ds-app ${focus ? 'is-focus' : ''}`}>
@@ -198,10 +204,11 @@ function WorkspaceApp({ user, onSignedOut }) {
       </nav>
     </aside>
     {mobileNav && <button className="ds-scrim" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
+    <button type="button" className="ds-collapse" aria-label={focus ? 'Show the sidebar' : 'Hide the sidebar'} aria-pressed={focus} onClick={() => setFocus(!focus)}><PanelLeft size={17} strokeWidth={1.7} /></button>
     <div className="ds-topbar" data-tauri-drag-region="true">
-      <button type="button" aria-label={focus ? 'Show the sidebar' : 'Hide the sidebar'} aria-pressed={focus} onClick={() => setFocus(!focus)}><Maximize2 size={15} /></button>
       <button type="button" aria-label="Settings" onClick={() => navigate('/settings')}><Avatar who={seat || { name: 'workspace', avatar: data.settings.avatar }} size={20} /></button>
     </div>
+    {needsSetup && setupPaused && !incoming && <div className="ds-banner" role="status"><span>Setup is paused.</span><button type="button" onClick={resumeSetup}>Continue setup</button></div>}
     {incoming && parsed.path !== '/desk' && <div className="ds-banner" role="status"><PhoneCall size={15} /><span>Incoming call from <b>{incoming.from || 'a caller'}</b></span><button type="button" onClick={() => navigate('/desk')}>Go to desk</button></div>}
     {error && <div className="ds-banner error" role="alert"><span>{error}</span><button type="button" className="x" aria-label="Dismiss" onClick={() => setError('')}><X size={14} /></button></div>}
     <section className="ds-sheet"><RouteTransition route={parsed.path + (parsed.params.id || '')}><Page {...common} /></RouteTransition></section>

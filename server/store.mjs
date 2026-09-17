@@ -56,6 +56,7 @@ export function validateState(state) {
   if (!layoutOk(settings.layout) || !phrasesOk(settings.phrases)) throw new Error('Stored settings are invalid');
   if (!(settings.persona === undefined || settings.persona === null || text(settings.persona, 300))) throw new Error('Stored settings are invalid');
   if (!glossaryOk(settings.glossary) || !formalityOk(settings.formality) || !avatarOk(settings.avatar)) throw new Error('Stored settings are invalid');
+  if (!([undefined, null].includes(settings.onboardedAt) || text(settings.onboardedAt, 50))) throw new Error('Stored settings are invalid');
   for (const voice of state.voices) {
     if (!plain(voice) || !text(voice.id, 128) || !text(voice.referenceId, 128) || !text(voice.name, 100) || !text(voice.description, 1000) || !text(voice.language, 40) || !['enrolled', 'licensed'].includes(voice.kind) || !['training', 'ready', 'failed'].includes(voice.status) || typeof voice.archived !== 'boolean' || !text(voice.createdAt, 50)) throw new Error('Stored voice data is invalid');
     if (!([undefined, null].includes(voice.register) || REGISTERS.includes(voice.register))) throw new Error('Stored voice data is invalid');

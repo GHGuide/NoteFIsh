@@ -85,7 +85,7 @@ export function loadConfig(env = process.env, root = process.cwd()) {
   });
 }
 
-export function getStatus(config, { audioAvailable = false } = {}) {
+export function getStatus(config, { audioAvailable = false, driverInstalled = null } = {}) {
   const keys = {
     OPENAI_API_KEY: config.openaiApiKey, FISH_API_KEY: config.fishApiKey,
     PUBLIC_BASE_URL: config.publicBaseUrl,
@@ -106,6 +106,7 @@ export function getStatus(config, { audioAvailable = false } = {}) {
     streamUrl: config.publicBaseUrl ? `${config.publicBaseUrl.replace(/^https:/, 'wss:')}/ws/twilio` : null,
     ready: blockers.length === 0, verified: false, blockers, missing, model: config.fishModel,
     audioAvailable, demoVerified: false, demoTransport: 'browser',
+    mac: { platform: process.platform, driverInstalled }, // the NoteFish Voice virtual microphone, for calls in Zoom and the rest
     access: { mode: config.publicDemo ? 'shared-demo' : 'protected', loginRequired: !config.publicDemo },
     callerUrl: config.publicBaseUrl ? `${config.publicBaseUrl}/caller` : null,
     // A shared demo has no way to tell one visitor from another, so a roster of

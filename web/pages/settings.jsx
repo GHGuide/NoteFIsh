@@ -53,7 +53,8 @@ function Workspace({ data, setup, readyVoices, saveSettings, roster, setTab }) {
       <Field label="House style"><textarea rows={2} maxLength={300} autoFocus defaultValue={s.persona || ''} placeholder="Brief and friendly. Formal “vous”. Never promise a time you can’t keep." onBlur={event => { const persona = event.target.value.trim(); if (persona !== (s.persona || '')) saveSettings({ persona }); }} /></Field>
       <p className="ds-note">Shapes how replies are worded before they are spoken: length, politeness, phrasing. Facts and meaning never change.</p>
     </div>}
-    <Setting main="Agents on the floor" sub={roster.length ? roster.map(agent => agent.name).join(', ') : 'Nobody yet · one desk'}><TextBtn onClick={() => setTab('agents')}>Manage</TextBtn></Setting>
+    <Setting main="Setup" sub="The five-minute walkthrough: languages, voice, a test line, this Mac."><TextBtn onClick={() => { try { sessionStorage.removeItem('notefish.setupPaused'); } catch { /* fine */ } saveSettings({ onboardedAt: null }); }}>Run again</TextBtn></Setting>
+        <Setting main="Agents on the floor" sub={roster.length ? roster.map(agent => agent.name).join(', ') : 'Nobody yet · one desk'}><TextBtn onClick={() => setTab('agents')}>Manage</TextBtn></Setting>
     <Setting main="Zendesk" sub="Creates a ticket for every completed call">{onOff(hooks.zendesk?.configured)}</Setting>
     <Setting main="Signed webhook" sub={hooks.webhook?.url || 'Posts every completed call to your endpoint, signed'}>{onOff(hooks.webhook?.configured)}</Setting>
     <Setting main="Export API" sub="Let a system pull calls as JSON or CSV">{onOff(hooks.exportApi?.configured)}</Setting>
