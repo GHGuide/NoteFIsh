@@ -444,7 +444,7 @@ fn main() {
             }
             let menu = build_menu(app.handle(), &Snapshot { status: "Starting…".into(), ..Default::default() })?;
             TrayIconBuilder::with_id("main")
-                .icon(app.default_window_icon().cloned().expect("app icon"))
+                .icon(tauri::include_image!("icons/tray.png")) // the fish alone; macOS tints it as a template
                 .icon_as_template(true)
                 .menu(&menu)
                 .show_menu_on_left_click(true)

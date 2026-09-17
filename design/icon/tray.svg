@@ -1,0 +1,5 @@
+<!-- Menu bar icon: the fish alone, black on transparent, eyes cut out; macOS tints it as a template. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">
+  <defs><mask id="m"><rect width="36" height="36" fill="#000"/><g transform="translate(0.9 1.6) scale(.36)"><g fill="#FFF"><circle cx="67" cy="51" r="14"/><circle cx="59.7" cy="67.3" r="14"/><circle cx="42" cy="74" r="14"/><circle cx="24.3" cy="67.3" r="14"/><circle cx="17" cy="51" r="14"/><circle cx="24.3" cy="34.7" r="14"/><circle cx="42" cy="28" r="14"/><circle cx="59.7" cy="34.7" r="14"/><circle cx="80" cy="36" r="12"/><circle cx="80" cy="66" r="12"/><circle cx="71" cy="51" r="11"/><ellipse cx="42" cy="51" rx="30" ry="26"/></g><g transform="rotate(-9 34 47)"><rect x="30.4" y="38" width="7.2" height="18" rx="3.6" fill="#000"/></g><g transform="rotate(9 50 47)"><rect x="46.4" y="38" width="7.2" height="18" rx="3.6" fill="#000"/></g></g></mask></defs>
+  <rect width="36" height="36" fill="#000" mask="url(#m)"/>
+</svg>
