@@ -5,11 +5,11 @@ import { runInNewContext } from 'node:vm';
 
 // Execute the shipped hook and its MediaRecorder callbacks, with browser events
 // scheduled explicitly. React rendering is irrelevant to this stop/onstop race.
-const app = await readFile(new URL('../web/App.jsx', import.meta.url), 'utf8');
-const hookStart = app.indexOf('function useCapture(');
-const hookEnd = app.indexOf('\nfunction LanguageSelect(', hookStart);
+const app = await readFile(new URL('../web/lib.jsx', import.meta.url), 'utf8');
+const hookStart = app.indexOf('export function useCapture(');
+const hookEnd = app.indexOf('\nexport function LanguageSelect(', hookStart);
 if (hookStart < 0 || hookEnd <= hookStart) throw new Error('Cannot locate the production capture hook');
-const hookSource = app.slice(hookStart, hookEnd);
+const hookSource = app.slice(hookStart, hookEnd).replace(/^export /, '');
 
 function captureFixture() {
   const completed = []; const recorders = [];

@@ -1,0 +1,8 @@
+/* Get a free month: the link and email fields, the notes on the other tabs, the footer. */
+.free-steps { margin-top: 2px; }
+.free-steps b { font-weight: 600; }
+.free-field { display: flex; flex-direction: column; gap: 6px; }
+.free-field strong { font-size: 12px; font-weight: 600; }
+.free-field .val svg { color: var(--navtext); flex-shrink: 0; }
+.free-note { margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: var(--panel); }
+.free-foot { font-size: 11px; color: var(--muted); line-height: 1.5; text-align: center; margin: auto 0 0; padding-top: 12px; }

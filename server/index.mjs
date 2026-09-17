@@ -70,7 +70,7 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
   app.use('/api', (req, res) => res.status(404).json({ error: 'API route not found.' }));
   if (hasBuild) {
     app.use(express.static(config.distPath, { dotfiles: 'deny', index: false, fallthrough: true }));
-    app.get(['/', '/desk', '/enroll', '/admin', '/voices', '/floor', '/pill'], (req, res) => res.sendFile(path.join(config.distPath, 'index.html')));
+    app.get(['/', '/desk', '/enroll', '/admin', '/voices', '/voice', '/floor', '/pill', '/calls', '/calls/:id', '/insights', '/glossary', '/phrases', '/settings'], (req, res) => res.sendFile(path.join(config.distPath, 'index.html')));
   } else {
     app.get('/', (req, res) => res.type('text/plain').send('NoteFish API is running. Start npm run dev:web, or run npm run build to serve the website here.'));
   }

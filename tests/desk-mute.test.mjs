@@ -5,10 +5,12 @@ import { runInNewContext } from 'node:vm';
 
 // Run the shipped desk handlers and capture hook with explicit browser callback
 // timing, including mute between release and MediaRecorder's async onstop.
-const app = await readFile(new URL('../web/App.jsx', import.meta.url), 'utf8');
-const captureSource = app.slice(app.indexOf('function useCapture('), app.indexOf('\nfunction LanguageSelect('));
-const deskStart = app.indexOf('function Desk(');
-const deskSource = app.slice(deskStart, app.indexOf('\n  const action =', deskStart));
+// The hook lives in lib.jsx; the desk page (companion design) in pages/desk.jsx.
+const lib = await readFile(new URL('../web/lib.jsx', import.meta.url), 'utf8');
+const captureSource = lib.slice(lib.indexOf('export function useCapture('), lib.indexOf('\nexport function LanguageSelect(')).replace(/^export /, '');
+const app = await readFile(new URL('../web/pages/desk.jsx', import.meta.url), 'utf8');
+const deskStart = app.indexOf('export default function DeskPage(');
+const deskSource = app.slice(deskStart, app.indexOf('\n  const action =', deskStart)).replace(/^export default /, '');
 
 function fixture({ deferPermission = false } = {}) {
   const recorders = []; const uploads = []; const tracks = []; const grants = [];
@@ -28,10 +30,10 @@ function fixture({ deferPermission = false } = {}) {
       this.onstop();
     }
   }
-  const Desk = runInNewContext(`${captureSource}\n${deskSource}\nreturn { startTalk, toggleMicrophone, capture }; }\nDesk;`, {
+  const Desk = runInNewContext(`${captureSource}\n${deskSource}\nreturn { startTalk, toggleMicrophone, capture }; }\nDeskPage;`, {
     useState: value => [value, () => {}], useRef: value => ({ current: value }),
     useCallback: value => value, useEffect: () => {},
-    callState: call => call?.state, isArchived: () => false,
+    callState: call => call?.state, isArchived: () => false, needsDispatch: () => false, languageName: code => code, REGISTERS: [], stamp: () => '', formatDuration: () => '', languages: [],
     Date: { now: () => time }, Blob, MediaRecorder: Recorder, recordingType: () => 'audio/webm',
     navigator: { mediaDevices: { getUserMedia: async () => {
       requests++;
@@ -43,6 +45,7 @@ function fixture({ deferPermission = false } = {}) {
   const desk = Desk({
     data: { calls: [{ id: 'call', state: 'in_call', phase: 'listening' }], voices: [{ id: 'voice', status: 'ready' }], settings: { voiceId: 'voice' } },
     connection: 'connected', clearAudio() {}, setError(error) { throw new Error(error); }, setNotice() {}, updateCall() {},
+    route: { path: '/desk', params: {}, query: {} }, owned: () => undefined, saveOwned: async () => true, setAudioMuted() {}, roster: [], seat: null, hasFloor: false,
   });
   return { desk, recorders, uploads, tracks, grants, requests: () => requests };
 }

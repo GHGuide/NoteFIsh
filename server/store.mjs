@@ -11,6 +11,10 @@ const plain = value => value && typeof value === 'object' && !Array.isArray(valu
 const text = (value, max) => typeof value === 'string' && value.length <= max;
 const phrasesOk = value => value === undefined || (Array.isArray(value) && value.length <= 30 && value.every(item => plain(item) && text(item.id, 64) && text(item.text, 300) && item.text.trim()));
 const layoutOk = value => value === undefined || isLayoutShape(value);
+const FORMALITY = ['formal', 'casual', 'match'];
+const glossaryOk = value => value === undefined || (Array.isArray(value) && value.length <= 200 && value.every(item => plain(item) && text(item.id, 64) && text(item.term, 120) && item.term.trim() && ['keep', 'as', 'spell'].includes(item.kind) && text(item.as ?? '', 200)));
+const formalityOk = value => value === undefined || value === null || FORMALITY.includes(value);
+const avatarOk = value => value === undefined || value === null || (plain(value) && text(value.variant, 20) && /^#[0-9A-Fa-f]{6}$/.test(String(value.color || '')) && (value.face === undefined || typeof value.face === 'boolean'));
 
 /** Version 1 held one global settings row and no roster. Its settings become the
  * workspace defaults that every agent inherits until they override one. */
@@ -36,6 +40,7 @@ export function validateState(state) {
     if (agent.registers !== undefined && (!plain(agent.registers) || Object.entries(agent.registers).some(([k, v]) => !REGISTERS.includes(k) || !(v === null || text(v, 128))))) throw new Error('Stored agent data is invalid');
     if (!layoutOk(agent.layout) || !phrasesOk(agent.phrases)) throw new Error('Stored agent data is invalid');
     if (!(agent.persona === undefined || agent.persona === null || text(agent.persona, 300))) throw new Error('Stored agent data is invalid');
+    if (!formalityOk(agent.formality) || !avatarOk(agent.avatar)) throw new Error('Stored agent data is invalid');
   }
   if (new Set(state.agents.map(agent => agent.id)).size !== state.agents.length) throw new Error('Stored agent data is invalid');
   const settings = state.settings;
@@ -43,6 +48,7 @@ export function validateState(state) {
   if (settings.registers !== undefined && (!plain(settings.registers) || Object.entries(settings.registers).some(([k, v]) => !REGISTERS.includes(k) || !(v === null || text(v, 128))))) throw new Error('Stored settings are invalid');
   if (!layoutOk(settings.layout) || !phrasesOk(settings.phrases)) throw new Error('Stored settings are invalid');
   if (!(settings.persona === undefined || settings.persona === null || text(settings.persona, 300))) throw new Error('Stored settings are invalid');
+  if (!glossaryOk(settings.glossary) || !formalityOk(settings.formality) || !avatarOk(settings.avatar)) throw new Error('Stored settings are invalid');
   for (const voice of state.voices) {
     if (!plain(voice) || !text(voice.id, 128) || !text(voice.referenceId, 128) || !text(voice.name, 100) || !text(voice.description, 1000) || !text(voice.language, 40) || !['enrolled', 'licensed'].includes(voice.kind) || !['training', 'ready', 'failed'].includes(voice.status) || typeof voice.archived !== 'boolean' || !text(voice.createdAt, 50)) throw new Error('Stored voice data is invalid');
     if (!([undefined, null].includes(voice.register) || REGISTERS.includes(voice.register))) throw new Error('Stored voice data is invalid');

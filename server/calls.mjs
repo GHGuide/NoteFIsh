@@ -426,6 +426,21 @@ export function createCallService({
   }
 
   /** Agent overrides win over the workspace defaults; an empty override inherits. */
+  /** One instruction block for the interpreter: how to word replies, which register, and the words that never change. */
+  function composeStyle({ persona = '', formality = null, glossary = [] }) {
+    const lines = [];
+    if (persona && persona.trim()) lines.push(persona.trim());
+    if (formality === 'formal') lines.push('Address the caller formally (vous, Sie, usted, u).');
+    if (formality === 'casual') lines.push('Address the caller informally (tu, du, tú, je).');
+    if (formality === 'match') lines.push('Mirror the register the caller uses, formal or informal.');
+    const keep = glossary.filter(item => item.kind === 'keep').map(item => item.term);
+    const spell = glossary.filter(item => item.kind === 'spell').map(item => item.term);
+    const as = glossary.filter(item => item.kind === 'as' && item.as).map(item => `"${item.term}" → "${item.as}"`);
+    if (keep.length) lines.push(`Never translate these, keep them exactly as written: ${keep.join(', ')}.`);
+    if (spell.length) lines.push(`Read these digit by digit or letter by letter: ${spell.join(', ')}.`);
+    if (as.length) lines.push(`Translate these terms exactly so: ${as.join('; ')}.`);
+    return lines.join('\n').slice(0, 1500);
+  }
   function resolveSettings(agentId) {
     const state = store.snapshot();
     const defaults = state.settings;
@@ -435,6 +450,7 @@ export function createCallService({
       voiceId: agent?.voiceId || defaults.voiceId,
       registers: agent?.registers || defaults.registers || {},
       persona: agent?.persona || defaults.persona || '',
+      style: composeStyle({ persona: agent?.persona || defaults.persona || '', formality: agent?.formality || defaults.formality || null, glossary: defaults.glossary || [] }),
       agentLanguage: agent?.agentLanguage || defaults.agentLanguage,
       customerLanguage: agent?.customerLanguage || defaults.customerLanguage,
     };
@@ -593,7 +609,7 @@ export function createCallService({
       runtime.call.stage = 'translating'; await persist(runtime);
       // Providers without an interpreter (tests, older adapters) still translate; tone then defaults to calm.
       const interpreted = providers.interpret
-        ? await providers.interpret({ text: textSource, sourceLanguage: settings.agentLanguage, targetLanguage, style: settings.persona, signal })
+        ? await providers.interpret({ text: textSource, sourceLanguage: settings.agentLanguage, targetLanguage, style: settings.style, signal })
         : { text: await providers.translate({ text: textSource, sourceLanguage: settings.agentLanguage, targetLanguage, signal }), tone: 'calm', language: settings.agentLanguage, sentences: [] };
       if (!current()) return structuredClone(runtime.call);
       arousal = clip ? arousalOf(clip, baseVoice.baseline || undefined) : { level: 'medium', rateRatio: 1, louderDb: 0 };

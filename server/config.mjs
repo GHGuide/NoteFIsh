@@ -62,6 +62,10 @@ export function loadConfig(env = process.env, root = process.cwd()) {
     if (!/^[a-zA-Z0-9._-]+$/.test(value)) throw new Error(`Invalid ${key}`);
     return value;
   };
+  // How long Fish may buffer before the first audio chunk. 'low' starts sooner and
+  // costs some prosody; 'normal' waits longest. Anything else is a typo worth catching.
+  const latency = read('FISH_LATENCY', 20) || 'balanced';
+  if (!['low', 'balanced', 'normal'].includes(latency)) throw new Error('FISH_LATENCY must be low, balanced or normal');
   return Object.freeze({
     root, port: Number(portText), host, publicBaseUrl, deskPassword, publicDemo,
     production, dataPath: path.join(dataDir, 'notefish.json'), distPath: path.join(root, 'dist'),
@@ -72,7 +76,11 @@ export function loadConfig(env = process.env, root = process.cwd()) {
     zendeskSubdomain, zendeskEmail, zendeskApiToken,
     demoVoiceReferenceId: read('NOTEFISH_DEMO_VOICE_REFERENCE_ID', 128),
     fishModel: model('FISH_MODEL', 's2.1-pro-free'),
+    fishLatency: latency,
     transcribeModel: model('OPENAI_TRANSCRIBE_MODEL', 'gpt-4o-mini-transcribe'),
+    // Live captions run on their own model: the batch one transcribes a finished clip,
+    // this one streams words back while the caller is still talking.
+    liveTranscribeModel: model('OPENAI_LIVE_TRANSCRIBE_MODEL', 'gpt-4o-mini-transcribe'),
     translationModel: model('OPENAI_TRANSLATION_MODEL', 'gpt-4o-mini'),
   });
 }

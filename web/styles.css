@@ -63,7 +63,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 .icon-button:hover { background: #EAE8E2; color: var(--ink); }
 .menu-button { display: none; }
 .page { width: 100%; max-width: 1336px; margin: 0 auto; padding: 36px 40px 32px; }
-.route-view { min-width: 0; }
+
 .page-footer { margin: 0 40px; padding: 20px 0 24px; border-top: 1px dashed var(--line); display: flex; justify-content: space-between; gap: 16px; font-size: 11px; color: var(--muted); }
 .footer-dot { margin: 0 5px; }
 .button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 11px 17px; border: 1px solid transparent; border-radius: 9px; font-size: 13px; font-weight: 550; line-height: 1.45; white-space: nowrap; transition: background .18s, border-color .18s, transform .16s; }

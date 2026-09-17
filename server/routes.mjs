@@ -24,6 +24,29 @@ const feelingInput = value => {
 /** A desk layout as sent by the app: three columns of panel ids. */
 const layoutInput = value => { if (!isLayoutShape(value)) throw new InputError('The desk layout is not valid.'); return normalizeLayout(value); };
 /** Canned lines: short strings an agent speaks with one click. Ids are kept when sane so the list can be edited in place. */
+/** Glossary: words that stay as written, are translated a set way, or are read out letter by letter. */
+function glossaryInput(value) {
+  if (!Array.isArray(value) || value.length > 200) throw new InputError('The glossary must be a list of up to 200 entries.');
+  return value.map((item, index) => {
+    if (!item || typeof item !== 'object') throw new InputError('Each glossary entry needs a term.');
+    allowed(item, ['id', 'term', 'kind', 'as']);
+    const kind = ['keep', 'as', 'spell'].includes(item.kind) ? item.kind : 'keep';
+    return { id: text(item.id || `g-${index}-${Date.now().toString(36)}`, 'glossary id', 64), term: text(item.term, 'term', 120).trim(), kind, as: kind === 'as' ? text(item.as ?? '', 'translation', 200, true).trim() : '' };
+  }).filter(item => item.term);
+}
+function formalityInput(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (!['formal', 'casual', 'match'].includes(value)) throw new InputError('Register must be formal, casual or match.');
+  return value;
+}
+function avatarInput(value) {
+  if (value === null || value === undefined) return null;
+  if (!value || typeof value !== 'object') throw new InputError('Avatar must be a shape and a colour.');
+  allowed(value, ['variant', 'color', 'face']);
+  if (!/^#[0-9A-Fa-f]{6}$/.test(String(value.color || ''))) throw new InputError('Avatar colour must be a hex colour.');
+  return { variant: text(value.variant, 'avatar shape', 20), color: value.color.toUpperCase(), face: value.face !== false };
+}
+
 const phrasesInput = value => {
   if (!Array.isArray(value) || value.length > 30) throw new InputError('Canned lines are a list of at most 30 lines.');
   return value.map(item => {
@@ -246,9 +269,12 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
   }));
   router.get('/settings', (req, res) => res.json({ settings: store.snapshot().settings }));
   const saveSettings = async (req, res) => {
-    allowed(req.body, ['voiceId', 'agentLanguage', 'customerLanguage', 'queueName', 'registers', 'layout', 'phrases', 'persona']);
+    allowed(req.body, ['voiceId', 'agentLanguage', 'customerLanguage', 'queueName', 'registers', 'layout', 'phrases', 'persona', 'glossary', 'formality', 'avatar']);
     const patch = {};
     if ('persona' in req.body) patch.persona = text(req.body.persona ?? '', 'house style', 300, true).trim();
+    if ('glossary' in req.body) patch.glossary = glossaryInput(req.body.glossary);
+    if ('formality' in req.body) patch.formality = formalityInput(req.body.formality);
+    if ('avatar' in req.body) patch.avatar = avatarInput(req.body.avatar);
     if ('layout' in req.body) patch.layout = layoutInput(req.body.layout);
     if ('phrases' in req.body) patch.phrases = phrasesInput(req.body.phrases);
     if ('registers' in req.body) {
@@ -288,10 +314,12 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
   });
   router.patch('/agents/:id', async (req, res) => {
     requireFloor();
-    allowed(req.body, ['name', 'voiceId', 'agentLanguage', 'customerLanguage', 'archived', 'registers', 'layout', 'phrases', 'persona']);
+    allowed(req.body, ['name', 'voiceId', 'agentLanguage', 'customerLanguage', 'archived', 'registers', 'layout', 'phrases', 'persona', 'formality', 'avatar']);
     findAgent(req.params.id, { active: false });
     const changes = {};
     if ('persona' in req.body) changes.persona = text(req.body.persona ?? '', 'style', 300, true).trim();
+    if ('formality' in req.body) changes.formality = formalityInput(req.body.formality);
+    if ('avatar' in req.body) changes.avatar = avatarInput(req.body.avatar);
     if ('layout' in req.body) changes.layout = layoutInput(req.body.layout);
     if ('phrases' in req.body) changes.phrases = phrasesInput(req.body.phrases);
     if ('name' in req.body) changes.name = text(req.body.name, 'agent name', 100);
@@ -364,6 +392,25 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     res.json({ floor: queue.snapshot() });
   });
   router.get('/floor', (req, res) => res.json({ floor: queue ? queue.snapshot() : { waiting: [], agents: [] } }));
+  /** The ask bar. The question travels with a bounded slice of the desk's own data; the answer comes back as plain text. */
+  router.post('/ask', limited(async (req, res) => {
+    allowed(req.body, ['question', 'scope', 'callId']);
+    if (!providers.ask) throw new InputError('Asking needs the OpenAI key on the server.', 503);
+    const question = text(req.body.question, 'question', 500).trim();
+    if (!question) throw new InputError('Ask something first.');
+    const scope = ['call', 'calls', 'floor', 'settings'].includes(req.body.scope) ? req.body.scope : 'calls';
+    const state = store.snapshot();
+    const brief = call => ({ id: call.id, from: call.from, startedAt: call.startedAt, answeredAt: call.answeredAt, endedAt: call.endedAt, state: call.state, agent: state.agents.find(a => a.id === call.agentId)?.name || null, callerLanguage: call.detectedLanguage || call.customerLanguage, agentLanguage: call.agentLanguage, notes: call.ticket, replies: (call.transcript || []).filter(l => l.speaker === 'agent').length, callerLines: (call.transcript || []).filter(l => l.speaker !== 'agent').length });
+    let context;
+    if (scope === 'call') {
+      const call = calls.snapshot().find(item => item.id === String(req.body.callId || ''));
+      if (!call) throw new InputError('That call is not here.', 404);
+      context = { call: brief(call), transcript: (call.transcript || []).slice(-80).map(l => ({ at: l.t, who: l.speaker === 'agent' ? 'agent' : 'caller', said: l.textSource, shown: l.textShown, feeling: l.feeling })) };
+    } else if (scope === 'floor') context = { floor: queue ? queue.snapshot() : null, agents: state.agents.filter(a => !a.archived).map(a => ({ name: a.name, languages: [a.agentLanguage, a.customerLanguage] })) };
+    else if (scope === 'settings') context = { settings: { ...state.settings, glossary: undefined }, glossary: state.settings.glossary || [], voices: state.voices.map(v => ({ name: v.name, kind: v.kind, status: v.status, language: v.language })), agents: state.agents.filter(a => !a.archived).map(a => a.name) };
+    else context = { now: new Date().toISOString(), calls: calls.snapshot().slice(-60).map(brief) };
+    res.json({ answer: await providers.ask({ question, context }) });
+  }));
   router.get('/integrations', (req, res) => res.json({
     enabled: Boolean(integrations?.enabled), adapters: integrations?.names || [], recent: integrations?.history() || [],
   }));

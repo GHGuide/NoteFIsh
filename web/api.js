@@ -45,4 +45,5 @@ export const api = {
   say: (id, text, feeling) => request(`/calls/${encodeURIComponent(id)}/reply`, { method: 'POST', body: JSON.stringify({ text, ...(feeling && feeling !== 'auto' ? { feeling } : {}) }) }),
   ptt: (id, blob, feeling) => { const body = new FormData(); body.append('audio', blob, `reply.${blob.type.includes('mp4') ? 'm4a' : 'webm'}`); if (feeling && feeling !== 'auto') body.append('feeling', feeling); return request(`/calls/${encodeURIComponent(id)}/reply`, { method: 'POST', body }); },
   ticket: (id, body) => request(`/calls/${encodeURIComponent(id)}/ticket`, { method: 'PATCH', body: JSON.stringify(body) }),
+  ask: (body, signal) => request('/ask', { method: 'POST', body: JSON.stringify(body), signal }),
 };

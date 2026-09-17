@@ -148,7 +148,7 @@ export function createProviders(config, { fetchImpl = globalThis.fetch } = {}) {
      */
     async interpret({ text, sourceLanguage, targetLanguage, style, signal }) {
       text = boundedText(text); targetLanguage = languageCode(targetLanguage);
-      style = typeof style === 'string' && style.trim() ? boundedText(style, 300, true).trim() : '';
+      style = typeof style === 'string' && style.trim() ? boundedText(style, 1500, true).trim() : '';
       const detect = sourceLanguage === 'auto';
       if (!detect) sourceLanguage = languageCode(sourceLanguage);
       const data = await request('OpenAI', '/v1/chat/completions', {
@@ -171,6 +171,22 @@ export function createProviders(config, { fetchImpl = globalThis.fetch } = {}) {
         .filter(item => item && typeof item.text === 'string' && item.text.trim())
         .map(item => ({ text: item.text.trim().slice(0, 2000), tag: typeof item.tag === 'string' ? item.tag.trim().slice(0, 40) : '' })) : [];
       return { text: translated, language, tone, sentences };
+    },
+    /** The ask bar: a short answer about the desk's own data (a call, the week, a setting). Nothing is invented. */
+    async ask({ question, context, signal }) {
+      question = boundedText(question, 500);
+      const data = await request('OpenAI', '/v1/chat/completions', {
+        headers: { 'Content-Type': 'application/json' }, signal,
+        body: JSON.stringify({ model: config.translationModel || 'gpt-4o-mini', temperature: 0.2, max_tokens: 600,
+          messages: [
+            { role: 'system', content: 'You are the assistant inside NoteFish, a call-centre desk that translates calls. Answer the question in one to four short sentences, in the language the question is written in, using only the JSON data provided. Quote names, times and numbers exactly. If the data does not answer the question, say so plainly in one sentence. No markdown.' },
+            { role: 'user', content: `Data:\n${JSON.stringify(context).slice(0, 60000)}\n\nQuestion: ${question}` },
+          ],
+        }),
+      });
+      const choice = data?.choices?.[0];
+      if (!choice?.message?.content) throw new ProviderError('No answer came back.');
+      return boundedText(choice.message.content, 2000).trim();
     },
     async synthesize({ text, referenceId, signal, format = 'mp3', temperature, speed }) {
       text = boundedText(text, 6000); referenceId = reference(referenceId);

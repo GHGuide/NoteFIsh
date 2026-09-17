@@ -1,0 +1,191 @@
+// Voice: the voice callers hear (the one in use, one take per feeling, the
+// library), the puff you are on the floor, and how formal replies are.
+import React, { useEffect, useRef, useState } from 'react';
+import { Archive, ArrowDownToLine, AudioLines, Check, Globe2, Mic, MoreHorizontal, Play, RefreshCw, Search, Settings2, Square } from 'lucide-react';
+import { api } from '../api.js';
+import { Toolbar, Title, Tabs, ReadBar, Body, Col, Label, Status, Chip, Row, Btn, TextBtn, Pill, SelectPill, Field, Switch, Option, Setting, Empty, Spinner, Ask, Avatar, Puff, PUFFS, SWATCHES, avatarOf } from '../shell.jsx';
+import { useCapture, VoiceModal, ImportModal, REGISTERS, READING_SCRIPTS, downloadJson, isArchived, languageName, formatDuration, callState } from '../lib.jsx';
+import { ActionMenu } from '../components/ui.jsx';
+import AudioWaveform from '../components/AudioWaveform.jsx';
+import RecordedAudio from '../components/RecordedAudio.jsx';
+import './voice.css';
+
+const TABS = [{ key: 'voice', label: 'Your voice' }, { key: 'takes', label: 'Takes' }, { key: 'avatar', label: 'Avatar' }, { key: 'register', label: 'Register' }, { key: 'library', label: 'Library' }];
+const AUDIO_ACCEPT = 'audio/wav,audio/mpeg,audio/mp4,audio/webm,audio/ogg,.wav,.mp3,.m4a,.webm,.ogg';
+const FORMALITY = [['formal', 'Formal', "vous · Sie · usted. The default for callers you don't know."], ['casual', 'Casual', 'tu · du · tú. For repeat callers who use it first.'], ['match', 'Match the caller', 'Follow whatever register the caller uses.']];
+const kindOf = voice => voice.kind === 'licensed' ? 'Licensed voice' : 'Voice clone';
+const toneOf = voice => isArchived(voice) ? ['muted', 'Archived'] : voice.status === 'ready' ? ['green', 'Ready'] : voice.status === 'training' ? ['amber', 'Training'] : ['red', 'Needs attention'];
+const feelingOf = key => REGISTERS.find(item => item.key === key);
+const dateOf = value => new Date(value).toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+export default function VoicePage(common) {
+  const { data, navigate, route, setError, setNotice, saveOwned, owned, refreshVoices, seat } = common;
+  const [localTab, setLocalTab] = useState('voice');
+  const tab = TABS.some(item => item.key === route.query.tab) ? route.query.tab : localTab;
+  const setTab = key => { setLocalTab(key); navigate(`/voice?tab=${key}`); };
+  const [selectedId, setSelectedId] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const voiceId = owned('voiceId') || data.settings.voiceId || '';
+  const selected = data.voices.find(item => item.id === selectedId);
+  const use = async chosen => { if (await saveOwned({ voiceId: chosen.id })) { setNotice(`${chosen.name} answers your calls.`); setSelectedId(null); } };
+  const shared = { ...common, setTab, setSelectedId, setImporting, use, voiceId, me: seat || { name: 'workspace', avatar: data.settings.avatar }, voice: data.voices.find(item => item.id === voiceId), ready: data.voices.filter(item => item.status === 'ready' && !isArchived(item)), registers: owned('registers') || {} };
+  const Section = { voice: YourVoice, takes: Takes, avatar: AvatarTab, register: Register, library: Library }[tab];
+  return <>
+    <Toolbar />
+    <Title title="Voice" sub={tab === 'takes' ? 'One take per feeling. The desk picks the take that matches how you spoke.' : 'How you sound to callers, and how you look on the floor'} />
+    <Tabs items={TABS} value={tab} onChange={setTab} />
+    <Section {...shared} />
+    <Ask placeholder="Ask how a reply will sound" scope="settings" />
+    {selected && <VoiceModal voice={selected} agentLanguage={data.settings.agentLanguage} customerLanguage={data.settings.customerLanguage} onClose={() => setSelectedId(null)} setError={setError} setNotice={setNotice} refreshVoices={refreshVoices} onUse={() => use(selected)} />}
+    {importing && <ImportModal onClose={() => setImporting(false)} setError={setError} setNotice={setNotice} refreshVoices={refreshVoices} />}
+  </>;
+}
+
+function YourVoice({ data, seat, owned, saveOwned, me, voice, ready, registers, setTab, setSelectedId }) {
+  const own = owned('voiceId') || '';
+  const ownVoice = data.voices.find(item => item.id === own);
+  const choices = ownVoice && !ready.includes(ownVoice) ? [ownVoice, ...ready] : ready;
+  const options = [...(seat ? [{ value: '', label: 'Workspace voice' }] : own ? [] : [{ value: '', label: ready.length ? 'Choose a voice' : 'No voice yet', disabled: true }]), ...choices.map(item => ({ value: item.id, label: item.name }))];
+  const taken = REGISTERS.filter(item => registers[item.key]);
+  return <Body>
+    <div className="ds-card"><Avatar who={me} size={54} /><div><strong>{voice ? `${voice.name} · ${voice.kind === 'licensed' ? 'licensed voice' : 'your voice'}` : 'No voice yet'}</strong><span>{voice ? [voice.createdAt && `Recorded ${dateOf(voice.createdAt)}`, languageName(voice.language || 'en'), kindOf(voice)].filter(Boolean).join(' · ') : 'Read one short passage and callers hear you in their language.'}</span></div>
+      <div className="actions">{voice && <Btn pill kind="ghost" icon={<Play size={12} />} onClick={() => setSelectedId(voice.id)}>Hear it</Btn>}<Btn pill icon={<Mic size={13} />} onClick={() => setTab('takes')}>{voice ? 'Re-record' : 'Record'}</Btn></div></div>
+    <h3>Voice for calls</h3>
+    <Setting main="Which voice answers" sub={seat ? 'Your own voice on calls, or the workspace voice when you have none.' : 'The voice every reply is spoken in.'}><SelectPill aria-label="Which voice answers" value={own} onChange={id => saveOwned({ voiceId: id || null })} options={options} /></Setting>
+    <h3>Takes</h3>
+    <Setting main={`${taken.length} of ${REGISTERS.length} feelings recorded`} sub={taken.length ? taken.map(item => item.label).join(', ') : 'Each feeling gets its own take; the desk picks the one that matches how you spoke.'}><TextBtn onClick={() => setTab('takes')}>{taken.length ? 'Record more' : 'Record a take'}</TextBtn></Setting>
+  </Body>;
+}
+
+function Takes({ data, seat, registers, setError, setNotice, saveOwned, refreshVoices, trainingNotes, sharedDemo, setSelectedId }) {
+  const [register, setRegister] = useState('calm');
+  const [language, setLanguage] = useState(READING_SCRIPTS[data.settings.customerLanguage] ? data.settings.customerLanguage : 'en');
+  const [sample, setSample] = useState(null);
+  const [name, setName] = useState('');
+  const [consent, setConsent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [savedId, setSavedId] = useState(null);
+  const fileInput = useRef(null);
+  const feeling = feelingOf(register);
+  const script = READING_SCRIPTS[language] || READING_SCRIPTS.en;
+  const liveCall = data.calls.some(call => ['ringing', 'in_call'].includes(callState(call)));
+  const created = data.voices.find(item => item.id === savedId);
+  const take = next => { setSample(next); setName(`${seat?.name || 'My voice'} · ${feeling.label}`); setConsent(false); setSavedId(null); };
+  const capture = useCapture((blob, duration) => {
+    if (duration < 10) { setError('Read for at least 10 seconds. Try reading the whole passage at your usual pace.'); return; }
+    if (duration < 30) setNotice('Under 30 seconds. It will work, but 45–60 seconds sounds more like you.');
+    take({ blob, duration, name: `voice-recording.${blob.type.includes('mp4') ? 'm4a' : 'webm'}`, transcript: script });
+  });
+  useEffect(() => { if (capture.error) setError(capture.error); }, [capture.error]);
+  useEffect(() => { if (liveCall) capture.stop(true); }, [liveCall, capture.stop]);
+  const upload = file => {
+    if (!file) return;
+    if (!/\.(wav|mp3|m4a|webm|ogg)$/i.test(file.name) && !['audio/wav', 'audio/x-wav', 'audio/mpeg', 'audio/mp4', 'audio/webm', 'audio/ogg'].includes(file.type)) { setError('Choose a WAV, MP3, M4A, WebM, or OGG recording.'); return; }
+    if (file.size > 30 * 1024 * 1024) { setError('Choose a recording smaller than 30 MB.'); return; }
+    take({ blob: file, name: file.name, transcript: '' });
+  };
+  const submit = async event => {
+    event.preventDefault(); if (!sample || !consent || !name.trim() || busy || liveCall) return;
+    setBusy(true);
+    try {
+      const payload = new FormData();
+      for (const [key, value] of Object.entries({ name: name.trim(), language, transcript: sample.transcript, consent: 'true', register })) payload.append(key, value);
+      payload.append('audio', sample.blob, sample.name);
+      const result = await api.createVoice(payload);
+      await refreshVoices(result.voice);
+      await saveOwned({ registers: { ...registers, [register]: result.voice.id } });
+      setSavedId(result.voice.id); setSample(null);
+      setNotice(`${feeling.label} take saved to your library.`);
+    } catch (failure) { setError(failure.message); } finally { setBusy(false); }
+  };
+  if (sample) return <Body tight><form className="ds-stack voice-review" onSubmit={submit}>
+    <div className="voice-review-head"><Label>{feeling.label} take · {languageName(language)}</Label><TextBtn muted icon={<RefreshCw size={13} />} disabled={busy} onClick={() => setSample(null)}>Record again</TextBtn></div>
+    <RecordedAudio blob={sample.blob} />
+    <Field label="Voice name"><input required maxLength={100} value={name} onChange={event => setName(event.target.value)} disabled={busy} /></Field>
+    <label className="ds-check"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} disabled={busy} required /><span>This is my voice, or I have permission to clone it and use it for translated calls.</span></label>
+    {liveCall && <div className="ds-info">Finish the call before creating a voice.</div>}
+    <Btn type="submit" icon={busy ? <Spinner size={15} /> : <AudioLines size={16} />} disabled={busy || !consent || !name.trim() || liveCall}>{busy ? 'Creating your voice…' : 'Create voice'}</Btn>
+    {sharedDemo && <p className="ds-note">Saved voices are available to everyone using this shared demo.</p>}
+  </form></Body>;
+  return <>
+    <Col className="ds-pillrow" style={{ marginTop: 18 }}><Label>Take</Label>{REGISTERS.map(item => <Pill key={item.key} on={item.key === register} disabled={capture.recording} onClick={() => setRegister(item.key)}>{item.label}{registers[item.key] && <Check size={11} strokeWidth={2.6} />}</Pill>)}<SelectPill bar className="voice-lang" aria-label="Recording language" lead={<Globe2 size={13} />} value={language} onChange={setLanguage} disabled={capture.recording} options={Object.keys(READING_SCRIPTS).map(code => ({ value: code, label: languageName(code) }))} /></Col>
+    <Body tight className="ds-stack">
+      {created && <div className="ds-card"><Avatar who={created.name} size={40} /><div><strong>{created.name}</strong><span>{[created.register && `${feelingOf(created.register)?.label} take`, kindOf(created), toneOf(created)[1]].filter(Boolean).join(' · ')}</span></div>{created.status === 'ready' && <div className="actions"><Btn pill kind="ghost" icon={<Play size={12} />} onClick={() => setSelectedId(created.id)}>Hear it</Btn></div>}</div>}
+      {created?.status === 'training' && <div className="ds-info"><Spinner size={14} />{trainingNotes[created.id] || 'Fish is preparing your voice. You can keep using the desk while it finishes.'}</div>}
+      {created?.status === 'failed' && <div className="ds-info">{created.error || 'Fish could not create this voice. Try another clear recording.'}</div>}
+      <div className="ds-script"><div className="head"><span className="ds-label">Read this aloud</span><span>{feeling.hint} · 45–60 s</span></div><p>{script}</p></div>
+    </Body>
+    <Col className="ds-foot voice-foot">
+      {liveCall && <div className="ds-info">Finish the call before creating a voice.</div>}
+      {capture.recording && <AudioWaveform stream={capture.stream} active={!capture.interrupted} height={36} label="Live microphone level" />}
+      <Btn kind={capture.recording ? 'red' : 'ink'} className="voice-record" icon={capture.requesting ? <Spinner size={15} /> : capture.recording ? <Square size={15} fill="currentColor" /> : <Mic size={15} />} disabled={liveCall || capture.requesting} onClick={() => capture.recording ? capture.stop() : capture.start().catch(failure => setError(failure.message))}>{capture.requesting ? 'Allow microphone access…' : capture.recording ? `Stop recording · ${formatDuration(capture.seconds)}` : 'Record my voice'}</Btn>
+      <span className="ds-note" role="status">{capture.interrupted ? 'Microphone paused. Check your microphone or stop and try again.' : capture.recording ? 'Stop when you finish the passage.' : 'One speaker. No music. Keep one feeling for the whole passage.'}</span>
+      {capture.requesting ? <TextBtn onClick={() => capture.stop(true)}>Cancel</TextBtn> : <TextBtn disabled={capture.recording || liveCall} onClick={() => fileInput.current?.click()}>Use an existing recording</TextBtn>}
+      <input hidden ref={fileInput} type="file" accept={AUDIO_ACCEPT} onChange={event => { upload(event.target.files[0]); event.target.value = ''; }} />
+    </Col>
+  </>;
+}
+
+function AvatarTab({ seat, owned, saveOwned }) {
+  const [draft, setDraft] = useState(null);
+  useEffect(() => { setDraft(null); }, [seat?.id]);
+  const saved = owned('avatar');
+  const fallback = avatarOf(seat?.name || 'workspace');
+  const avatar = draft || (saved?.variant && saved?.color ? { variant: saved.variant, color: saved.color, face: saved.face !== false } : fallback);
+  const change = next => { setDraft(next); saveOwned({ avatar: next }); };
+  return <Body tight className="voice-look">
+    <div className="voice-big"><Puff variant={avatar.variant} color={avatar.color} size={92} /></div>
+    <div className="ds-panel">
+      <div className="head"><button type="button" className="ds-ptab on">Shape</button><button type="button" className="ds-ptab" disabled title="Coming soon">Generate</button><button type="button" className="ds-ptab" disabled title="Coming soon">Upload</button><span style={{ flex: 1 }} /><TextBtn muted onClick={() => { setDraft(fallback); saveOwned({ avatar: null }); }}>Reset</TextBtn></div>
+      <div className="ds-avatar-cells">{PUFFS.map(variant => <button type="button" key={variant} className={`ds-avatar-cell ${variant === avatar.variant ? 'on' : ''}`} aria-label={variant} aria-pressed={variant === avatar.variant} onClick={() => change({ ...avatar, variant })}><Puff variant={variant} color={avatar.color} size={44} /></button>)}</div>
+      {[SWATCHES.slice(0, 6), SWATCHES.slice(6)].map((row, index) => <div className="ds-swatches" key={index}>{row.map(([name, color]) => <button type="button" key={color} className={`ds-swatch ${color === avatar.color ? 'on' : ''}`} style={{ background: color }} aria-label={name} aria-pressed={color === avatar.color} onClick={() => change({ ...avatar, color })} />)}</div>)}
+    </div>
+    <div className="ds-toggle-row"><div><strong>Show my face on the floor</strong><span>Off shows the puff without eyes in lists and call records.</span></div><Puff variant={avatar.variant} color={avatar.color} size={32} face={false} /><Switch checked={avatar.face} onChange={face => change({ ...avatar, face })} label="Show my face on the floor" /></div>
+  </Body>;
+}
+
+function Register({ seat, owned, saveOwned }) {
+  const formality = owned('formality') || 'formal';
+  const persona = owned('persona') || '';
+  return <Body tight>
+    <h3 className="voice-first">Register</h3>
+    {FORMALITY.map(([key, main, sub]) => <Option key={key} on={formality === key} main={main} sub={sub} onClick={() => saveOwned({ formality: key })} />)}
+    <Field label="House style" className="voice-style"><textarea key={`${seat?.id || ''}:${persona}`} rows={3} maxLength={300} defaultValue={persona} placeholder="Brief and friendly. Formal “vous”. Never promise a time you can’t keep." onBlur={event => { const next = event.target.value.trim(); if (next !== persona) saveOwned({ persona: next }); }} /></Field>
+    <p className="ds-note">Shapes how replies are worded before they are spoken — length, politeness, phrasing. Facts and meaning never change.</p>
+  </Body>;
+}
+
+function Library({ data, loading, voiceId, trainingNotes, setError, setNotice, refreshVoices, setSelectedId, setImporting, setTab, use }) {
+  const [query, setQuery] = useState('');
+  const [busy, setBusy] = useState('');
+  const attempt = fn => fn().catch(failure => setError(failure.message));
+  const act = (voice, fn) => { setBusy(voice.id); attempt(fn).finally(() => setBusy('')); };
+  const matches = voice => `${voice.name} ${voice.description || ''} ${languageName(voice.language || 'en')}`.toLowerCase().includes(query.trim().toLowerCase());
+  const shown = data.voices.filter(voice => !isArchived(voice) && matches(voice));
+  const archived = data.voices.filter(voice => isArchived(voice) && matches(voice));
+  const menu = voice => [
+    { id: 'preview', label: 'Preview voice', icon: Play, disabled: voice.status !== 'ready' || isArchived(voice), opensDialog: true, onSelect: () => setSelectedId(voice.id) },
+    { id: 'edit', label: 'Edit voice details', icon: Settings2, opensDialog: true, onSelect: () => setSelectedId(voice.id) },
+    { separator: true },
+    { id: 'refresh', label: 'Refresh voice status', icon: RefreshCw, onSelect: () => act(voice, async () => { await api.refreshVoice(voice.id); await refreshVoices(); setNotice('Voice status refreshed.'); }) },
+    { id: 'export', label: 'Export voice file', icon: ArrowDownToLine, onSelect: () => act(voice, async () => { downloadJson(`${voice.name}.notefish-voice.json`, await api.exportVoice(voice.id)); setNotice('Voice file downloaded. Import it on any other desk.'); }) },
+    { separator: true },
+    { id: 'archive', label: isArchived(voice) ? 'Restore voice' : 'Archive voice', icon: Archive, onSelect: () => act(voice, async () => { await api.editVoice(voice.id, { archived: !isArchived(voice) }); await refreshVoices(); setNotice(isArchived(voice) ? 'Voice restored.' : 'Voice archived. You can restore it from Archived.'); }) },
+  ];
+  const line = voice => {
+    const [tone, word] = toneOf(voice);
+    const usable = voice.status === 'ready' && !isArchived(voice);
+    return <Row key={voice.id} lead={<span className="lead"><Avatar who={voice.name} size={30} /></span>}
+      main={<>{voice.name}{voice.id === voiceId && <Chip tone="ink">Desk voice</Chip>}{voice.register && <Chip>{feelingOf(voice.register)?.label} take</Chip>}</>}
+      sub={[kindOf(voice), languageName(voice.language || 'en'), voice.status === 'training' && !isArchived(voice) ? trainingNotes[voice.id] || 'Fish is creating this voice' : voice.status === 'failed' && !isArchived(voice) ? voice.error || word : word].join(' · ')}
+      right={<><Status tone={tone}>{word}</Status>{usable && voice.id !== voiceId && <TextBtn disabled={busy === voice.id} onClick={() => act(voice, () => use(voice))}>Use</TextBtn>}<ActionMenu label={`Actions for ${voice.name}`} items={menu(voice)}><button type="button" className="ds-tool" aria-label={`Manage ${voice.name}`} disabled={busy === voice.id}>{busy === voice.id ? <Spinner size={15} /> : <MoreHorizontal size={16} />}</button></ActionMenu></>} />;
+  };
+  return <>
+    <ReadBar right={<><TextBtn onClick={() => setImporting(true)}>Import</TextBtn><TextBtn onClick={() => attempt(async () => { downloadJson('notefish-voices.json', await api.exportVoices()); setNotice('Voice library exported.'); })}>Export library</TextBtn></>}><Search size={14} /><input type="search" placeholder="Search voices" aria-label="Search voices" value={query} onChange={event => setQuery(event.target.value)} /></ReadBar>
+    <Body tight className="voice-lib">
+      {loading ? <div className="ds-info"><Spinner size={14} />Loading your voices…</div>
+        : !data.voices.length ? <Empty icon={<AudioLines size={34} strokeWidth={1.4} />} title="Every conversation starts with a voice." actions={<><Btn small icon={<Mic size={14} />} onClick={() => setTab('takes')}>Record</Btn><Btn small kind="ghost" icon={<ArrowDownToLine size={14} />} onClick={() => setImporting(true)}>Import</Btn></>}>Add a short recording to make your first voice clone, or import a Fish voice you already have.</Empty>
+        : <>{shown.map(line)}{!shown.length && <p className="ds-note voice-none">{query ? 'No voices match. Try another name or language.' : 'Your active voices appear here.'}</p>}{archived.length > 0 && <><Label style={{ margin: '18px 0 2px' }}>Archived</Label>{archived.map(line)}</>}</>}
+    </Body>
+  </>;
+}

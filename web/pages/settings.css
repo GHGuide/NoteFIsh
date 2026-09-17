@@ -1,0 +1,10 @@
+/* Settings: the inline line-name field, the revealed house-style editor, and the phone-number blocks. */
+.settings-inline { height: 28px; width: 180px; padding: 0 10px; border: 1px solid var(--sheet-line); border-radius: 999px; background: var(--sheet); font: 600 12px var(--sans); color: var(--ink); outline: none; }
+.settings-inline:focus { border-color: #8F8B83; }
+.settings-more { display: flex; flex-direction: column; gap: 8px; padding: 10px 0 14px; border-bottom: 1px solid var(--sheet-line); }
+.settings-block { display: flex; flex-direction: column; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--sheet-line); }
+.settings-block + .settings-block { margin-top: 4px; }
+.settings-block .ds-setting { border-bottom: 0; padding-bottom: 4px; }
+.settings-block .ds-note b { font-weight: 600; color: var(--ink); }
+.settings-block .ds-text { align-self: flex-start; text-decoration: none; }
+.settings-block .ds-text:hover { text-decoration: underline; }

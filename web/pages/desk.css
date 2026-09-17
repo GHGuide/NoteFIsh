@@ -1,0 +1,14 @@
+/* Desk-only clothes the design system lacks: the language-pair pill, the scrolling
+   caption column, the invite block. Everything else is design.css. */
+.desk-pair { display: inline-flex; align-items: center; height: 28px; padding-left: 10px; border-radius: 999px; border: 1px solid var(--sheet-line); background: var(--sheet); font: 600 12px var(--sans); color: var(--ink); white-space: nowrap; }
+.desk-pair .arrow { color: var(--muted); margin: 0 1px 0 6px; }
+.desk-pair .ds-selectpill { border: 0; background: transparent; height: 26px; }
+.ds-col.desk-scroll { flex: 1 1 0; min-height: 0; overflow: auto; margin-top: 14px; padding-bottom: 12px; }
+.desk-code { font-weight: 600; margin-right: 6px; }
+.desk-live .ds-wave { color: var(--red); }
+.ds-foot .desk-left { margin-right: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.ds-foot .desk-left svg { color: var(--green); flex-shrink: 0; }
+.desk-invite { display: flex; flex-direction: column; gap: 10px; margin-top: auto; padding: 14px 0; flex-shrink: 0; }
+.desk-invite .between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.desk-invite .ds-info { justify-content: space-between; }
+.desk-new { text-align: center; padding-top: 8px; }

@@ -1,0 +1,9 @@
+/* Phrases: the board's block per line (shortcut chip + the line, the caller-language note under it). */
+.phrases-item { padding: 12px 0; border-bottom: 1px solid var(--sheet-line); }
+.phrases-item .head { display: flex; align-items: center; gap: 10px; }
+.phrases-item .head .ds-chip { font-size: 12px; padding: 3px 8px; border-radius: 6px; }
+.phrases-item .head strong { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; line-height: 1.4; }
+.phrases-item .head .ds-tool { opacity: .55; }
+.phrases-item:hover .head .ds-tool, .phrases-item .head .ds-tool:focus-visible { opacity: 1; }
+.phrases-item p { font-size: 13px; line-height: 1.5; color: var(--muted); margin: 6px 0 0; padding-left: 2px; }
+.phrases-item p b { font-size: 10px; font-weight: 600; margin-right: 6px; }
