@@ -1,5 +1,5 @@
 /* Desk-only clothes the design system lacks: the language-pair pill, the scrolling
-   caption column, the invite block. Everything else is design.css. */
+   caption column, the invite block, and the home screen shown between calls. */
 .desk-pair { display: inline-flex; align-items: center; height: 28px; padding-left: 10px; border-radius: 999px; border: 1px solid var(--sheet-line); background: var(--sheet); font: 600 12px var(--sans); color: var(--ink); white-space: nowrap; }
 .desk-pair .arrow { color: var(--muted); margin: 0 1px 0 6px; }
 .desk-pair .ds-selectpill { border: 0; background: transparent; height: 26px; }
@@ -8,7 +8,35 @@
 .desk-live .ds-wave { color: var(--red); }
 .ds-foot .desk-left { margin-right: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .ds-foot .desk-left svg { color: var(--green); flex-shrink: 0; }
-.desk-invite { display: flex; flex-direction: column; gap: 10px; margin-top: auto; padding: 14px 0; flex-shrink: 0; }
-.desk-invite .between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.desk-invite .ds-info { justify-content: space-between; }
 .desk-new { text-align: center; padding-top: 8px; }
+
+/* Home: a dark banner beside a stats card, the caller link under the banner, recent calls below. */
+.desk-home { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; margin-top: 26px; }
+.desk-home .left { display: flex; flex-direction: column; min-width: 0; }
+.desk-banner { position: relative; overflow: hidden; flex: 1; box-sizing: border-box; min-height: 190px; padding: 28px; border-radius: 18px; background: #1A1A19; color: #F3F1EC; display: flex; flex-direction: column; justify-content: center; }
+.desk-banner::before { content: ''; position: absolute; right: -60px; top: -80px; width: 340px; height: 340px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 255, 255, .07), transparent); pointer-events: none; }
+.desk-banner .text { position: relative; max-width: calc(100% - 176px); display: flex; flex-direction: column; align-items: flex-start; }
+.desk-banner h2 { font: 400 30px/1.15 var(--serif); letter-spacing: -.4px; margin: 0; }
+.desk-banner h2 em { font-style: italic; font-synthesis: style; }
+.desk-banner p { font-size: 13.5px; line-height: 1.5; color: rgba(243, 241, 236, .72); margin: 8px 0 18px; }
+.desk-banner .ds-btn.ink { background: #FFF; border-color: #FFF; color: #1A1A19; }
+.desk-banner .ds-btn.ink:hover:not(:disabled) { background: #F3F1EC; border-color: #F3F1EC; }
+.desk-art { position: absolute; right: 24px; top: 50%; width: 164px; height: 150px; transform: translateY(-50%); pointer-events: none; }
+.desk-art svg { position: absolute; }
+.desk-art svg:nth-child(1) { left: 36px; top: 30px; }
+.desk-art svg:nth-child(2) { left: 2px; top: 80px; }
+.desk-art svg:nth-child(3) { left: 102px; top: 8px; }
+.desk-art svg:nth-child(4) { left: 106px; top: 96px; }
+.desk-stats { box-sizing: border-box; padding: 20px; border: 1px solid var(--sheet-line); border-radius: 16px; background: var(--card); display: flex; flex-direction: column; gap: 10px; }
+.desk-stats .n { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.desk-stats .n strong { font: 400 30px/1.1 var(--serif); letter-spacing: -.4px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.desk-stats .n span { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.desk-stats .voice { margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--sheet-line); }
+.desk-stats .voice .who { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.desk-stats .voice .who > div { flex: 1; min-width: 0; }
+.desk-stats .voice strong { display: block; font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.desk-stats .voice span { display: block; font-size: 12px; color: var(--muted); margin-top: 1px; }
+.desk-invite { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.desk-invite .between, .desk-invite.between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.desk-clip { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 900px) { .desk-home { grid-template-columns: minmax(0, 1fr); } }

@@ -4,6 +4,7 @@
    window. Every class is prefixed ds- so it never fights the older stylesheet. */
 @font-face { font-family: 'DM Sans'; font-style: italic; font-weight: 300 700; font-display: swap; src: url('./fonts/DMSans-italic-300_700.woff2') format('woff2'); }
 @font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 300 700; font-display: swap; src: url('./fonts/DMSans-normal-300_700.woff2') format('woff2'); }
+@font-face { font-family: 'DM Serif Display'; font-style: italic; font-weight: 400; font-display: swap; src: url('./fonts/DMSerifDisplay-italic-400.woff2') format('woff2'); }
 @font-face { font-family: 'DM Serif Display'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/DMSerifDisplay-normal-400.woff2') format('woff2'); }
 
 :root {
@@ -12,7 +13,7 @@
   --sheet: #FCFBFA; --sheet-line: #E8E6E1; --nav-active: #ECEBE8; --bar: #F1F0ED; --placeholder: #8F8B83;
   --sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --serif: 'DM Serif Display', Georgia, serif;
-  --side: 224px; --col: 760px; --sheet-top: 46px; --ease: cubic-bezier(.2, .7, .2, 1);
+  --side: 224px; --col: 900px; --sheet-top: 46px; --ease: cubic-bezier(.2, .7, .2, 1);
 }
 html, body { height: 100%; }
 body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(--paper); font-size: 14.5px; -webkit-font-smoothing: antialiased; letter-spacing: -.005em; }
@@ -59,7 +60,7 @@ body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(-
 .ds-app.is-focus .ds-sheet, .ds-app.is-focus .ds-topbar { left: 0; }
 .ds-app.is-focus .ds-sheet { border-radius: 0; border-left: 0; }
 .ds-col { width: min(var(--col), calc(100% - 72px)); margin: 0 auto; flex-shrink: 0; }
-.ds-col.wide { width: min(1000px, calc(100% - 80px)); }
+.ds-col.wide { width: min(var(--col), calc(100% - 80px)); }
 .ds-toolbar { height: 60px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 38px; }
 .ds-toolbar .right { display: flex; align-items: center; gap: 4px; }
 .ds-tool { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; min-width: 30px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--navtext); font: 500 13px var(--sans); cursor: pointer; }
