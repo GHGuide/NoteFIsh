@@ -218,6 +218,9 @@ export function createCallService({
     } catch { emit({ type: 'error', error: 'A caption could not be saved.' }); }
     finally { runtime.captionRunning = false; }
   }
+  // Partial captions: short enough to be worth a translation, and this much longer than the last one before spending another.
+  const PARTIAL_MIN_CHARS = 8, PARTIAL_GROWTH = 10;
+
   function queueCaption(runtime, audio, text) {
     if (!audio && text === undefined) return;
     if (runtime.captionQueue.length >= 3) {
@@ -271,7 +274,7 @@ export function createCallService({
     };
     const runtime = { call, ws: null, streamSid: null,
       segmenter: new SpeechSegmenter(transport === 'browser' ? { format: 'pcm', sampleRate: 16000 } : {}), run: 0, busy: false,
-      captionAbort: new AbortController(), captionQueue: [], captionRunning: false, lastQueueWarning: 0,
+      captionAbort: new AbortController(), captionQueue: [], captionRunning: false, lastQueueWarning: 0, partial: null,
       replyAbort: null, replyLineId: null, mark: null, noAnswerTimer: null, lifetimeTimer: null, playbackTimer: null, ringbackTimer: null,
       frameWindow: Date.now(), frameBytes: 0, frameCount: 0, pcmTail: Buffer.alloc(0), heartbeatTimer: null, browserAlive: true,
     };
@@ -446,8 +449,17 @@ export function createCallService({
     try {
       const live = providers.openTranscription({
         language: hint,
-        onPartial: text => { if (runtime.call.state === 'in_call' && runtime.live === live) emit({ type: 'caption-partial', callId: runtime.call.id, text }, runtime.call.agentId); },
-        onFinal: text => { if (runtime.call.state === 'in_call' && runtime.live === live) { emit({ type: 'caption-partial', callId: runtime.call.id, text: '' }, runtime.call.agentId); queueCaption(runtime, null, text); } },
+        onPartial: text => {
+          if (runtime.call.state !== 'in_call' || runtime.live !== live) return;
+          if (!runtime.partial) runtime.partial = { text: '', shown: '', from: '', running: false };
+          const state = runtime.partial;
+          // A new phrase starts its own text, so the old translation no longer describes it.
+          if (state.from && !text.startsWith(state.from)) state.shown = '';
+          state.text = text;
+          showPartial(runtime, text, state.shown);
+          void translatePartial(runtime);
+        },
+        onFinal: text => { if (runtime.call.state === 'in_call' && runtime.live === live) { clearPartial(runtime); queueCaption(runtime, null, text); } },
         onError: error => { if (runtime.live === live) { warn(runtime, `Live captions stopped, using segments: ${safeError(error)}`); stopLiveCaptions(runtime); } },
       });
       runtime.live = live;
@@ -456,7 +468,49 @@ export function createCallService({
   }
   function stopLiveCaptions(runtime) {
     const live = runtime.live; runtime.live = null;
+    clearPartial(runtime);
     try { live?.close(); } catch { /* closing */ }
+  }
+
+  /** What the caller is saying right now: their own words, and the agent's
+   * language once a translation of the phrase so far has come back. */
+  function showPartial(runtime, text, shown = '') {
+    emit({ type: 'caption-partial', callId: runtime.call.id, text, ...(shown ? { shown } : {}) }, runtime.call.agentId);
+  }
+  function clearPartial(runtime) {
+    if (!runtime.partial) return;
+    runtime.partial = null;
+    showPartial(runtime, '');
+  }
+  /** The pair a partial is translated across, or nulls while auto-detect is still waiting for the first phrase. */
+  function partialLanguages(runtime) {
+    const source = runtime.call.customerLanguage === 'auto' ? runtime.call.detectedLanguage : runtime.call.customerLanguage;
+    const target = runtime.call.agentLanguage;
+    if (!source || !languageCodes.has(source) || !languageCodes.has(target) || source === target) return null;
+    return { source, target };
+  }
+  /**
+   * Translate the phrase so far, so the agent reads it in their own language
+   * before the caller stops talking. One translation is in flight at a time and
+   * the next only starts once it returns, so its own round trip paces the spend:
+   * a fast talker costs a handful of short calls per phrase, not one per token.
+   */
+  async function translatePartial(runtime) {
+    const state = runtime.partial;
+    if (!state || state.running || !providers.translate) return;
+    const pair = partialLanguages(runtime);
+    if (!pair) return;
+    const text = state.text;
+    // Enough to be worth translating, and meaningfully more than last time —
+    // except when the caller has started a new phrase, which resets the text.
+    const restarted = !state.from || !text.startsWith(state.from);
+    if (text.length < PARTIAL_MIN_CHARS || (!restarted && text.length - state.from.length < PARTIAL_GROWTH)) return;
+    state.running = true; state.from = text;
+    try {
+      const shown = await providers.translate({ text, sourceLanguage: pair.source, targetLanguage: pair.target, signal: runtime.captionAbort.signal });
+      if (runtime.partial === state && shown?.trim()) { state.shown = shown; showPartial(runtime, state.text, shown); }
+    } catch { /* the caller's own words stay on screen; the finished phrase is the authoritative caption */ }
+    finally { state.running = false; if (runtime.partial === state) void translatePartial(runtime); }
   }
   /** A caller frame goes to live captions when the session is up; otherwise to the segmenter. */
   function hearCaller(runtime, pcm16k, mulawFrame) {

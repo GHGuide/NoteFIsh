@@ -1,21 +1,29 @@
-// NoteFish for Mac: the desk in a window, a pill under the menu bar, and a
+// NoteFish for Mac: the desk in a window, a pill under the menu bar, a menu-bar
+// menu with the current call, recent calls and the caption language, and a
 // system-wide push-to-talk key. The Node server (server/index.mjs) does the work;
 // this shell finds it on 127.0.0.1:3001 or starts it, then hosts the same web UI.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::fs::File;
+use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
-use std::time::Duration;
+use std::process::{Child, Command};
+use std::sync::Mutex;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::TrayIconBuilder,
-    Emitter, Manager, WebviewUrl, WebviewWindowBuilder,
+    Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Wry,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tauri_plugin_positioner::{Position, WindowExt};
 use tauri_plugin_shell::ShellExt;
 
 const DESK: &str = "http://127.0.0.1:3001";
+const HELP: &str = "https://github.com/GHGuide/NoteFish#readme";
+/// Caption languages offered in the menu; the desk's Setup page has the full catalog.
+const MENU_LANGUAGES: [&str; 15] = ["en", "es", "fr", "de", "it", "pt", "nl", "pl", "tr", "ar", "hi", "zh", "ja", "ko", "ru"];
 
 /// Where the NoteFish checkout lives: NOTEFISH_ROOT, else the folder above src-tauri (dev), else ~/NoteFish.
 fn notefish_root() -> PathBuf {
@@ -66,6 +74,182 @@ fn ensure_desk(app: &tauri::AppHandle) {
     }
 }
 
+/// One local HTTP call to the desk server. Local requests need no password; the
+/// Origin header is what the server checks on writes.
+fn http(method: &str, path: &str, body: Option<&str>) -> Option<serde_json::Value> {
+    let mut stream = TcpStream::connect_timeout(&"127.0.0.1:3001".parse().ok()?, Duration::from_millis(500)).ok()?;
+    stream.set_read_timeout(Some(Duration::from_secs(3))).ok()?;
+    let body = body.unwrap_or("");
+    let request = format!(
+        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:3001\r\nOrigin: {DESK}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    stream.write_all(request.as_bytes()).ok()?;
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response).ok()?;
+    let text = String::from_utf8_lossy(&response);
+    let (_, body) = text.split_once("\r\n\r\n")?;
+    serde_json::from_str(body).ok()
+}
+
+/// Seconds since the epoch for the server's "2026-09-17T14:15:30.123Z" stamps.
+fn epoch(iso: &str) -> Option<i64> {
+    let field = |from: usize, to: usize| iso.get(from..to)?.parse::<i64>().ok();
+    let (y, m, d) = (field(0, 4)?, field(5, 7)?, field(8, 10)?);
+    let (hh, mm, ss) = (field(11, 13)?, field(14, 16)?, field(17, 19)?);
+    let (y, m) = if m <= 2 { (y - 1, m + 9) } else { (y, m - 3) };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * m + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    Some((era * 146097 + doe - 719468) * 86400 + hh * 3600 + mm * 60 + ss)
+}
+
+fn clock(seconds: i64) -> String {
+    format!("{}:{:02}", seconds / 60, seconds % 60)
+}
+
+/// The companion that watches for calls (Zoom, WhatsApp, Meet…) while "Listen for calls" is on.
+struct Listener(Mutex<Option<Child>>);
+
+fn listening(app: &tauri::AppHandle) -> bool {
+    let state = app.state::<Listener>();
+    let mut guard = state.0.lock().unwrap();
+    if let Some(child) = guard.as_mut() {
+        if matches!(child.try_wait(), Ok(Some(_))) {
+            *guard = None; // it exited on its own
+        }
+    }
+    guard.is_some()
+}
+
+fn toggle_listener(app: &tauri::AppHandle) {
+    let state = app.state::<Listener>();
+    let mut guard = state.0.lock().unwrap();
+    if let Some(mut child) = guard.take() {
+        let _ = child.kill();
+        return;
+    }
+    let root = notefish_root();
+    let log = File::create(root.join("companion/listen.log")).ok();
+    let mut command = Command::new("node");
+    command.arg("companion/index.mjs").arg("--watch").current_dir(&root);
+    if let Some(log) = log {
+        if let Ok(err) = log.try_clone() {
+            command.stdout(log).stderr(err);
+        }
+    }
+    match command.spawn() {
+        Ok(child) => *guard = Some(child),
+        Err(error) => eprintln!("Could not start the companion: {error}"),
+    }
+}
+
+/// What the menu shows; rebuilt whenever it changes.
+#[derive(Default, PartialEq, Clone)]
+struct Snapshot {
+    status: String,
+    recent: Vec<(String, String)>,
+    languages: Vec<(String, String)>,
+    language: String,
+    listening: bool,
+}
+
+fn snapshot(app: &tauri::AppHandle) -> Snapshot {
+    let mut snap = Snapshot { listening: listening(app), status: "Desk offline".into(), ..Default::default() };
+    let Some(settings) = http("GET", "/api/settings", None) else { return snap };
+    snap.language = settings["settings"]["agentLanguage"].as_str().unwrap_or("en").to_string();
+    let catalog = http("GET", "/api/languages", None).unwrap_or_default();
+    let name = |code: &str| {
+        catalog["languages"]
+            .as_array()
+            .and_then(|list| list.iter().find(|l| l["code"] == code))
+            .and_then(|l| l["name"].as_str())
+            .unwrap_or(code)
+            .to_string()
+    };
+    snap.languages = MENU_LANGUAGES.iter().map(|code| (code.to_string(), name(code))).collect();
+    if !MENU_LANGUAGES.contains(&snap.language.as_str()) {
+        snap.languages.push((snap.language.clone(), name(&snap.language)));
+    }
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+    let calls = http("GET", "/api/calls", None).unwrap_or_default();
+    let mut ended: Vec<&serde_json::Value> = Vec::new();
+    snap.status = if snap.listening { "No call · listening for Zoom, WhatsApp, Meet…".into() } else { "No call".into() };
+    for call in calls["calls"].as_array().into_iter().flatten() {
+        let from = call["from"].as_str().unwrap_or("Caller");
+        let started = call["startedAt"].as_str().and_then(epoch).unwrap_or(now);
+        match call["state"].as_str().unwrap_or("") {
+            "ended" => ended.push(call),
+            "ringing" => snap.status = format!("Ringing · {from}"),
+            _ => snap.status = format!("On a call · {from} · {}", clock(now - started)),
+        }
+    }
+    ended.sort_by_key(|call| std::cmp::Reverse(call["startedAt"].as_str().unwrap_or("")));
+    for call in ended.into_iter().take(5) {
+        let from = call["from"].as_str().unwrap_or("Caller");
+        let started = call["startedAt"].as_str().and_then(epoch);
+        let finished = call["endedAt"].as_str().and_then(epoch);
+        let length = match (started, finished) {
+            (Some(a), Some(b)) if b >= a => clock(b - a),
+            _ => "—".into(),
+        };
+        let language = call["customerLanguage"].as_str().map(name).unwrap_or_default();
+        snap.recent.push((call["id"].as_str().unwrap_or("").to_string(), format!("{from} · {length} · {language}")));
+    }
+    snap
+}
+
+fn build_menu(app: &tauri::AppHandle, snap: &Snapshot) -> tauri::Result<Menu<Wry>> {
+    let status = MenuItem::with_id(app, "status", snap.status.as_str(), false, None::<&str>)?;
+    let recent: Vec<MenuItem<Wry>> = snap
+        .recent
+        .iter()
+        .map(|(id, label)| MenuItem::with_id(app, format!("call:{id}"), label.as_str(), true, None::<&str>))
+        .collect::<tauri::Result<_>>()?;
+    let recent_refs: Vec<&dyn IsMenuItem<Wry>> = recent.iter().map(|item| item as &dyn IsMenuItem<Wry>).collect();
+    let recent_menu = Submenu::with_id_and_items(app, "recent", "Recent calls", !recent.is_empty(), &recent_refs)?;
+    let open = MenuItem::with_id(app, "open", "Open desk", true, None::<&str>)?;
+    let pill = MenuItem::with_id(app, "pill", "Show / hide pill", true, None::<&str>)?;
+    let listen = CheckMenuItem::with_id(app, "listen", "Listen for calls (Zoom, WhatsApp, Meet…)", true, snap.listening, None::<&str>)?;
+    let talk = MenuItem::with_id(app, "talk", "Hold ⌥ Space anywhere to talk", false, None::<&str>)?;
+    let languages: Vec<CheckMenuItem<Wry>> = snap
+        .languages
+        .iter()
+        .map(|(code, name)| CheckMenuItem::with_id(app, format!("lang:{code}"), name.as_str(), true, code == &snap.language, None::<&str>))
+        .collect::<tauri::Result<_>>()?;
+    let language_refs: Vec<&dyn IsMenuItem<Wry>> = languages.iter().map(|item| item as &dyn IsMenuItem<Wry>).collect();
+    let language_menu = Submenu::with_id_and_items(app, "languages", "Captions in", true, &language_refs)?;
+    let help = MenuItem::with_id(app, "help", "Help", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit NoteFish", true, Some("CmdOrCtrl+Q"))?;
+    Menu::with_items(
+        app,
+        &[
+            &status,
+            &recent_menu,
+            &PredefinedMenuItem::separator(app)?,
+            &open,
+            &pill,
+            &listen,
+            &PredefinedMenuItem::separator(app)?,
+            &talk,
+            &language_menu,
+            &PredefinedMenuItem::separator(app)?,
+            &help,
+            &quit,
+        ],
+    )
+}
+
+fn refresh_menu(app: &tauri::AppHandle, snap: Snapshot) {
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let (Ok(menu), Some(tray)) = (build_menu(&handle, &snap), handle.tray_by_id("main")) {
+            let _ = tray.set_menu(Some(menu));
+        }
+    });
+}
+
 fn show_main(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -112,30 +296,60 @@ fn main() {
                 })
                 .build(),
         )
+        .manage(Listener(Mutex::new(None)))
         .setup(|app| {
             ensure_desk(app.handle());
             let ptt = Shortcut::new(Some(Modifiers::ALT), Code::Space);
             if let Err(error) = app.global_shortcut().register(ptt) {
                 eprintln!("Push-to-talk key not registered: {error}");
             }
-            let open = MenuItem::with_id(app, "open", "Open desk", true, None::<&str>)?;
-            let pill = MenuItem::with_id(app, "pill", "Show / hide pill", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Quit NoteFish", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open, &pill, &quit])?;
+            let menu = build_menu(app.handle(), &Snapshot { status: "Starting…".into(), ..Default::default() })?;
             TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().cloned().expect("app icon"))
                 .icon_as_template(true)
                 .menu(&menu)
                 .show_menu_on_left_click(true)
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "open" => show_main(app),
-                    "pill" => toggle_pill(app),
-                    "quit" => app.exit(0),
-                    _ => {}
+                .on_menu_event(|app, event| {
+                    let id = event.id.as_ref();
+                    match id {
+                        "open" => show_main(app),
+                        "pill" => toggle_pill(app),
+                        "listen" => {
+                            toggle_listener(app);
+                            refresh_menu(app, snapshot(app));
+                        }
+                        "help" => {
+                            let _ = app.shell().open(HELP, None);
+                        }
+                        "quit" => {
+                            let _ = app.state::<Listener>().0.lock().unwrap().take().map(|mut child| child.kill());
+                            app.exit(0);
+                        }
+                        _ if id.starts_with("lang:") => {
+                            let body = format!("{{\"agentLanguage\":\"{}\"}}", &id[5..]);
+                            http("PATCH", "/api/settings", Some(&body));
+                            refresh_menu(app, snapshot(app));
+                        }
+                        _ if id.starts_with("call:") => show_main(app),
+                        _ => {}
+                    }
                 })
                 .on_tray_icon_event(|tray, event| tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event))
                 .build(app)?;
             toggle_pill(app.handle());
+            // Keep the menu current: the live call's timer, recent calls, the caption language.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                let mut last = Snapshot::default();
+                loop {
+                    let snap = snapshot(&handle);
+                    if snap != last {
+                        last = snap.clone();
+                        refresh_menu(&handle, snap);
+                    }
+                    std::thread::sleep(Duration::from_secs(2));
+                }
+            });
             Ok(())
         })
         .on_window_event(|window, event| {

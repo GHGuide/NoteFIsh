@@ -124,7 +124,7 @@ export function AgentsPanel({ agents, me }) {
  * height from its text alone, so a new caption opens to exactly its size and a
  * long call renders only the lines in view (no layout reads on scroll). */
 const WINDOW_AFTER = 120;
-export function TranscriptLog({ lines, call, partial = '', containerRef, onScroll, empty, stamp }) {
+export function TranscriptLog({ lines, call, partial = '', partialSource = '', containerRef, onScroll, empty, stamp }) {
   const reduced = useReducedMotion();
   const [fonts, setFonts] = useState(null); // { shown, source, width, chrome, lineHeight, sourceLineHeight }
   const [scrollTop, setScrollTop] = useState(0);
@@ -201,7 +201,7 @@ export function TranscriptLog({ lines, call, partial = '', containerRef, onScrol
       {lines.slice(win.start, win.end).map((line, offset) => render(line, win.start + offset))}
       <div style={{ height: win.bottom }} aria-hidden="true" />
     </> : lines.map(render)}
-    {partial && <article className="transcript-line customer is-partial" aria-live="off"><div className="transcript-meta"><span className="speaker-avatar"><Phone size={13} /></span><strong>Partner</strong><span className="delivery">speaking…</span></div><p>{partial}</p></article>}
+    {partial && <article className="transcript-line customer is-partial" aria-live="off"><div className="transcript-meta"><span className="speaker-avatar"><Phone size={13} /></span><strong>Partner</strong><span className="delivery">speaking…</span></div><p>{partial}</p>{partialSource && <div className="source-text"><Globe2 size={12} /><span><span className="transcript-language">{languageName(call?.detectedLanguage || call?.customerLanguage)}</span>{partialSource}</span></div>}</article>}
   </div>;
 }
 
