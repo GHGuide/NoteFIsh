@@ -152,8 +152,8 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
         let message;
         try { message = JSON.parse(raw.toString()); } catch { throw new CallerAccessError('Open a valid caller link before starting a call.'); }
         if (!message || typeof message !== 'object' || Array.isArray(message) || Object.keys(message).some(key => !['type', 'token'].includes(key)) || message.type !== 'join') throw new CallerAccessError('Open a valid caller link before starting a call.');
-        const { label } = callerAccess.consume(message.token);
-        const call = await calls.registerBrowserInbound({ from: label });
+        const { label, via } = callerAccess.consume(message.token);
+        const call = await calls.registerBrowserInbound({ from: label, via });
         if (ws.readyState !== WebSocket.OPEN) { await calls.end(call.id); return; }
         clearTimeout(timer);
         ws.removeListener('message', join);

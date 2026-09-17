@@ -62,6 +62,7 @@ export function validateState(state) {
     if (!([undefined, null].includes(call.agentId) || text(call.agentId, 128))) throw new Error('Stored call data is invalid');
     if (!([undefined, null].includes(call.detectedLanguage) || text(call.detectedLanguage, 40))) throw new Error('Stored call data is invalid');
     if (!([undefined, null].includes(call.callerTone) || text(call.callerTone, 20))) throw new Error('Stored call data is invalid');
+    if (!([undefined, null].includes(call.via) || ['link', 'companion'].includes(call.via))) throw new Error('Stored call data is invalid');
     for (const line of call.transcript) if (!plain(line) || !['customer', 'agent'].includes(line.speaker) || !text(line.textSource, 12000) || !text(line.textShown, 12000) || !text(line.sourceLang, 40)) throw new Error('Stored transcript is invalid');
     if (!text(call.ticket.issue, 4000) || !text(call.ticket.address, 1000) || !['none', 'requested', 'confirmed', 'pending', true, false].includes(call.ticket.dispatch)) throw new Error('Stored ticket is invalid');
   }

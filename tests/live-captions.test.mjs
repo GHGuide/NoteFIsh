@@ -79,6 +79,7 @@ test('the phrase so far is translated while the caller is still talking', async 
   const call = await f.service.registerBrowserInbound({ from: 'Zoom' });
   const ws = new Socket(); f.service.handleBrowserStream(ws, { callId: call.id });
   await f.service.answer(call.id);
+  ws.binary(Buffer.alloc(640, 0x10)); // the caller made a sound, so what the transcriber hears is not invented
 
   f.sessions[0].onPartial('Bonjour, je vous appelle');
   const partial = await settle(() => f.events.filter(e => e.type === 'caption-partial').at(-1), e => e?.shown);
@@ -106,6 +107,7 @@ test('a partial stays in the caller’s own words until auto-detect knows what t
   const call = await f.service.registerBrowserInbound({});
   const ws = new Socket(); f.service.handleBrowserStream(ws, { callId: call.id });
   await f.service.answer(call.id);
+  ws.binary(Buffer.alloc(640, 0x10)); // the caller made a sound, so what the transcriber hears is not invented
 
   f.sessions[0].onPartial('Bonjour, je vous appelle');
   await delay(20);

@@ -23,7 +23,7 @@ export function createCallerAccess(config, { now = Date.now, lifetimeMs = 10 * 6
       // Existing Node randomUUID supplies independent cryptographically random IDs;
       // together these contain 244 random bits, with no custom crypto algorithm.
       const clean = typeof label === 'string' ? label.replace(/[^\p{L}\p{N} .,'’·()+-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 40) : '';
-      const invitation = { token: `${randomUUID()}.${randomUUID()}`, expires: now() + lifetimeMs, label: clean };
+      const invitation = { token: `${randomUUID()}.${randomUUID()}`, expires: now() + lifetimeMs, label: clean, via: local ? 'companion' : 'link' };
       invitations.add(invitation);
       return { ...(config.publicBaseUrl ? { url: `${config.publicBaseUrl}/caller#${invitation.token}` } : {}), ...(local ? { token: invitation.token } : {}), expiresAt: new Date(invitation.expires).toISOString(), ...(clean ? { label: clean } : {}) };
     },
@@ -34,7 +34,7 @@ export function createCallerAccess(config, { now = Date.now, lifetimeMs = 10 * 6
       for (const invitation of invitations) if (constantTimeEqual(token, invitation.token)) matched = invitation;
       if (!matched) throw new CallerAccessError('This caller link is invalid, expired, or already used. Ask the agent for a new link.');
       invitations.delete(matched);
-      return { label: matched.label || '' };
+      return { label: matched.label || '', via: matched.via || 'link' };
     },
     allowUpgrade(address) {
       const current = now();

@@ -10,6 +10,7 @@ import { DEFAULT_SETTINGS, EMPTY_FLOOR, AGENT_STATE, callState } from './lib.jsx
 import { Avatar, LogoMark } from './shell.jsx';
 import { UiProvider, RouteTransition } from './components/ui.jsx';
 import Caller from './Caller.jsx';
+import PillEntry from './pill.jsx';
 import DeskPage from './pages/desk.jsx';
 import CallsPage from './pages/calls.jsx';
 import InsightsPage from './pages/insights.jsx';
@@ -39,42 +40,6 @@ export default function App() {
   // loads voices/settings/tickets, or opens the desk WebSocket.
   const path = location.pathname.replace(/\/+$/, '');
   return <UiProvider>{path === '/caller' ? <CallerEntry /> : path === '/pill' ? <PillEntry /> : <WorkspaceApp />}</UiProvider>;
-}
-
-/** The pill under the menu bar (Mac app): call state, the last caption, hold-to-talk feedback. */
-function PillEntry() {
-  const [calls, setCalls] = useState([]);
-  const [connection, setConnection] = useState('connecting');
-  const [holding, setHolding] = useState(false);
-  useEffect(() => { document.documentElement.classList.add('pill-page'); return () => document.documentElement.classList.remove('pill-page'); }, []);
-  useEffect(() => {
-    let socket, timer, closed = false;
-    const connect = () => {
-      socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/desk`);
-      socket.onopen = () => setConnection('connected');
-      socket.onmessage = event => { let message; try { message = JSON.parse(event.data); } catch { return; } if (message.type === 'snapshot') setCalls(message.calls || []); if (message.type === 'call' && message.call) setCalls(current => [message.call, ...current.filter(call => call.id !== message.call.id)]); };
-      socket.onclose = () => { setConnection('reconnecting'); if (!closed) timer = setTimeout(connect, 2000); };
-    };
-    connect();
-    return () => { closed = true; clearTimeout(timer); socket?.close(); };
-  }, []);
-  useEffect(() => {
-    const tauri = window.__TAURI__;
-    if (!tauri?.event?.listen) return;
-    let unlisten; tauri.event.listen('ptt', event => setHolding(!!event.payload)).then(fn => { unlisten = fn; });
-    return () => unlisten?.();
-  }, []);
-  const live = calls.find(call => call.state === 'in_call') || calls.find(call => call.state === 'ringing');
-  const last = live?.transcript?.at(-1);
-  const state = !live ? (connection === 'connected' ? 'No call' : 'Connecting…') : live.state === 'ringing' ? `${live.from || 'Call'} · ringing` : holding ? 'Recording' : live.phase === 'playing' ? 'Speaking' : live.phase === 'translating' ? 'Translating' : 'Listening';
-  const caption = last ? (last.speaker === 'agent' ? last.textSource : last.textShown) : live ? 'Hold ⌥ Space anywhere to speak.' : 'Calls appear here. Hold ⌥ Space to speak.';
-  const openDesk = () => { try { window.__TAURI__?.webviewWindow?.WebviewWindow?.getByLabel?.('main')?.then?.(w => w?.show()); } catch { /* not in the app */ } };
-  return <div className={`pill ${live ? 'is-live' : ''} ${holding ? 'is-holding' : ''}`} data-tauri-drag-region="true">
-    <span className="pill-mark"><AudioLines size={16} /></span>
-    <span className="pill-state"><span className="pill-dot" />{state}</span>
-    <span className="pill-caption" title={caption}>{caption}</span>
-    <button type="button" className="pill-open" onClick={openDesk} aria-label="Open the desk"><Maximize2 size={13} /></button>
-  </div>;
 }
 
 function CallerEntry() {

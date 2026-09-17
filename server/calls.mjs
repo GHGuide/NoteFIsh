@@ -257,7 +257,7 @@ export function createCallService({
     await Promise.all(pending);
   }
 
-  async function createInboundCall({ callSid, from, to, transport }) {
+  async function createInboundCall({ callSid, from, to, transport, via = null }) {
     await initialize();
     const duplicate = [...live.values()].find(value => value.call.callSid === callSid);
     if (duplicate) return structuredClone(duplicate.call);
@@ -266,7 +266,7 @@ export function createCallService({
     const settings = store.snapshot().settings;
     if (!languageCodes.has(settings.agentLanguage) || !isCallerLanguage(settings.customerLanguage)) throw new CallError('Configure valid call languages before receiving a call.', 503);
     const call = {
-      id: randomUUID(), callSid, from, to, transport, state: 'ringing', phase: 'listening', stage: 'waiting', mediaConnected: false,
+      id: randomUUID(), callSid, from, to, transport, ...(via ? { via } : {}), state: 'ringing', phase: 'listening', stage: 'waiting', mediaConnected: false,
       startedAt: now(), answeredAt: null, endedAt: null, agentId: null, agentName: '', detectedLanguage: null,
       voiceId: settings.voiceId, agentLanguage: settings.agentLanguage, customerLanguage: settings.customerLanguage,
       queueName: settings.queueName || '',
@@ -293,8 +293,9 @@ export function createCallService({
     if (typeof to !== 'string' || !PHONE.test(to) || (config.twilioNumber && to !== config.twilioNumber)) throw new CallError('This number is not assigned to the desk.', 400);
     return createInboundCall({ callSid, from, to, transport: 'twilio' });
   }
-  async function registerBrowserInbound({ from = '' } = {}) {
-    return createInboundCall({ callSid: `browser:${randomUUID()}`, from: from || 'Browser caller', to: 'Browser desk', transport: 'browser' });
+  async function registerBrowserInbound({ from = '', via = 'link' } = {}) {
+    // via: 'link' is a caller on their phone; 'companion' is a call the companion detected on this Mac (Zoom, WhatsApp…).
+    return createInboundCall({ callSid: `browser:${randomUUID()}`, from: from || 'Browser caller', to: 'Browser desk', transport: 'browser', via });
   }
 
   /** Called only after the server consumes a valid, single-use caller invitation. */
@@ -466,7 +467,7 @@ export function createCallService({
       const live = providers.openTranscription({
         language: hint,
         onPartial: text => {
-          if (runtime.call.state !== 'in_call' || runtime.live !== live) return;
+          if (runtime.call.state !== 'in_call' || runtime.live !== live || !heardSpeech(runtime)) return;
           if (!runtime.partial) runtime.partial = { text: '', shown: '', from: '', running: false };
           const state = runtime.partial;
           // A new phrase starts its own text, so the old translation no longer describes it.
@@ -475,7 +476,7 @@ export function createCallService({
           showPartial(runtime, text, state.shown);
           void translatePartial(runtime);
         },
-        onFinal: text => { if (runtime.call.state === 'in_call' && runtime.live === live) { clearPartial(runtime); queueCaption(runtime, null, text); } },
+        onFinal: text => { if (runtime.call.state === 'in_call' && runtime.live === live) { clearPartial(runtime); if (heardSpeech(runtime)) queueCaption(runtime, null, text); } },
         onError: error => { if (runtime.live === live) { warn(runtime, `Live captions stopped, using segments: ${safeError(error)}`); stopLiveCaptions(runtime); } },
       });
       runtime.live = live;
@@ -529,8 +530,20 @@ export function createCallService({
     finally { state.running = false; if (runtime.partial === state) void translatePartial(runtime); }
   }
   /** A caller frame goes to live captions when the session is up; otherwise to the segmenter. */
+  // The live transcriber invents sentences over silence. Remember when the caller
+  // last made a sound, and let a caption through only if it followed one.
+  const SPEECH_FLOOR = 350; // PCM16 RMS, about -39 dBFS: quieter than any voice on a call
+  const SPEECH_MEMORY = 6000; // a phrase finishes within a few seconds of its last sound
+  function noteSound(runtime, pcm) {
+    let sum = 0, count = 0;
+    for (let i = 0; i + 1 < pcm.length; i += 8) { const v = pcm.readInt16LE(i); sum += v * v; count++; }
+    if (count && Math.sqrt(sum / count) > SPEECH_FLOOR) runtime.lastSound = Date.now();
+  }
+  const heardSpeech = runtime => runtime.lastSound && Date.now() - runtime.lastSound < SPEECH_MEMORY;
   function hearCaller(runtime, pcm16k, mulawFrame) {
-    if (runtime.live?.open) { runtime.live.push(pcm16k ?? upsample8kTo16k(mulawToPcm(mulawFrame))); return; }
+    const pcm = pcm16k ?? upsample8kTo16k(mulawToPcm(mulawFrame));
+    noteSound(runtime, pcm);
+    if (runtime.live?.open) { runtime.live.push(pcm); return; }
     queueCaption(runtime, runtime.segmenter.push(pcm16k ?? mulawFrame));
   }
   async function answer(id, agentId = null) {

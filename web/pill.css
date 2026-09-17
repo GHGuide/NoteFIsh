@@ -1,0 +1,51 @@
+/* The pill under the menu bar (Mac app): the companion design's call states.
+   The window is transparent and exactly as big as what is drawn, so this file
+   decides the window's size. Keep every box's width stable while a state is on
+   or the window resizes on every caption. */
+.pill-page, .pill-page body { background: transparent !important; }
+.pill-page body { margin: 0; display: flex; justify-content: center; overflow: hidden; }
+.pill-page ::selection { background: transparent; }
+
+/* the measured box: padding leaves room for the shadows */
+.pillroot { display: inline-flex; flex-direction: column; align-items: center; gap: 10px; padding: 8px 30px 30px; }
+
+/* the caption above the pill, from the companion board */
+.pillcap { width: 420px; padding: 11px 14px; border-radius: 14px; background: #FEFDFC; border: 1px solid rgba(36, 36, 36, .12); box-shadow: 0 10px 30px rgba(36, 36, 36, .18); text-align: left; }
+.pillcap p { margin: 0; font-size: 14.5px; line-height: 1.4; color: #242424; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.pillcap p.sub { margin-top: 3px; font-size: 12px; color: #66645F; -webkit-line-clamp: 1; }
+.pillcap p.sub b { font-weight: 600; margin-right: 6px; }
+.pillcap .who { display: block; font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: #8F8B83; margin-bottom: 3px; }
+.pillcap.mine .who { color: #815A25; }
+@media (prefers-color-scheme: dark) {
+  .pillcap { background: #262522; border-color: rgba(243, 241, 236, .14); box-shadow: 0 12px 34px rgba(0, 0, 0, .5); }
+  .pillcap p { color: #F1EFE9; } .pillcap p.sub { color: rgba(241, 239, 233, .62); } .pillcap .who { color: rgba(241, 239, 233, .45); }
+}
+
+/* the pill itself */
+.pill { display: inline-flex; align-items: center; gap: 10px; height: 46px; padding: 0 16px 0 12px; border-radius: 999px; background: #242424; color: #FFF; box-shadow: 0 10px 30px rgba(36, 36, 36, .28), inset 0 0 0 1px rgba(255, 255, 255, .10); font: 500 14px/1 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; white-space: nowrap; }
+@media (prefers-color-scheme: dark) { .pill { background: #2E2D2A; box-shadow: 0 12px 34px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 255, 255, .18); } }
+.pillrow { display: inline-flex; align-items: center; gap: 10px; }
+.pill .mark { display: grid; place-items: center; border: 0; background: transparent; padding: 0; cursor: pointer; flex-shrink: 0; border-radius: 50%; opacity: .95; transition: opacity .15s, transform .15s cubic-bezier(.2, .7, .2, 1); }
+.pill .mark:hover { opacity: 1; transform: scale(1.08); }
+.pill .dim { opacity: .5; } .pill .dim2 { opacity: .6; display: inline-flex; }
+.pill b { font-weight: 600; }
+.pill kbd { font: inherit; font-size: 11px; border: 1px solid #777; padding: 3px 7px; border-radius: 4px; color: #E2E0DB; }
+.pill .act { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border: 0; border-radius: 999px; background: #FFF; color: #242424; font: 600 13px 'DM Sans', sans-serif; cursor: pointer; margin-left: 2px; }
+.pill .act:hover { background: #ECEAE5; }
+.pill .act.ghost { background: rgba(255, 255, 255, .14); color: #FFF; width: 28px; padding: 0; justify-content: center; }
+.pill .act.ghost:hover { background: rgba(255, 255, 255, .24); }
+.pill .rec { width: 9px; height: 9px; border-radius: 50%; background: #C43B36; box-shadow: 0 0 0 4px rgba(196, 59, 54, .28); animation: pill-blink 1.2s ease-in-out infinite; flex-shrink: 0; }
+@keyframes pill-blink { 50% { opacity: .35; } }
+.pill .bar { width: 84px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .18); overflow: hidden; }
+.pill .bar i { display: block; height: 100%; background: #FFF; border-radius: 2px; transition: width .25s linear; }
+.pill .wave { display: inline-flex; align-items: center; gap: 3px; height: 22px; }
+.pill .wave i { width: 3px; border-radius: 2px; background: currentColor; height: var(--h, 10px); transform-origin: center; animation: pill-wave 1s ease-in-out infinite; animation-delay: var(--d, 0s); }
+@keyframes pill-wave { 0%, 100% { transform: scaleY(.45); } 50% { transform: scaleY(1); } }
+.pill .spin { animation: pill-spin 1s linear infinite; }
+@keyframes pill-spin { to { transform: rotate(360deg); } }
+.pill.is-recording { background: #3A2422; }
+@media (prefers-color-scheme: dark) { .pill.is-recording { background: #3A2422; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pill .wave i, .pill .rec, .pill .spin { animation: none; }
+}

@@ -9,7 +9,7 @@ test('the companion gets a local, labelled invitation without a public address; 
   assert.match(invite.token, /^[0-9a-f-]{36}\.[0-9a-f-]{36}$/);
   assert.equal('url' in invite, false, 'no link to hand out, only the token for this machine');
   assert.equal(invite.label, 'Zoom · Weekly sync script', 'the label is plain text');
-  assert.deepEqual(local.consume(invite.token), { label: 'Zoom · Weekly sync script' }, 'joining hands the label back so the call is named after the app');
+  assert.deepEqual(local.consume(invite.token), { label: 'Zoom · Weekly sync script', via: 'companion' }, 'joining hands the label back so the call is named after the app, marked as one the companion found');
   assert.throws(() => local.consume(invite.token), /invalid, expired, or already used/, 'one use');
 
   const remote = createCallerAccess({ publicBaseUrl: 'https://desk.example', deskPassword: 'secret-secret-secret', publicDemo: false });
@@ -17,6 +17,6 @@ test('the companion gets a local, labelled invitation without a public address; 
   assert.ok(link.url.startsWith('https://desk.example/caller#'));
   assert.equal('token' in link, false, 'phone invitations keep the token inside the link only');
   assert.equal(link.label.length, 40, 'labels are capped');
-  assert.deepEqual(remote.consume(link.url.split('#')[1]), { label: 'x'.repeat(40) });
-  assert.deepEqual(remote.consume(remote.issue().url.split('#')[1]), { label: '' }, 'no label is fine');
+  assert.deepEqual(remote.consume(link.url.split('#')[1]), { label: 'x'.repeat(40), via: 'link' });
+  assert.deepEqual(remote.consume(remote.issue().url.split('#')[1]), { label: '', via: 'link' }, 'no label is fine');
 });

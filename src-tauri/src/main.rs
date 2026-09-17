@@ -14,7 +14,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{
     menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::TrayIconBuilder,
-    Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Wry,
+    Emitter, Listener as _, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder, Wry,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tauri_plugin_positioner::{Position, WindowExt};
@@ -210,7 +210,7 @@ fn build_menu(app: &tauri::AppHandle, snap: &Snapshot) -> tauri::Result<Menu<Wry
     let recent_refs: Vec<&dyn IsMenuItem<Wry>> = recent.iter().map(|item| item as &dyn IsMenuItem<Wry>).collect();
     let recent_menu = Submenu::with_id_and_items(app, "recent", "Recent calls", !recent.is_empty(), &recent_refs)?;
     let open = MenuItem::with_id(app, "open", "Open desk", true, None::<&str>)?;
-    let pill = MenuItem::with_id(app, "pill", "Show / hide pill", true, None::<&str>)?;
+    let pill = MenuItem::with_id(app, "pill", "Show the pill", true, None::<&str>)?;
     let listen = CheckMenuItem::with_id(app, "listen", "Listen for calls (Zoom, WhatsApp, Meet…)", true, snap.listening, None::<&str>)?;
     let talk = MenuItem::with_id(app, "talk", "Hold ⌥ Space anywhere to talk", false, None::<&str>)?;
     let languages: Vec<CheckMenuItem<Wry>> = snap
@@ -257,29 +257,67 @@ fn show_main(app: &tauri::AppHandle) {
     }
 }
 
-/// The pill: a small always-on-top strip under the menu bar showing call state and the last caption.
-fn toggle_pill(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("pill") {
-        if window.is_visible().unwrap_or(false) {
-            let _ = window.hide();
-        } else {
-            let _ = window.show();
-        }
+/// The pill: a transparent always-on-top strip under the menu bar. It starts hidden;
+/// its page shows it when a call needs attention and sizes it to what it draws.
+fn create_pill(app: &tauri::AppHandle) {
+    if app.get_webview_window("pill").is_some() {
         return;
     }
     let url = format!("{DESK}/pill").parse().expect("pill url");
     if let Ok(window) = WebviewWindowBuilder::new(app, "pill", WebviewUrl::External(url))
         .title("NoteFish")
-        .inner_size(420.0, 64.0)
+        .inner_size(360.0, 100.0)
         .decorations(false)
         .transparent(true)
         .always_on_top(true)
         .skip_taskbar(true)
         .resizable(false)
+        .shadow(false)
+        .focused(false)
+        .visible(false)
+        .accept_first_mouse(true)
         .build()
     {
         let _ = window.move_window(Position::TopCenter);
     }
+}
+
+/// Sent by the pill's page with the size of what it drew. Growing keeps the
+/// horizontal centre still; `recenter` puts it back under the menu bar's middle.
+fn pill_layout(app: &tauri::AppHandle, width: f64, height: f64, recenter: bool) {
+    let Some(window) = app.get_webview_window("pill") else { return };
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let before = window.outer_size().ok().map(|size| size.to_logical::<f64>(scale));
+    let position = window.outer_position().ok().map(|point| point.to_logical::<f64>(scale));
+    let _ = window.set_size(LogicalSize::new(width.max(80.0), height.max(40.0)));
+    if recenter {
+        let _ = window.move_window(Position::TopCenter);
+    } else if let (Some(before), Some(position)) = (before, position) {
+        let _ = window.set_position(LogicalPosition::new(position.x + (before.width - width) / 2.0, position.y));
+    }
+}
+
+fn pill_visible(app: &tauri::AppHandle, show: bool) {
+    if let Some(window) = app.get_webview_window("pill") {
+        let _ = if show { window.show() } else { window.hide() };
+    }
+}
+
+/// The pill's page speaks to this shell over events, which the capability already allows.
+fn listen_to_pill(app: &tauri::App) {
+    let handle = app.handle().clone();
+    app.listen("pill-layout", move |event| {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(event.payload()) {
+            pill_layout(&handle, v["width"].as_f64().unwrap_or(360.0), v["height"].as_f64().unwrap_or(100.0), v["recenter"].as_bool().unwrap_or(false));
+        }
+    });
+    let handle = app.handle().clone();
+    app.listen("pill-visible", move |event| {
+        let show = serde_json::from_str::<serde_json::Value>(event.payload()).ok().and_then(|v| v["show"].as_bool()).unwrap_or(false);
+        pill_visible(&handle, show);
+    });
+    let handle = app.handle().clone();
+    app.listen("open-desk", move |_| show_main(&handle));
 }
 
 fn main() {
@@ -313,7 +351,9 @@ fn main() {
                     let id = event.id.as_ref();
                     match id {
                         "open" => show_main(app),
-                        "pill" => toggle_pill(app),
+                        "pill" => {
+                            let _ = app.emit("pill-peek", ());
+                        }
                         "listen" => {
                             toggle_listener(app);
                             refresh_menu(app, snapshot(app));
@@ -336,7 +376,8 @@ fn main() {
                 })
                 .on_tray_icon_event(|tray, event| tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event))
                 .build(app)?;
-            toggle_pill(app.handle());
+            create_pill(app.handle());
+            listen_to_pill(app);
             // Keep the menu current: the live call's timer, recent calls, the caption language.
             let handle = app.handle().clone();
             std::thread::spawn(move || {
