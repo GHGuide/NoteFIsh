@@ -48,3 +48,6 @@
 .au-error { margin: 0; padding: 9px 12px; border-radius: 9px; background: #FFF3F1; font-size: 12.5px; color: #8F2C2B; }
 .au-legal { margin: 0; max-width: 340px; font-size: 11px; line-height: 1.5; color: #8F8B83; text-align: center; }
 @media (max-width: 860px) { .au { grid-template-columns: 1fr; overflow: auto; } .au-left { padding: 28px 24px 16px; gap: 24px; } .au-demo, .au-steps { display: none; } .au-right { border-left: 0; border-top: 1px solid var(--sheet-line); padding: 24px; } .au-form { width: 100%; max-width: 360px; margin-top: 0; } }
+.au-skip { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 12.5px; }
+.au-skip a { font-weight: 600; color: var(--ink); text-decoration: none; }
+.au-skip span { font-size: 11px; color: #8F8B83; }

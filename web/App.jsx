@@ -47,9 +47,12 @@ export default function App() {
 function Gate() {
   const [me, setMe] = useState(null); // { user, users }
   useEffect(() => { api.me().then(setMe).catch(() => setMe({ user: null, users: 0 })); }, []);
+  // Skipping is a local convenience: the server's loopback bypass already opens the API here.
+  const [skipped, setSkipped] = useState(() => { try { return localStorage.getItem('notefish.skipAuth') === '1'; } catch { return false; } });
+  const skip = value => { setSkipped(value); try { value ? localStorage.setItem('notefish.skipAuth', '1') : localStorage.removeItem('notefish.skipAuth'); } catch { /* fine */ } };
   if (!me) return null;
-  if (!me.user) return <AuthPage users={me.users} onSignedIn={user => setMe({ ...me, user })} />;
-  return <WorkspaceApp user={me.user} onSignedOut={() => setMe({ ...me, user: null, users: Math.max(1, me.users) })} />;
+  if (!me.user && !(skipped && me.local)) return <AuthPage users={me.users} local={me.local} onSignedIn={user => setMe({ ...me, user })} onSkip={() => skip(true)} />;
+  return <WorkspaceApp user={me.user} onSignedOut={() => { skip(false); setMe({ ...me, user: null, users: Math.max(1, me.users) }); }} />;
 }
 
 function CallerEntry() {
@@ -190,7 +193,7 @@ function WorkspaceApp({ user, onSignedOut }) {
         <button type="button" onClick={() => setFree(true)}><Gift size={16} strokeWidth={1.7} />Get a free month</button>
         <a href="/settings" className={parsed.path === '/settings' ? 'active' : ''} onClick={event => { event.preventDefault(); navigate('/settings'); }}><Settings size={16} strokeWidth={1.7} />Settings</a>
         <a href={HELP_URL} target="_blank" rel="noreferrer"><CircleHelp size={16} strokeWidth={1.7} />Help</a>
-        <button type="button" title={user?.email || ''} onClick={() => api.signOut().catch(() => {}).finally(onSignedOut)}><LogOut size={16} strokeWidth={1.7} />Sign out{user?.name ? ` · ${user.name.split(' ')[0]}` : ''}</button>
+        <button type="button" title={user?.email || ''} onClick={() => api.signOut().catch(() => {}).finally(onSignedOut)}><LogOut size={16} strokeWidth={1.7} />{user ? `Sign out · ${user.name.split(' ')[0]}` : 'Sign in'}</button>
         <div className="ds-side-foot"><i className={connection === 'connected' ? 'connected' : ''} />{connection === 'connected' ? 'Desk connected' : connection === 'connecting' ? 'Connecting…' : 'Reconnecting…'}</div>
       </nav>
     </aside>
