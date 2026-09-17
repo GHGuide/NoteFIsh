@@ -8,6 +8,7 @@ import { motion, useReducedMotion } from 'motion/react';
 
 const COPY = {
   fr: {
+    captions: 'Sous-titres · dans votre langue', captionsHide: 'Masquer', captionsShow: 'Afficher', captionsEmpty: 'Ce que vous dites tous les deux apparaît ici, dans votre langue.', you: 'Vous', agentName: 'Standard',
     label: 'UNE CONVERSATION, TOUT SIMPLEMENT', title: 'On vous écoute.', intro: 'Parlez dans votre langue. Votre interlocuteur vous répond avec une voix traduite.',
     call: 'Appeler', connecting: 'Connexion en cours…', ringing: 'Votre interlocuteur est prévenu.', waiting: 'Patientez un instant. La conversation commence dès qu’il répond.',
     live: 'Vous êtes en ligne.', listening: 'À vous de parler. Votre interlocuteur vous entend.', translating: 'Votre interlocuteur prépare sa réponse…', playing: 'Écoutez la réponse de votre interlocuteur.',
@@ -27,6 +28,7 @@ const COPY = {
     micErrors: { blocked: 'L’accès au microphone est bloqué par le navigateur ou le téléphone.', missing: 'Aucun microphone disponible. Vérifiez votre appareil.', busy: 'Le microphone est indisponible. Fermez les autres appels et réessayez.', unsupported: 'Ce navigateur ne permet pas l’accès au microphone ici. Ouvrez le lien HTTPS dans Safari ou Chrome.', failed: 'Le microphone n’a pas pu démarrer. Réessayez ou ouvrez le lien dans Safari ou Chrome.', timeout: 'La demande de microphone est toujours en attente. Autorisez-la, puis réessayez.' },
   },
   en: {
+    captions: 'Captions · in your language', captionsHide: 'Hide', captionsShow: 'Show', captionsEmpty: 'What you both say appears here, in your language.', you: 'You', agentName: 'Desk',
     label: 'A CONVERSATION, MADE SIMPLE', title: 'We’re listening.', intro: 'Speak in your language. The person at the desk replies with a translated voice.',
     call: 'Call', connecting: 'Connecting…', ringing: 'Your call is ringing.', waiting: 'Just a moment. The conversation starts when the person at the desk answers.',
     live: 'You’re connected.', listening: 'Go ahead and speak. The person at the desk can hear you.', translating: 'The person at the desk is preparing a reply…', playing: 'Listen to their reply.',
@@ -49,7 +51,9 @@ const COPY = {
 
 export default function Caller() {
   const [token] = useState(() => { try { return decodeURIComponent(location.hash.slice(1)); } catch { return ''; } });
-  const [language, setLanguage] = useState('fr');
+  const [language, setLanguage] = useState('en');
+  const [captions, setCaptions] = useState([]);
+  const [showCaptions, setShowCaptions] = useState(true);
   const [state, setState] = useState(token ? 'ready' : 'unavailable');
   const [phase, setPhase] = useState('listening');
   const [error, setError] = useState('');
@@ -61,7 +65,7 @@ export default function Caller() {
   const [deviceMuted, setDeviceMuted] = useState(false);
   const [permissionProblem, setPermissionProblem] = useState('');
   const [linkNotice, setLinkNotice] = useState('');
-  const [speechLanguage, setSpeechLanguage] = useState('fr');
+  const [speechLanguage, setSpeechLanguage] = useState('auto');
   const [used, setUsed] = useState(false);
   const reducedMotion = useReducedMotion();
   const mutedRef = useRef(false);
@@ -162,6 +166,7 @@ export default function Caller() {
           session.audio.play(message.payload, message.playbackId).then(() => { if (!session.ended && pendingPlayback.current === message) pendingPlayback.current = null; }).catch(failure => { if (!session.ended) { setError(failure.message); setAudioState(session.audio.context.state); } });
         }
         if (message.type === 'clear') { pendingPlayback.current = null; session.audio.clearPlayback(); }
+        if (message.type === 'caption' && typeof message.text === 'string') setCaptions(list => [...list.filter(item => item.id !== message.id).slice(-19), { id: message.id || String(Date.now()), who: message.who === 'agent' ? 'agent' : 'you', text: message.text.slice(0, 600) }]);
         if (message.type === 'error') {
           const messageText = message.error || copyRef.current.disconnected;
           if (stateRef.current === 'connecting') finish('error', messageText, true);
@@ -207,7 +212,8 @@ export default function Caller() {
           audioContext={runtime.current?.audio?.context} active={microphoneLive || playing} height={56} label={playing ? copy.replyWaveform : copy.micWaveform} />
       </div>}
       {error && <div className="caller-error" role="alert">{error}</div>}
-      {connected && <p className="caller-speech-language"><Globe2 size={14} />{copy.speechLanguage}: <strong>{languageName(speechLanguage)}</strong></p>}
+      {connected && <p className="caller-speech-language"><Globe2 size={14} />{copy.speechLanguage}: <strong>{speechLanguage === 'auto' ? (language === 'fr' ? 'détection…' : 'detecting…') : languageName(speechLanguage)}</strong></p>}
+      {connected && <section className="caller-captions" aria-label={copy.captions}><div className="caller-captions-head"><span>{copy.captions}</span><button type="button" className="text-button" aria-pressed={showCaptions} onClick={() => setShowCaptions(!showCaptions)}>{showCaptions ? copy.captionsHide : copy.captionsShow}</button></div>{showCaptions && (captions.length ? <ol aria-live="polite">{captions.slice(-6).map(item => <li key={item.id} className={item.who}><span>{item.who === 'agent' ? copy.agentName : copy.you}</span><p>{item.text}</p></li>)}</ol> : <p className="caller-captions-empty">{copy.captionsEmpty}</p>)}</section>}
       {state === 'connecting' && !microphoneReady && <p className="caller-permission-wait" role="status">{copy.permissionWaiting}</p>}
       {inProgress && audioState !== 'running' && audioState !== 'idle' && <div className="caller-audio-recovery"><p>{copy.audioHelp}</p><button className="button primary" onClick={resumeAudio}><Volume2 size={17} />{copy.audio}</button></div>}
       {!inProgress && !used && token && state !== 'ended' && <><motion.button className="button primary caller-call-button" onClick={start} whileTap={reducedMotion ? undefined : { scale: .98 }}><Phone size={19} />{state === 'error' ? copy.retry : copy.call}</motion.button><span className="caller-permission">{copy.allow}</span></>}

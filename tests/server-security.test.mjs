@@ -57,7 +57,11 @@ test('Twilio request signatures bind all body values and exact public endpoint',
   assert.equal(validateTwilio({ ...incoming, body: { ...body, From: '+33123456780' } }, config), false);
   assert.equal(validateTwilio({ ...incoming, url: '/twilio/incoming?other=1' }, config), false);
   assert.equal(validateTwilio({ ...incoming, path: '/twilio/status' }, config), false);
-  assert.equal(validateTwilio(incoming, { ...config, deskPassword: '' }), false);
+  // The signature authenticates Twilio, so a passwordless shared demo can still
+  // take real phone calls. Missing provider configuration still rejects.
+  assert.equal(validateTwilio(incoming, { ...config, deskPassword: '' }), true);
+  assert.equal(validateTwilio(incoming, { ...config, twilioAuthToken: '' }), false);
+  assert.equal(validateTwilio(incoming, { ...config, publicBaseUrl: '' }), false);
 });
 
 test('Twilio WSS rejects untrusted signatures and accepts documented canonical/trailing slash variants', () => {

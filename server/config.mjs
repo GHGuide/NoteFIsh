@@ -31,6 +31,30 @@ export function loadConfig(env = process.env, root = process.cwd()) {
   if (twilioAccountSid && !SID.test(twilioAccountSid)) throw new Error('Invalid TWILIO_ACCOUNT_SID');
   const twilioNumber = read('TWILIO_PHONE_NUMBER') || read('TWILIO_CALLER_ID');
   if (twilioNumber && !E164.test(twilioNumber)) throw new Error('Invalid TWILIO_PHONE_NUMBER');
+  const sessionSecret = read('NOTEFISH_SESSION_SECRET', 256);
+  if (sessionSecret && sessionSecret.length < 32) throw new Error('NOTEFISH_SESSION_SECRET must contain at least 32 characters');
+  const count = (key, fallback, max) => {
+    const value = read(key, 6) || String(fallback);
+    if (!/^\d{1,6}$/.test(value) || Number(value) < 1 || Number(value) > max) throw new Error(`Invalid ${key}`);
+    return Number(value);
+  };
+  const maxAgents = count('NOTEFISH_MAX_AGENTS', 20, 50);
+  const maxConcurrentCalls = count('NOTEFISH_MAX_CONCURRENT_CALLS', 20, 50);
+  const webhookUrl = read('NOTEFISH_WEBHOOK_URL');
+  if (webhookUrl) {
+    let url;
+    try { url = new URL(webhookUrl); } catch { throw new Error('Invalid NOTEFISH_WEBHOOK_URL'); }
+    if (url.protocol !== 'https:' || url.username || url.password) throw new Error('NOTEFISH_WEBHOOK_URL must be an HTTPS URL without credentials');
+  }
+  const webhookSecret = read('NOTEFISH_WEBHOOK_SECRET', 256);
+  if (webhookUrl && webhookSecret.length < 32) throw new Error('NOTEFISH_WEBHOOK_SECRET must contain at least 32 characters when a webhook URL is set');
+  const exportToken = read('NOTEFISH_EXPORT_TOKEN', 256);
+  if (exportToken && exportToken.length < 32) throw new Error('NOTEFISH_EXPORT_TOKEN must contain at least 32 characters');
+  const zendeskSubdomain = read('ZENDESK_SUBDOMAIN', 100);
+  if (zendeskSubdomain && !/^[a-z0-9][a-z0-9-]{0,62}$/i.test(zendeskSubdomain)) throw new Error('Invalid ZENDESK_SUBDOMAIN');
+  const zendeskEmail = read('ZENDESK_EMAIL', 200);
+  const zendeskApiToken = read('ZENDESK_API_TOKEN', 256);
+  if (zendeskSubdomain && (!zendeskEmail || !zendeskApiToken)) throw new Error('ZENDESK_EMAIL and ZENDESK_API_TOKEN are required with ZENDESK_SUBDOMAIN');
   const dataDir = read('DATA_DIR') || path.join(root, 'data');
   if (!path.isAbsolute(dataDir)) throw new Error('DATA_DIR must be an absolute directory path');
   const model = (key, fallback) => {
@@ -43,6 +67,10 @@ export function loadConfig(env = process.env, root = process.cwd()) {
     production, dataPath: path.join(dataDir, 'notefish.json'), distPath: path.join(root, 'dist'),
     openaiApiKey: read('OPENAI_API_KEY'), fishApiKey: read('FISH_API_KEY'),
     twilioAccountSid, twilioAuthToken: read('TWILIO_AUTH_TOKEN'), twilioNumber,
+    sessionSecret, maxAgents, maxConcurrentCalls,
+    webhookUrl, webhookSecret, exportToken,
+    zendeskSubdomain, zendeskEmail, zendeskApiToken,
+    demoVoiceReferenceId: read('NOTEFISH_DEMO_VOICE_REFERENCE_ID', 128),
     fishModel: model('FISH_MODEL', 's2.1-pro-free'),
     transcribeModel: model('OPENAI_TRANSCRIBE_MODEL', 'gpt-4o-mini-transcribe'),
     translationModel: model('OPENAI_TRANSLATION_MODEL', 'gpt-4o-mini'),
@@ -72,5 +100,18 @@ export function getStatus(config, { audioAvailable = false } = {}) {
     audioAvailable, demoVerified: false, demoTransport: 'browser',
     access: { mode: config.publicDemo ? 'shared-demo' : 'protected', loginRequired: !config.publicDemo },
     callerUrl: config.publicBaseUrl ? `${config.publicBaseUrl}/caller` : null,
+    // A shared demo has no way to tell one visitor from another, so a roster of
+    // named agents there would be theatre. Multi-agent stays protected-only.
+    floor: {
+      multiAgent: !config.publicDemo,
+      reason: config.publicDemo ? 'The shared demo runs as one desk. Set NOTEFISH_PUBLIC_DEMO=false to run a roster of agents.' : '',
+      maxAgents: config.maxAgents, maxConcurrentCalls: config.maxConcurrentCalls,
+      persistentSessions: Boolean(config.sessionSecret),
+    },
+    integrations: {
+      webhook: { configured: Boolean(config.webhookUrl), url: config.webhookUrl || null },
+      zendesk: { configured: Boolean(config.zendeskSubdomain && config.zendeskEmail && config.zendeskApiToken) },
+      exportApi: { configured: Boolean(config.exportToken) },
+    },
   };
 }

@@ -15,15 +15,17 @@ export function createCallerAccess(config, { now = Date.now, lifetimeMs = 10 * 6
   const attempts = new Map();
   const prune = () => { for (const invitation of invitations) if (invitation.expires <= now()) invitations.delete(invitation); };
   return {
-    issue() {
-      if (!config.publicBaseUrl || (!config.deskPassword && !config.publicDemo)) throw new CallerAccessError('Configure the public HTTPS address and workspace access before creating a caller link.', 503);
+    issue({ label = '', local = false } = {}) {
+      // A phone link needs the public HTTPS address; the companion joins from this machine and only needs the token.
+      if (!local && (!config.publicBaseUrl || (!config.deskPassword && !config.publicDemo))) throw new CallerAccessError('Configure the public HTTPS address and workspace access before creating a caller link.', 503);
       prune();
       if (invitations.size >= 8) throw new CallerAccessError('There are already eight active caller links. Use an existing link or wait ten minutes.', 429);
       // Existing Node randomUUID supplies independent cryptographically random IDs;
       // together these contain 244 random bits, with no custom crypto algorithm.
-      const invitation = { token: `${randomUUID()}.${randomUUID()}`, expires: now() + lifetimeMs };
+      const clean = typeof label === 'string' ? label.replace(/[^\p{L}\p{N} .,'’·()+-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 40) : '';
+      const invitation = { token: `${randomUUID()}.${randomUUID()}`, expires: now() + lifetimeMs, label: clean };
       invitations.add(invitation);
-      return { url: `${config.publicBaseUrl}/caller#${invitation.token}`, expiresAt: new Date(invitation.expires).toISOString() };
+      return { ...(config.publicBaseUrl ? { url: `${config.publicBaseUrl}/caller#${invitation.token}` } : {}), ...(local ? { token: invitation.token } : {}), expiresAt: new Date(invitation.expires).toISOString(), ...(clean ? { label: clean } : {}) };
     },
     consume(token) {
       if (typeof token !== 'string' || !TOKEN.test(token)) throw new CallerAccessError('This caller link is invalid, expired, or already used. Ask the agent for a new link.');
@@ -32,6 +34,7 @@ export function createCallerAccess(config, { now = Date.now, lifetimeMs = 10 * 6
       for (const invitation of invitations) if (constantTimeEqual(token, invitation.token)) matched = invitation;
       if (!matched) throw new CallerAccessError('This caller link is invalid, expired, or already used. Ask the agent for a new link.');
       invitations.delete(matched);
+      return { label: matched.label || '' };
     },
     allowUpgrade(address) {
       const current = now();

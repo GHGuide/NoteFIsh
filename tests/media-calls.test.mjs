@@ -60,7 +60,8 @@ test('real protocol path gates ringing audio, captions answered caller and plays
   assert.equal(result.phase, 'playing');
   assert.equal(result.transcript.at(-1).delivery, 'pending');
   assert.equal(f.invoked.find(([kind]) => kind === 'synthesize')[1].referenceId, 'approved_voice');
-  assert.equal(f.invoked.find(([kind]) => kind === 'synthesize')[1].text, 'Je vous aide.');
+  // Replies carry a leading register tag for the S2 models; the words themselves are untouched.
+  assert.match(f.invoked.find(([kind]) => kind === 'synthesize')[1].text, /^(\[[^\]]+\] )?Je vous aide\.$/);
   const sent = ws.sent.find(frame => frame.event === 'media');
   assert.deepEqual(Buffer.from(sent.media.payload, 'base64'), Buffer.alloc(800, 0x7f));
   await assert.rejects(f.service.say(call.id, { text: 'Another reply' }), /current reply/);
@@ -119,7 +120,11 @@ test('stream start is bound to registered account/call and rejects malformed fra
     tracks: ['inbound'], customParameters: { callId: call.id }, mediaFormat: { encoding: 'audio/x-mulaw', sampleRate: 8000, channels: 1 } } });
   assert.equal(other.readyState, 3);
   assert.equal(ws.readyState, 1);
-  await assert.rejects(f.service.registerInbound({ callSid: 'CA' + '6'.repeat(32), from, to }), /another call/);
+  // A second caller no longer collides with the first; the floor takes both.
+  const second = await f.service.registerInbound({ callSid: 'CA' + '6'.repeat(32), from, to });
+  assert.equal(second.state, 'ringing');
+  assert.equal(f.service.snapshot().filter(item => item.state !== 'ended').length, 2);
+  await f.service.end(second.id);
   await f.service.answer(call.id);
   ws.message({ event: 'media', streamSid, media: { track: 'inbound', payload: 'invalid!!!!' } });
   await delay(5);
@@ -176,7 +181,7 @@ test('browser caller rings, relays real PCM, captions at 16k, and receives only 
   assert.equal(audio.mimeType, 'audio/mpeg');
   assert.deepEqual(Buffer.from(audio.payload, 'base64'), Buffer.alloc(500, 0x11));
   assert.equal(f.invoked.find(([method]) => method === 'synthesize')[1].referenceId, 'approved_voice');
-  assert.equal(f.invoked.find(([method]) => method === 'synthesize')[1].text, 'Je vous aide.');
+  assert.match(f.invoked.find(([method]) => method === 'synthesize')[1].text, /^(\[[^\]]+\] )?Je vous aide\.$/);
   const callerStates = ws.sent.filter(event => event.type === 'state');
   assert.ok(callerStates.every(event => !event.transcript && !event.ticket && !event.voiceId && !event.from));
   const before = f.events.filter(event => event.type === 'audio').length; ws.binary(speech);

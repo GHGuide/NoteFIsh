@@ -29,7 +29,14 @@ test('shared demo opens the workspace without a login challenge while preserving
     assert.equal(body.includes(config.fishApiKey), false);
     assert.equal(body.includes(config.openaiApiKey), false);
   }
-  assert.deepEqual(await (await fetch(base + '/api/session')).json(), { authenticated: false, loginRequired: false, method: 'shared-demo' });
+  assert.deepEqual(await (await fetch(base + '/api/session')).json(), {
+    authenticated: false, loginRequired: false, method: 'shared-demo',
+    // A shared demo cannot tell visitors apart, so it stays a single desk.
+    multiAgent: false, identity: 'single-desk', agent: null, persistentSessions: false,
+  });
+  const roster = await fetch(base + '/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://example.test' }, body: JSON.stringify({ name: 'Nina' }) });
+  assert.equal(roster.status, 409);
+  assert.equal((await roster.json()).code, 'SINGLE_DESK');
   const put = origin => fetch(base + '/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify({ queueName: 'Shared demo line' }) });
   assert.equal((await put()).status, 403);
   assert.equal((await put('https://other.test')).status, 403);

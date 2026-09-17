@@ -27,3 +27,18 @@ services:
         sync: false
       - key: FISH_MODEL
         value: s2.1-pro-free
+      # Seats survive a restart only with a secret. numInstances stays 1: the
+      # floor and the JSON store live in one process.
+      - key: NOTEFISH_SESSION_SECRET
+        generateValue: true
+      - key: NOTEFISH_MAX_AGENTS
+        value: "20"
+      - key: NOTEFISH_MAX_CONCURRENT_CALLS
+        value: "20"
+      # Outbound delivery. Leave unset to keep calls inside NoteFIsh.
+      - key: NOTEFISH_WEBHOOK_URL
+        sync: false
+      - key: NOTEFISH_WEBHOOK_SECRET
+        sync: false
+      - key: NOTEFISH_EXPORT_TOKEN
+        sync: false

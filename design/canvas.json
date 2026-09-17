@@ -1,0 +1,205 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1000,
+      "h": 622,
+      "title": "Calls · a record"
+    },
+    {
+      "file": "Desk.dc.html",
+      "x": 1080,
+      "y": 0,
+      "w": 1000,
+      "h": 622,
+      "title": "Desk · live call"
+    },
+    {
+      "file": "Companion.dc.html",
+      "x": 2160,
+      "y": 0,
+      "w": 1000,
+      "h": 622,
+      "title": "Companion · on any screen"
+    },
+    {
+      "file": "DeskHold.dc.html",
+      "x": 3240,
+      "y": 0,
+      "w": 1000,
+      "h": 622,
+      "title": "Desk · holding to speak"
+    },
+    {
+      "file": "Calls.dc.html",
+      "x": 0,
+      "y": 780,
+      "w": 1000,
+      "h": 622,
+      "title": "Calls"
+    },
+    {
+      "file": "Insights.dc.html",
+      "x": 1080,
+      "y": 780,
+      "w": 1000,
+      "h": 622,
+      "title": "Insights"
+    },
+    {
+      "file": "Glossary.dc.html",
+      "x": 2160,
+      "y": 780,
+      "w": 1000,
+      "h": 622,
+      "title": "Glossary"
+    },
+    {
+      "file": "Phrases.dc.html",
+      "x": 0,
+      "y": 1560,
+      "w": 1000,
+      "h": 622,
+      "title": "Phrases"
+    },
+    {
+      "file": "Voice.dc.html",
+      "x": 1080,
+      "y": 1560,
+      "w": 1000,
+      "h": 622,
+      "title": "Voice"
+    },
+    {
+      "file": "Floor.dc.html",
+      "x": 2160,
+      "y": 1560,
+      "w": 1000,
+      "h": 622,
+      "title": "Floor"
+    },
+    {
+      "file": "Settings.dc.html",
+      "x": 0,
+      "y": 2340,
+      "w": 1000,
+      "h": 622,
+      "title": "Settings"
+    },
+    {
+      "file": "Invite.dc.html",
+      "x": 0,
+      "y": 3420,
+      "w": 1000,
+      "h": 622,
+      "title": "Get a free month"
+    },
+    {
+      "file": "Logo.dc.html",
+      "x": 1080,
+      "y": 3420,
+      "w": 1000,
+      "h": 622,
+      "title": "Logo"
+    },
+    {
+      "file": "Avatar.dc.html",
+      "x": 1080,
+      "y": 2340,
+      "w": 1000,
+      "h": 622,
+      "title": "Voice · Avatar"
+    },
+    {
+      "file": "Directions.dc.html",
+      "x": 2160,
+      "y": 2340,
+      "w": 1000,
+      "h": 980,
+      "title": "Avatar · the family"
+    },
+    {
+      "file": "DeskRinging.dc.html",
+      "x": 0,
+      "y": 4200,
+      "w": 1000,
+      "h": 622,
+      "title": "Desk · incoming call"
+    },
+    {
+      "file": "DeskTicket.dc.html",
+      "x": 1080,
+      "y": 4200,
+      "w": 1000,
+      "h": 622,
+      "title": "Desk · ticket"
+    },
+    {
+      "file": "Ended.dc.html",
+      "x": 2160,
+      "y": 4200,
+      "w": 1000,
+      "h": 622,
+      "title": "Desk · call ended"
+    },
+    {
+      "file": "Record.dc.html",
+      "x": 0,
+      "y": 4980,
+      "w": 1000,
+      "h": 622,
+      "title": "Voice · record a take"
+    },
+    {
+      "file": "Seat.dc.html",
+      "x": 1080,
+      "y": 4980,
+      "w": 1000,
+      "h": 622,
+      "title": "Desk · answering as"
+    },
+    {
+      "file": "Caller.dc.html",
+      "x": 2160,
+      "y": 4980,
+      "w": 390,
+      "h": 844,
+      "title": "Caller · phone"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "structure",
+      "x": 0,
+      "y": -180,
+      "w": 760,
+      "text": "Same window, same bones as the reference: 1000×622, 158px sidebar, inset sheet with a 12px corner, document column of 535px — title, date, three tabs, read bar, body, ask input.\nWispr's sections mapped one-to-one onto NoteFIsh: Dictation→Desk, Notetaker→Calls, Insights, Dictionary→Glossary (words that stay as written), Snippets→Phrases (saved replies), Style→Voice (your clone + register), Transforms→Floor. Bottom: Invite your team, Settings, Help.\nName, mark, icons and type are NoteFIsh's own."
+    },
+    {
+      "id": "avatar",
+      "x": 2160,
+      "y": 3380,
+      "w": 420,
+      "text": "Avatar: Puff. A fluffy circle of bumps with dot eyes and a small smile. Eight silhouettes (puff, cloud, sheep, bloom, tuft, pom, squish, pear), eleven colours. The face can be switched off for lists."
+    },
+    {
+      "id": "companion",
+      "x": 2160,
+      "y": 660,
+      "w": 460,
+      "text": "The pill lives on the screen, not in the window. It appears when a call is detected in any app and asks before it starts. Hold ⌥ to speak; the caller hears your voice in their language."
+    },
+    {
+      "id": "moments",
+      "x": 0,
+      "y": 4050,
+      "w": 620,
+      "text": "The moments the app has that the design never drew: the call ringing, the ticket while talking, the call ending, recording a take, taking a seat, and what the caller sees on their phone."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

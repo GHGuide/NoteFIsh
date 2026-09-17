@@ -31,3 +31,6 @@ const catalog = [
 export const languages = catalog.map(([code, name]) => ({ code, name }));
 export const languageCodes = new Set(languages.map(({ code }) => code));
 export const languageName = code => languages.find(language => language.code === code)?.name || code;
+
+/** The caller's language may be left to detection; the agent's may not. */
+export const isCallerLanguage = code => code === 'auto' || languageCodes.has(code);

@@ -2,13 +2,36 @@ import express from 'express';
 import multer from 'multer';
 import { randomUUID } from 'node:crypto';
 import twilio from 'twilio';
-import { languages, languageCodes } from './languages.mjs';
+import { languages, languageCodes, isCallerLanguage } from './languages.mjs';
+import { measureClip, REGISTERS, canonicalRegister } from './emotion.mjs';
+import { isLayoutShape, normalizeLayout } from './layout.mjs';
+import { buildPack, parsePack } from './voice-pack.mjs';
+import { convertAudio } from './audio.mjs';
 import { getStatus } from './config.mjs';
-import { isLocalRequest, validateTwilio } from './security.mjs';
+import { isLocalRequest, validateTwilio, constantTimeEqual } from './security.mjs';
 
 export class InputError extends Error {
   constructor(message, status = 400, code = 'INVALID_INPUT') { super(message); this.name = 'InputError'; this.status = status; this.code = code; }
 }
+
+/** How a reply should sound, when the agent chose instead of letting the desk decide. */
+const feelingInput = value => {
+  if (value === undefined || value === '' || value === 'auto') return undefined;
+  value = canonicalRegister(value);
+  if (!REGISTERS.includes(value)) throw new InputError(`Choose a feeling: auto, ${REGISTERS.join(', ')}.`);
+  return value;
+};
+/** A desk layout as sent by the app: three columns of panel ids. */
+const layoutInput = value => { if (!isLayoutShape(value)) throw new InputError('The desk layout is not valid.'); return normalizeLayout(value); };
+/** Canned lines: short strings an agent speaks with one click. Ids are kept when sane so the list can be edited in place. */
+const phrasesInput = value => {
+  if (!Array.isArray(value) || value.length > 30) throw new InputError('Canned lines are a list of at most 30 lines.');
+  return value.map(item => {
+    const raw = item && typeof item === 'object' ? item.text : item;
+    if (typeof raw !== 'string' || !raw.trim() || raw.length > 300) throw new InputError('Each canned line is 1 to 300 characters.');
+    return { id: typeof item?.id === 'string' && /^[\w-]{1,64}$/.test(item.id) ? item.id : randomUUID(), text: raw.trim() };
+  });
+};
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const allowed = (body, fields) => {
   if (!object(body) || Object.keys(body).some(key => !fields.includes(key))) throw new InputError('The request contains an invalid field.');
@@ -20,6 +43,10 @@ const text = (value, name, max, optional = false) => {
 };
 const language = value => {
   if (!languageCodes.has(value)) throw new InputError('Choose a language from the supported language list.');
+  return value;
+};
+const callerLanguage = value => {
+  if (!isCallerLanguage(value)) throw new InputError('Choose a language from the supported language list, or auto-detect.');
   return value;
 };
 const ref = value => {
@@ -34,8 +61,31 @@ const findVoice = (store, id, ready = false) => {
   return voice;
 };
 
-export function createApiRouter({ config, store, providers, calls, broadcast, audioAvailable, callerAccess }) {
+export function createApiRouter({ config, store, providers, calls, broadcast, audioAvailable, callerAccess, sessions, queue, integrations, floorEvent = () => {} }) {
   const router = express.Router();
+  // A shared demo cannot tell one anonymous visitor from another, so it stays a
+  // single desk. Named agents require the protected access mode.
+  const multiAgent = !config.publicDemo;
+  const currentAgent = req => (multiAgent && sessions ? sessions.read(req) : '');
+  // A deployment with an empty roster is one desk and needs no seat. Seats
+  // become required only once someone actually adds agents.
+  const rostered = () => multiAgent && store.snapshot().agents.some(agent => !agent.archived);
+  const requireFloor = () => {
+    if (!multiAgent) throw new InputError('The shared demo runs as one desk. Set NOTEFISH_PUBLIC_DEMO=false to use a roster of agents.', 409, 'SINGLE_DESK');
+  };
+  const findAgent = (id, { active = true } = {}) => {
+    const agent = store.snapshot().agents.find(item => item.id === id);
+    if (!agent || (active && agent.archived)) throw new InputError('Agent not found.', 404, 'NOT_FOUND');
+    return agent;
+  };
+  /** An agent may only act on the call assigned to them. */
+  const ownCall = (req, id) => {
+    if (!multiAgent) return '';
+    const agentId = currentAgent(req);
+    const call = calls.snapshot().find(item => item.id === id);
+    if (call?.agentId && agentId && call.agentId !== agentId) throw new InputError('This call belongs to another agent.', 403, 'NOT_YOUR_CALL');
+    return agentId;
+  };
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 30 * 1024 * 1024, files: 1, fields: 8, fieldSize: 8000, parts: 10 } }).single('audio');
   let activeExpensive = 0;
   const limited = handler => async (req, res, next) => {
@@ -43,27 +93,77 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     activeExpensive++;
     try { await handler(req, res); } catch (error) { next(error); } finally { activeExpensive--; }
   };
-  const stateEvent = () => broadcast({ type: 'snapshot', calls: calls.snapshot(), settings: store.snapshot().settings });
-  router.get('/session', (req, res) => res.json({ authenticated: !config.publicDemo, loginRequired: false, method: config.publicDemo ? 'shared-demo' : !config.production && isLocalRequest(req) ? 'local' : 'basic' }));
+  const stateEvent = () => broadcast({ type: 'snapshot', calls: calls.snapshot(), settings: store.snapshot().settings, agents: store.snapshot().agents, floor: queue ? queue.snapshot() : null });
+  router.get('/session', (req, res) => {
+    const agentId = currentAgent(req);
+    const agent = agentId ? store.snapshot().agents.find(item => item.id === agentId && !item.archived) : null;
+    res.json({
+      authenticated: !config.publicDemo, loginRequired: false,
+      method: config.publicDemo ? 'shared-demo' : !config.production && isLocalRequest(req) ? 'local' : 'basic',
+      multiAgent,
+      // Naming an agent identifies a seat. It does not authenticate a person.
+      identity: multiAgent ? 'roster-presence' : 'single-desk',
+      agent: agent ? { id: agent.id, name: agent.name } : null,
+      persistentSessions: sessions ? !sessions.ephemeral : false,
+    });
+  });
   router.post('/caller-invitations', (req, res) => {
-    if (req.body !== undefined) allowed(req.body, []);
-    res.status(201).json(callerAccess.issue());
+    if (req.body !== undefined) allowed(req.body, ['label', 'transport']);
+    const label = req.body?.label ? text(req.body.label, 'call label', 40) : '';
+    const local = req.body?.transport === 'companion';
+    // The companion bridges a call happening on this machine (Zoom, WhatsApp, Meet…); it may only join from here.
+    if (local && !isLocalRequest(req)) throw new InputError('The companion can only join from the machine running the desk.', 403);
+    res.status(201).json(callerAccess.issue({ label, local }));
   });
   router.get(['/status', '/setup'], (req, res) => res.json(getStatus(config, { audioAvailable })));
   router.get('/languages', (req, res) => res.json({ languages }));
-  router.get('/bootstrap', (req, res) => res.json({ ...store.snapshot(), calls: calls.snapshot(), setup: getStatus(config, { audioAvailable }), languages }));
+  router.get('/bootstrap', (req, res) => res.json({
+    ...store.snapshot(), calls: calls.snapshot(), setup: getStatus(config, { audioAvailable }), languages,
+    floor: queue ? queue.snapshot() : null, agentId: currentAgent(req),
+  }));
   router.get('/voices', (req, res) => {
     if (req.query.archived !== undefined && !['true', 'false'].includes(req.query.archived)) throw new InputError('The archived filter must be true or false.');
     res.json({ voices: store.snapshot().voices.filter(voice => req.query.archived === 'true' || !voice.archived) });
   });
+  // Voice files: the Fish reference plus what the library knows. Import re-attaches after Fish confirms the model.
+  router.get('/voices/export', (req, res) => {
+    const state = store.snapshot();
+    res.setHeader('Content-Disposition', 'attachment; filename="notefish-voices.json"');
+    res.json(buildPack(state.voices.filter(voice => !voice.archived), { exportedBy: state.settings.queueName || '' }));
+  });
+  router.get('/voices/:id/export', (req, res) => {
+    const voice = findVoice(store, req.params.id);
+    res.setHeader('Content-Disposition', `attachment; filename="${(voice.name.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'voice').slice(0, 60)}.notefish-voice.json"`);
+    res.json(buildPack([voice]));
+  });
+  router.post('/voices/import-pack', limited(async (req, res) => {
+    allowed(req.body, ['pack', 'consent']);
+    if (req.body.consent !== true) throw new InputError('Confirm that you own or have licensed these voices.');
+    let entries;
+    try { entries = parsePack(req.body.pack); } catch (error) { throw new InputError(error.message); }
+    const imported = [], skipped = [];
+    for (const entry of entries) {
+      if (store.snapshot().voices.some(voice => voice.referenceId === entry.referenceId)) { skipped.push(entry.name); continue; }
+      if (store.snapshot().voices.length >= 1000) throw new InputError('The voice library is full.', 409);
+      const result = await providers.getVoice({ referenceId: entry.referenceId });
+      const voice = { id: randomUUID(), referenceId: entry.referenceId, name: entry.name, description: entry.description, language: languageCodes.has(entry.language) ? entry.language : 'en', kind: entry.kind,
+        status: voiceState(result.state), archived: false, createdAt: new Date().toISOString(), consent: true, consentAt: new Date().toISOString(),
+        ...(entry.register ? { register: entry.register } : {}), ...(entry.baseline ? { baseline: entry.baseline } : {}) };
+      await store.update(state => { if (!state.voices.some(item => item.referenceId === voice.referenceId)) state.voices.push(voice); });
+      imported.push(voice);
+    }
+    stateEvent(); res.status(201).json({ imported, skipped });
+  }));
   router.get('/voices/available', limited(async (req, res) => {
     const results = await providers.listOwnVoices();
     res.json({ voices: results.map(voice => ({ referenceId: ref(voice.referenceId), name: voice.name, description: voice.description, status: voiceState(voice.state), languages: voice.languages || [] })) });
   }));
   router.post(['/voices/clone', '/voices'], limited(async (req, res) => {
     await new Promise((resolve, reject) => upload(req, res, error => error ? reject(error) : resolve()));
-    allowed(req.body, ['name', 'description', 'transcript', 'language', 'consent', 'kind']);
+    allowed(req.body, ['name', 'description', 'transcript', 'language', 'consent', 'kind', 'register']);
     if (req.body.consent !== 'true') throw new InputError('Confirm that this is your own voice or that you have permission to clone it.');
+    const register = req.body.register ? canonicalRegister(req.body.register) : null;
+    if (register !== null && !REGISTERS.includes(register)) throw new InputError(`Choose a register: ${REGISTERS.join(', ')}.`);
     if (store.snapshot().calls.some(call => call.state !== 'ended')) throw new InputError('Finish the call before enrolling a voice.', 409);
     if (!req.file) throw new InputError('Record or upload a voice sample.');
     if (store.snapshot().voices.length >= 1000) throw new InputError('The voice library is full.', 409);
@@ -71,9 +171,26 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     const description = text(req.body.description, 'description', 1000, true);
     const selectedLanguage = language(req.body.language || 'en');
     const transcript = text(req.body.transcript, 'sample transcript', 6000, true);
+    // The reference's own loudness and rate are the baseline every later reply is measured against.
+    let baseline = null;
+    try {
+      const wav = await convertAudio(req.file.buffer, req.file.mimetype, { output: 'wav', sampleRate: 16000, maxSeconds: 120, minSeconds: 3 });
+      const clip = measureClip(wav, transcript ? transcript.trim().split(/\s+/u).length : 0);
+      // Digital silence measures as nothing at all; only a real signal drowned in noise is refused.
+      if (clip.voicedSeconds >= 1 && clip.snr < 15 && clip.loudness > -70) throw new InputError('We can hear the room more than your voice. Find a quieter spot and record again.', 422, 'NOISY_SAMPLE');
+      baseline = { loudness: clip.loudness, rate: clip.rate, snr: clip.snr, seconds: clip.voicedSeconds };
+    } catch (error) { if (error instanceof InputError) throw error; /* measurement is best-effort */ }
     const result = await providers.createVoice({ name, description, audio: req.file.buffer, mimeType: req.file.mimetype, transcript });
-    const voice = { id: randomUUID(), referenceId: ref(result.referenceId), name, description, language: selectedLanguage, kind: 'enrolled', status: voiceState(result.state), archived: false, createdAt: new Date().toISOString(), consent: true, consentAt: new Date().toISOString() };
-    await store.update(state => { state.voices.push(voice); });
+    const voice = { id: randomUUID(), referenceId: ref(result.referenceId), name, description, language: selectedLanguage, kind: 'enrolled', status: voiceState(result.state), archived: false, createdAt: new Date().toISOString(), consent: true, consentAt: new Date().toISOString(), register, baseline };
+    const agentId = currentAgent(req);
+    await store.update(state => {
+      state.voices.push(voice);
+      // A seated agent's take lands in their own register slot; the first one also becomes their default.
+      const agent = agentId ? state.agents.find(item => item.id === agentId && !item.archived) : null;
+      const owner = agent || state.settings;
+      owner.registers = { ...(owner.registers || {}), ...(register ? { [register]: voice.id } : {}) };
+      if (agent && (!agent.voiceId || register === 'calm')) agent.voiceId = voice.id;
+    });
     res.status(201).json({ voice });
   }));
   router.post('/voices/import', limited(async (req, res) => {
@@ -129,39 +246,216 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
   }));
   router.get('/settings', (req, res) => res.json({ settings: store.snapshot().settings }));
   const saveSettings = async (req, res) => {
-    allowed(req.body, ['voiceId', 'agentLanguage', 'customerLanguage', 'queueName']);
+    allowed(req.body, ['voiceId', 'agentLanguage', 'customerLanguage', 'queueName', 'registers', 'layout', 'phrases', 'persona']);
     const patch = {};
+    if ('persona' in req.body) patch.persona = text(req.body.persona ?? '', 'house style', 300, true).trim();
+    if ('layout' in req.body) patch.layout = layoutInput(req.body.layout);
+    if ('phrases' in req.body) patch.phrases = phrasesInput(req.body.phrases);
+    if ('registers' in req.body) {
+      req.body.registers = Object.fromEntries(Object.entries(req.body.registers || {}).map(([k, v]) => [canonicalRegister(k), v]));
+      allowed(req.body.registers, REGISTERS);
+      patch.registers = Object.fromEntries(Object.entries(req.body.registers).map(([k, v]) => [canonicalRegister(k), v ? findVoice(store, v, true).id : null]));
+    }
     if ('voiceId' in req.body) { if (req.body.voiceId !== null) findVoice(store, req.body.voiceId, true); patch.voiceId = req.body.voiceId; }
     if ('agentLanguage' in req.body) patch.agentLanguage = language(req.body.agentLanguage);
-    if ('customerLanguage' in req.body) patch.customerLanguage = language(req.body.customerLanguage);
+    if ('customerLanguage' in req.body) patch.customerLanguage = callerLanguage(req.body.customerLanguage);
     if ('queueName' in req.body) patch.queueName = text(req.body.queueName, 'queue name', 100);
     const settings = await store.update(state => { Object.assign(state.settings, patch); return state.settings; });
     await calls.applySettings(settings);
     stateEvent(); res.json({ settings });
   };
   router.put('/settings', saveSettings); router.patch('/settings', saveSettings);
+  router.get('/agents', (req, res) => res.json({ agents: store.snapshot().agents, floor: queue ? queue.snapshot() : null, agentId: currentAgent(req) }));
+  router.post('/agents', async (req, res) => {
+    requireFloor();
+    allowed(req.body, ['name', 'voiceId', 'agentLanguage', 'customerLanguage']);
+    const name = text(req.body.name, 'agent name', 100);
+    const agent = {
+      id: randomUUID(), name,
+      voiceId: req.body.voiceId ? findVoice(store, req.body.voiceId, true).id : null,
+      agentLanguage: req.body.agentLanguage ? language(req.body.agentLanguage) : null,
+      customerLanguage: req.body.customerLanguage ? callerLanguage(req.body.customerLanguage) : null,
+      registers: {}, archived: false, createdAt: new Date().toISOString(),
+    };
+    await store.update(state => {
+      const active = state.agents.filter(item => !item.archived);
+      if (active.length >= config.maxAgents) throw new InputError(`The roster is limited to ${config.maxAgents} agents.`, 409);
+      if (active.some(item => item.name.toLowerCase() === name.toLowerCase())) throw new InputError('An agent with that name is already on the roster.', 409);
+      state.agents.push(agent);
+    });
+    stateEvent(); floorEvent();
+    res.status(201).json({ agent });
+  });
+  router.patch('/agents/:id', async (req, res) => {
+    requireFloor();
+    allowed(req.body, ['name', 'voiceId', 'agentLanguage', 'customerLanguage', 'archived', 'registers', 'layout', 'phrases', 'persona']);
+    findAgent(req.params.id, { active: false });
+    const changes = {};
+    if ('persona' in req.body) changes.persona = text(req.body.persona ?? '', 'style', 300, true).trim();
+    if ('layout' in req.body) changes.layout = layoutInput(req.body.layout);
+    if ('phrases' in req.body) changes.phrases = phrasesInput(req.body.phrases);
+    if ('name' in req.body) changes.name = text(req.body.name, 'agent name', 100);
+    if ('voiceId' in req.body) changes.voiceId = req.body.voiceId ? findVoice(store, req.body.voiceId, true).id : null;
+    if ('agentLanguage' in req.body) changes.agentLanguage = req.body.agentLanguage ? language(req.body.agentLanguage) : null;
+    if ('customerLanguage' in req.body) changes.customerLanguage = req.body.customerLanguage ? callerLanguage(req.body.customerLanguage) : null;
+    if ('registers' in req.body) {
+      req.body.registers = Object.fromEntries(Object.entries(req.body.registers || {}).map(([k, v]) => [canonicalRegister(k), v]));
+      allowed(req.body.registers, REGISTERS);
+      changes.registers = Object.fromEntries(Object.entries(req.body.registers).map(([k, v]) => [canonicalRegister(k), v ? findVoice(store, v, true).id : null]));
+    }
+    if ('archived' in req.body) {
+      if (typeof req.body.archived !== 'boolean') throw new InputError('Archived must be true or false.');
+      changes.archived = req.body.archived;
+    }
+    if (changes.archived && calls.snapshot().some(call => call.agentId === req.params.id && call.state !== 'ended')) {
+      throw new InputError('End this agent\'s call before removing them from the roster.', 409);
+    }
+    const agent = await store.update(state => {
+      const item = state.agents.find(item => item.id === req.params.id);
+      Object.assign(item, changes);
+      return item;
+    });
+    stateEvent(); floorEvent();
+    res.json({ agent });
+  });
+  router.delete('/agents/:id', async (req, res) => {
+    requireFloor();
+    findAgent(req.params.id, { active: false });
+    if (calls.snapshot().some(call => call.agentId === req.params.id && call.state !== 'ended')) throw new InputError('End this agent\'s call before removing them from the roster.', 409);
+    const agent = await store.update(state => {
+      const item = state.agents.find(item => item.id === req.params.id);
+      item.archived = true;
+      return item;
+    });
+    stateEvent(); floorEvent();
+    res.json({ agent });
+  });
+  // Taking a seat is presence, not a login: it says which roster entry this
+  // browser is acting as. Workspace access was already decided upstream.
+  router.post('/agents/:id/session', (req, res) => {
+    requireFloor();
+    if (req.body !== undefined) allowed(req.body, []);
+    const agent = findAgent(req.params.id);
+    res.setHeader('Set-Cookie', sessions.cookie(agent.id));
+    res.status(201).json({ agent: { id: agent.id, name: agent.name } });
+  });
+  router.delete('/agents/session', (req, res) => {
+    const agentId = currentAgent(req);
+    res.setHeader('Set-Cookie', sessions ? sessions.clearCookie() : '');
+    if (agentId && queue) { queue.resume(agentId); floorEvent(); }
+    res.json({ agent: null });
+  });
+  router.post('/agents/session/pause', (req, res) => {
+    requireFloor();
+    allowed(req.body || {}, ['reason']);
+    const agentId = currentAgent(req);
+    if (!agentId) throw new InputError('Take a seat before pausing.', 409, 'NO_SEAT');
+    queue.pause(agentId, text(req.body?.reason, 'reason', 100, true));
+    floorEvent();
+    res.json({ floor: queue.snapshot() });
+  });
+  router.post('/agents/session/resume', (req, res) => {
+    requireFloor();
+    if (req.body !== undefined) allowed(req.body, []);
+    const agentId = currentAgent(req);
+    if (!agentId) throw new InputError('Take a seat before resuming.', 409, 'NO_SEAT');
+    queue.resume(agentId);
+    floorEvent();
+    res.json({ floor: queue.snapshot() });
+  });
+  router.get('/floor', (req, res) => res.json({ floor: queue ? queue.snapshot() : { waiting: [], agents: [] } }));
+  router.get('/integrations', (req, res) => res.json({
+    enabled: Boolean(integrations?.enabled), adapters: integrations?.names || [], recent: integrations?.history() || [],
+  }));
   router.get('/calls', (req, res) => res.json({ calls: calls.snapshot() }));
-  for (const action of ['answer', 'end', 'stop']) router.post(`/calls/:id/${action}`, async (req, res) => res.json({ call: await calls[action](req.params.id) }));
+  router.post('/calls/:id/answer', async (req, res) => {
+    const agentId = ownCall(req, req.params.id);
+    if (rostered() && !agentId) throw new InputError('Take a seat on the floor before answering.', 409, 'NO_SEAT');
+    res.json({ call: await calls.answer(req.params.id, agentId || null) });
+  });
+  for (const action of ['end', 'stop']) router.post(`/calls/:id/${action}`, async (req, res) => {
+    ownCall(req, req.params.id);
+    res.json({ call: await calls[action](req.params.id) });
+  });
   router.post('/calls/:id/reply', limited(async (req, res) => {
+    ownCall(req, req.params.id);
     if (req.is('multipart/form-data')) {
       await new Promise((resolve, reject) => upload(req, res, error => error ? reject(error) : resolve()));
       if (!req.file) throw new InputError('Record a reply first.');
-      allowed(req.body, []);
-      res.json({ call: await calls.ptt(req.params.id, { buffer: req.file.buffer, mimetype: req.file.mimetype }) });
+      allowed(req.body, ['feeling']);
+      res.json({ call: await calls.ptt(req.params.id, { buffer: req.file.buffer, mimetype: req.file.mimetype, feeling: feelingInput(req.body.feeling) }) });
     } else {
-      allowed(req.body, ['text']);
-      res.json({ call: await calls.say(req.params.id, { text: text(req.body.text, 'reply', 3000) }) });
+      allowed(req.body, ['text', 'feeling']);
+      res.json({ call: await calls.say(req.params.id, { text: text(req.body.text, 'reply', 3000), feeling: feelingInput(req.body.feeling) }) });
     }
   }));
   router.patch('/calls/:id/ticket', async (req, res) => {
+    const agentId = ownCall(req, req.params.id);
+    const actor = agentId ? store.snapshot().agents.find(item => item.id === agentId)?.name || '' : '';
     allowed(req.body, ['issue', 'address', 'dispatch', 'confirmDispatch']);
     const patch = {};
     if ('issue' in req.body) patch.issue = text(req.body.issue, 'issue', 4000, true);
     if ('address' in req.body) patch.address = text(req.body.address, 'address', 1000, true);
     if ('dispatch' in req.body) { if (!['none', 'requested', 'confirmed', 'pending'].includes(req.body.dispatch)) throw new InputError('Choose a valid dispatch status.'); patch.dispatch = req.body.dispatch; }
     if ('confirmDispatch' in req.body) { if (typeof req.body.confirmDispatch !== 'boolean') throw new InputError('Confirm dispatch must be true or false.'); patch.confirmDispatch = req.body.confirmDispatch; }
-    res.json({ call: await calls.update(req.params.id, patch) });
+    res.json({ call: await calls.update(req.params.id, patch, actor) });
   });
+  return router;
+}
+
+const csvCell = value => {
+  const text = value === null || value === undefined ? '' : String(value);
+  // A leading =, +, - or @ is executed by spreadsheet software; neutralise it.
+  const guarded = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  return /[",\n\r]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
+};
+
+/**
+ * Read-only pull API for a ticketing system that prefers polling to webhooks.
+ * It is mounted before the workspace access gate and carries its own bearer
+ * token, so an integration never needs the desk password.
+ */
+export function createExportRouter({ config, calls, store, integrations }) {
+  const router = express.Router();
+  router.use((req, res, next) => {
+    if (!config.exportToken) return res.status(503).json({ error: 'Set NOTEFISH_EXPORT_TOKEN to enable the export API.', code: 'EXPORT_DISABLED' });
+    const header = req.headers.authorization;
+    if (typeof header !== 'string' || !header.startsWith('Bearer ') || !constantTimeEqual(header.slice(7), config.exportToken)) {
+      return res.status(401).json({ error: 'Provide the export bearer token.', code: 'EXPORT_AUTH_REQUIRED' });
+    }
+    if (!['GET', 'HEAD'].includes(req.method)) return res.status(405).json({ error: 'The export API is read-only.', code: 'READ_ONLY' });
+    next();
+  });
+  router.get('/calls', (req, res) => {
+    const { since, cursor, limit, format } = req.query;
+    if (format !== undefined && !['json', 'csv'].includes(format)) throw new InputError('Choose json or csv.');
+    for (const [name, value] of [['since', since], ['cursor', cursor]]) {
+      if (value !== undefined && (typeof value !== 'string' || value.length > 40 || Number.isNaN(Date.parse(value)))) throw new InputError(`Provide ${name} as an ISO timestamp.`);
+    }
+    if (limit !== undefined && (typeof limit !== 'string' || !/^\d{1,4}$/.test(limit) || Number(limit) < 1 || Number(limit) > 500)) throw new InputError('Limit must be between 1 and 500.');
+    const size = Number(limit || 100);
+    const after = cursor || since;
+    const ended = calls.snapshot()
+      .filter(call => call.state === 'ended' && call.endedAt)
+      .sort((a, b) => new Date(a.endedAt) - new Date(b.endedAt))
+      .filter(call => !after || new Date(call.endedAt) > new Date(after));
+    const page = ended.slice(0, size);
+    const next = ended.length > page.length && page.length ? page.at(-1).endedAt : null;
+    const rows = page.map(call => integrations ? integrations.payload(call) : call);
+    if (format === 'csv') {
+      const header = ['id', 'from', 'transport', 'agent', 'agentLanguage', 'customerLanguage', 'startedAt', 'answeredAt', 'endedAt', 'issue', 'address', 'dispatch', 'lines'];
+      const body = rows.map(row => [
+        row.id, row.from, row.transport, row.agent?.name || '', row.agentLanguage, row.customerLanguage,
+        row.startedAt, row.answeredAt || '', row.endedAt, row.ticket?.issue || '', row.ticket?.address || '',
+        row.ticket?.dispatch || 'none', row.transcript?.length || 0,
+      ].map(csvCell).join(','));
+      res.type('text/csv').set('Content-Disposition', 'attachment; filename="notefish-calls.csv"');
+      if (next) res.set('X-NoteFIsh-Next-Cursor', next);
+      return res.send([header.join(','), ...body].join('\n'));
+    }
+    res.json({ calls: rows, nextCursor: next, count: rows.length });
+  });
+  router.get('/agents', (req, res) => res.json({ agents: store.snapshot().agents.map(({ id, name, archived, createdAt }) => ({ id, name, archived, createdAt })) }));
   return router;
 }
 

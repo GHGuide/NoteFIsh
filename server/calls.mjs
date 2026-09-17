@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { convertAudio, SpeechSegmenter, AudioError, ringbackTone, pcm16kToMulaw8k } from './audio.mjs';
 import { ProviderError } from './providers.mjs';
-import { languageCodes } from './languages.mjs';
+import { languageCodes, isCallerLanguage } from './languages.mjs';
+import { measureClip, arousalOf, registerFor, tagFor, prosodyFor, describe, chooseRegister, taggedText, REGISTERS, canonicalRegister } from './emotion.mjs';
 
 const CALL_SID = /^CA[0-9a-f]{32}$/iu;
 const STREAM_SID = /^MZ[0-9a-f]{32}$/iu;
@@ -24,11 +25,16 @@ function textInput(value, maximum, label, empty = false) {
   return value.trim();
 }
 
-/** One real caller, one desk. Only synthesized Fish speech reaches the caller. */
+/**
+ * Real callers and a floor of agents. Only synthesized Fish speech reaches a
+ * caller, and caller audio only reaches the agent the call is assigned to.
+ */
 export function createCallService({
   config, store, providers, broadcast,
   convert = convertAudio, fetchImpl = globalThis.fetch,
   noAnswerMs = 60000, maxCallMs = 3600000, playbackGraceMs = 10000,
+  maxConcurrentCalls = config?.maxConcurrentCalls || 20,
+  onComplete = null,
 }) {
   const live = new Map(); let initializing;
   const waitingTone = ringbackTone().toString('base64');
@@ -45,7 +51,9 @@ export function createCallService({
     const saved = store.snapshot().calls;
     return saved.map(call => structuredClone(live.get(call.id)?.call || call));
   };
-  const emit = event => { try { broadcast(event); } catch { /* A browser disconnect cannot interrupt a phone call. */ } };
+  // `to` narrows an event to one agent. Caller audio must never fan out to
+  // every open desk: other agents have no business hearing this caller.
+  const emit = (event, to) => { try { broadcast(event, to ? { to } : undefined); } catch { /* A browser disconnect cannot interrupt a phone call. */ } };
   const persist = async runtime => {
     const copy = structuredClone(runtime.call);
     await store.update(state => {
@@ -79,12 +87,18 @@ export function createCallService({
     if (runtime.ws.bufferedAmount > 4 * 1024 * 1024) throw new CallError('The caller audio connection is too slow. Try again.');
     runtime.ws.send(JSON.stringify(event));
   }
+  /** The caller's own captions, on their phone if they want them: what they said, as
+   * heard, and what the desk answered, in their language. Never another call's lines. */
+  function captionCaller(runtime, line, who) {
+    if (!line || runtime.call.transport !== 'browser' || runtime.ws?.readyState !== 1) return;
+    try { sendBrowser(runtime, { type: 'caption', id: line.id, who, text: who === 'you' ? line.textSource : line.textShown }); } catch { /* audio matters more than a caption */ }
+  }
   function notifyCaller(runtime) {
     if (runtime.call.transport !== 'browser' || runtime.ws?.readyState !== 1) return;
     try {
-      // A caller link never exposes desk tickets, voice IDs or conversation transcripts.
+      // A caller link never exposes desk notes, voice IDs or other calls; it sees only its own captions.
       sendBrowser(runtime, { type: 'state', callId: runtime.call.id, state: runtime.call.state,
-        phase: runtime.call.phase, customerLanguage: runtime.call.customerLanguage });
+        phase: runtime.call.phase, customerLanguage: runtime.call.customerLanguage === 'auto' ? (runtime.call.detectedLanguage || 'auto') : runtime.call.customerLanguage });
     } catch { runtime.ws?.close(1013, 'Caller connection is too slow'); }
   }
   function send(runtime, event) {
@@ -122,6 +136,8 @@ export function createCallService({
     if (ws && ws.readyState < 2) ws.close(1000, 'Call ended');
     const saved = await persist(runtime);
     live.delete(runtime.call.id);
+    // Outbound delivery must never be able to break hanging up.
+    if (onComplete) { try { void onComplete(structuredClone(saved)); } catch { /* delivery reports its own failures */ } }
     if (remote && runtime.call.transport !== 'browser' && config.twilioAccountSid && config.twilioAuthToken) {
       const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 8000); timer.unref?.();
       try {
@@ -155,11 +171,32 @@ export function createCallService({
         const { audio, sourceLanguage, targetLanguage } = runtime.captionQueue.shift();
         const signal = runtime.captionAbort.signal;
         try {
-          const textSource = await providers.transcribe({ audio, mimeType: 'audio/wav', language: sourceLanguage, signal });
+          // Once the caller's language is known, keep using it as the hint; 'auto' only for the first phrases.
+          const hint = sourceLanguage === 'auto' ? (runtime.call.detectedLanguage || 'auto') : sourceLanguage;
+          const textSource = await providers.transcribe({ audio, mimeType: 'audio/wav', language: hint, signal });
           if (!textSource?.trim()) continue;
-          const textShown = await providers.translate({ text: textSource, sourceLanguage, targetLanguage, signal });
+          let textShown, spoken = hint;
+          if (providers.interpret) {
+            // Captions are always in the agent's language; the interpreter also tells us what the caller speaks and how.
+            const result = await providers.interpret({ text: textSource, sourceLanguage: hint, targetLanguage, signal });
+            textShown = result.text;
+            // The caller's state steers the next reply: an upset caller is answered with an apology.
+            runtime.call.callerTone = result.tone || 'calm';
+            runtime.captionTone = result.tone && result.tone !== 'calm' ? result.tone : '';
+            const detecting = hint === 'auto' || runtime.call.customerLanguage === 'auto';
+            if (detecting && result.language && languageCodes.has(result.language)) {
+              spoken = result.language;
+              if (runtime.call.detectedLanguage !== result.language) {
+                runtime.call.detectedLanguage = result.language;
+                emit({ type: 'language', callId: runtime.call.id, language: result.language });
+              }
+            }
+          } else {
+            textShown = await providers.translate({ text: textSource, sourceLanguage: hint === 'auto' ? targetLanguage : hint, targetLanguage, signal });
+          }
           if (runtime.call.state !== 'in_call' || signal.aborted) break;
-          addLine(runtime, { speaker: 'customer', sourceLang: sourceLanguage, targetLang: targetLanguage, textSource, textShown, delivery: 'caption' });
+          captionCaller(runtime, addLine(runtime, { speaker: 'customer', sourceLang: spoken === 'auto' ? 'und' : spoken, targetLang: targetLanguage, textSource, textShown, delivery: 'caption', ...(runtime.captionTone ? { feeling: runtime.captionTone } : {}) }), 'you');
+          runtime.captionTone = '';
           await persist(runtime);
         } catch (error) {
           if (runtime.call.state !== 'in_call' || signal.aborted) break;
@@ -179,7 +216,7 @@ export function createCallService({
       return;
     }
     const settings = runtime.call;
-    if (!languageCodes.has(settings.customerLanguage) || !languageCodes.has(settings.agentLanguage)) {
+    if (!isCallerLanguage(settings.customerLanguage) || !languageCodes.has(settings.agentLanguage)) {
       warn(runtime, 'Choose supported call languages before continuing captions.'); return;
     }
     runtime.captionQueue.push({ audio, sourceLanguage: settings.customerLanguage, targetLanguage: settings.agentLanguage });
@@ -187,15 +224,19 @@ export function createCallService({
   }
 
   async function applySettings(settings) {
-    if (!languageCodes.has(settings.customerLanguage) || !languageCodes.has(settings.agentLanguage)) throw new CallError('Choose supported call languages.', 400);
+    if (!isCallerLanguage(settings.customerLanguage) || !languageCodes.has(settings.agentLanguage)) throw new CallError('Choose supported call languages.', 400);
     const pending = [];
     for (const runtime of live.values()) {
-      if (runtime.call.state === 'ended' || (runtime.call.customerLanguage === settings.customerLanguage && runtime.call.agentLanguage === settings.agentLanguage)) continue;
+      // Each live call follows its own agent's pair, so a workspace-default
+      // change leaves calls whose agent overrides it untouched.
+      const resolved = resolveSettings(runtime.call.agentId);
+      if (!isCallerLanguage(resolved.customerLanguage) || !languageCodes.has(resolved.agentLanguage)) continue;
+      if (runtime.call.state === 'ended' || (runtime.call.customerLanguage === resolved.customerLanguage && runtime.call.agentLanguage === resolved.agentLanguage)) continue;
       // Finish the current phrase with its original language hint. Already queued
       // captions and an in-flight reply keep their own captured language pair.
       if (runtime.call.state === 'in_call') queueCaption(runtime, runtime.segmenter.flush());
-      runtime.call.customerLanguage = settings.customerLanguage;
-      runtime.call.agentLanguage = settings.agentLanguage;
+      runtime.call.customerLanguage = resolved.customerLanguage;
+      runtime.call.agentLanguage = resolved.agentLanguage;
       pending.push(persist(runtime));
     }
     await Promise.all(pending);
@@ -206,13 +247,14 @@ export function createCallService({
     const duplicate = [...live.values()].find(value => value.call.callSid === callSid);
     if (duplicate) return structuredClone(duplicate.call);
     if (store.snapshot().calls.some(call => call.callSid === callSid)) throw new CallError('This call has already ended.');
-    if (live.size) throw new CallError('The desk is already handling another call.');
+    if (live.size >= maxConcurrentCalls) throw new CallError('Every line is busy. Try again shortly.');
     const settings = store.snapshot().settings;
-    if (!languageCodes.has(settings.agentLanguage) || !languageCodes.has(settings.customerLanguage)) throw new CallError('Configure valid call languages before receiving a call.', 503);
+    if (!languageCodes.has(settings.agentLanguage) || !isCallerLanguage(settings.customerLanguage)) throw new CallError('Configure valid call languages before receiving a call.', 503);
     const call = {
       id: randomUUID(), callSid, from, to, transport, state: 'ringing', phase: 'listening', stage: 'waiting', mediaConnected: false,
-      startedAt: now(), answeredAt: null, endedAt: null,
+      startedAt: now(), answeredAt: null, endedAt: null, agentId: null, agentName: '', detectedLanguage: null,
       voiceId: settings.voiceId, agentLanguage: settings.agentLanguage, customerLanguage: settings.customerLanguage,
+      queueName: settings.queueName || '',
       transcript: [], ticket: { issue: '', address: '', dispatch: 'none' },
     };
     const runtime = { call, ws: null, streamSid: null,
@@ -236,8 +278,8 @@ export function createCallService({
     if (typeof to !== 'string' || !PHONE.test(to) || (config.twilioNumber && to !== config.twilioNumber)) throw new CallError('This number is not assigned to the desk.', 400);
     return createInboundCall({ callSid, from, to, transport: 'twilio' });
   }
-  async function registerBrowserInbound() {
-    return createInboundCall({ callSid: `browser:${randomUUID()}`, from: 'Browser caller', to: 'Browser desk', transport: 'browser' });
+  async function registerBrowserInbound({ from = '' } = {}) {
+    return createInboundCall({ callSid: `browser:${randomUUID()}`, from: from || 'Browser caller', to: 'Browser desk', transport: 'browser' });
   }
 
   /** Called only after the server consumes a valid, single-use caller invitation. */
@@ -268,7 +310,7 @@ export function createCallService({
           runtime.pcmTail = Buffer.from(buffered.subarray(pairedBytes));
           if (pairedBytes) {
             const audio = pcm16kToMulaw8k(buffered.subarray(0, pairedBytes));
-            emit({ type: 'audio', callId, payload: audio.toString('base64') });
+            emit({ type: 'audio', callId, payload: audio.toString('base64') }, runtime.call.agentId);
           }
           queueCaption(runtime, runtime.segmenter.push(raw));
           return;
@@ -357,7 +399,7 @@ export function createCallService({
         runtime.frameBytes += frame.length;
         if (runtime.frameBytes > 160000) return fail();
         if (runtime.call.state !== 'in_call' || runtime.busy) return;
-        emit({ type: 'audio', callId: runtime.call.id, payload });
+        emit({ type: 'audio', callId: runtime.call.id, payload }, runtime.call.agentId);
         queueCaption(runtime, runtime.segmenter.push(frame));
       })().catch(() => fail());
     });
@@ -368,9 +410,39 @@ export function createCallService({
     ws.on('error', () => fail());
   }
 
-  async function answer(id) {
+  /** Agent overrides win over the workspace defaults; an empty override inherits. */
+  function resolveSettings(agentId) {
+    const state = store.snapshot();
+    const defaults = state.settings;
+    const agent = agentId ? (state.agents || []).find(item => item.id === agentId && !item.archived) : null;
+    return {
+      agent,
+      voiceId: agent?.voiceId || defaults.voiceId,
+      registers: agent?.registers || defaults.registers || {},
+      persona: agent?.persona || defaults.persona || '',
+      agentLanguage: agent?.agentLanguage || defaults.agentLanguage,
+      customerLanguage: agent?.customerLanguage || defaults.customerLanguage,
+    };
+  }
+
+  async function answer(id, agentId = null) {
     const runtime = find(id); connected(runtime);
+    // Every available agent sees a ringing call. The first one through this
+    // check owns it; the rest are told so rather than silently stealing it.
+    if (agentId && runtime.call.agentId && runtime.call.agentId !== agentId) throw new CallError('Another agent already answered this call.');
     if (runtime.call.state === 'in_call') return structuredClone(runtime.call);
+    if (agentId) {
+      const settings = resolveSettings(agentId);
+      if (!settings.agent) throw new CallError('This agent is no longer on the roster.', 403);
+      for (const other of live.values()) {
+        if (other !== runtime && other.call.agentId === agentId && other.call.state === 'in_call') throw new CallError('You are already on another call. End it before answering.');
+      }
+      runtime.call.agentId = agentId;
+      runtime.call.agentName = settings.agent.name;
+      if (settings.voiceId) runtime.call.voiceId = settings.voiceId;
+      if (languageCodes.has(settings.agentLanguage)) runtime.call.agentLanguage = settings.agentLanguage;
+      if (isCallerLanguage(settings.customerLanguage)) runtime.call.customerLanguage = settings.customerLanguage;
+    }
     clearTimeout(runtime.noAnswerTimer); clearInterval(runtime.ringbackTimer);
     send(runtime, { event: 'clear' });
     runtime.call.state = 'in_call'; runtime.call.answeredAt = now();
@@ -388,13 +460,20 @@ export function createCallService({
     try { send(runtime, { event: 'clear' }); } catch (error) { warn(runtime, safeError(error)); }
     return persist(runtime);
   }
-  async function reply(id, { buffer, mimetype, text }) {
+  async function reply(id, { buffer, mimetype, text, feeling }) {
     const runtime = find(id, true); connected(runtime);
     if (runtime.busy) throw new CallError('Wait for the current reply, or stop it before starting another.');
-    const state = store.snapshot(); const settings = state.settings;
-    const voice = state.voices.find(voice => voice.id === settings.voiceId);
-    if (!voice || voice.status !== 'ready' || voice.archived || !['enrolled', 'licensed'].includes(voice.kind)) throw new CallError('Select a ready, enrolled or licensed voice before speaking.');
-    if (!languageCodes.has(settings.agentLanguage) || !languageCodes.has(settings.customerLanguage)) throw new CallError('Choose supported call languages.');
+    feeling = feeling === undefined ? undefined : canonicalRegister(feeling);
+    if (feeling !== undefined && feeling !== 'auto' && !REGISTERS.includes(feeling)) throw new CallError(`Choose a feeling: auto, ${REGISTERS.join(', ')}.`);
+    const state = store.snapshot(); const settings = resolveSettings(runtime.call.agentId);
+    const readyVoice = id => { const v = state.voices.find(voice => voice.id === id); return v && v.status === 'ready' && !v.archived && ['enrolled', 'licensed'].includes(v.kind) ? v : null; };
+    const baseVoice = readyVoice(settings.voiceId);
+    if (!baseVoice) throw new CallError('Select a ready, enrolled or licensed voice before speaking.');
+    // The caller's language: what they were heard speaking, else the configured one.
+    const targetLanguage = settings.customerLanguage === 'auto' ? runtime.call.detectedLanguage : settings.customerLanguage;
+    if (!languageCodes.has(settings.agentLanguage) || !isCallerLanguage(settings.customerLanguage)) throw new CallError('Choose supported call languages.');
+    if (!targetLanguage) throw new CallError('Wait for the caller to say something so their language can be detected, or pick their language in the call bar.', 409);
+    let voice = baseVoice;
     if (text !== undefined) text = textInput(text, 3000, 'reply text');
     else if (!Buffer.isBuffer(buffer) || buffer.length > 12 * 1024 * 1024) throw new CallError('Provide a short microphone recording.', 400);
     queueCaption(runtime, runtime.segmenter.flush());
@@ -403,25 +482,44 @@ export function createCallService({
     const signal = controller.signal; runtime.call.error = undefined;
     runtime.call.voiceId = voice.id; runtime.call.agentLanguage = settings.agentLanguage;
     runtime.call.customerLanguage = settings.customerLanguage; runtime.call.phase = 'translating';
+    let arousal = null, register = 'calm', tag = '', prosody = {};
     runtime.call.stage = text === undefined ? 'transcribing' : 'translating';
     const current = () => runtime.run === generation && runtime.call.state === 'in_call' && !signal.aborted;
     try {
       await persist(runtime);
-      let textSource = text;
+      let textSource = text, clip = null;
       if (textSource === undefined) {
         const audio = await convert(buffer, mimetype, { output: 'wav', sampleRate: 16000, minSeconds: 0.25, maxSeconds: 45, signal });
         if (!current()) return structuredClone(runtime.call);
         textSource = await providers.transcribe({ audio, mimeType: 'audio/wav', language: settings.agentLanguage, signal });
+        // How it was said, from the clip itself: text alone would decide the emotion otherwise.
+        if (textSource?.trim()) clip = measureClip(audio, textSource.trim().split(/\s+/u).length);
       }
       if (!current()) return structuredClone(runtime.call);
       if (!textSource?.trim()) throw new CallError('No speech was detected. Hold the button and try again.', 422);
       runtime.call.stage = 'translating'; await persist(runtime);
-      const textShown = await providers.translate({ text: textSource, sourceLanguage: settings.agentLanguage, targetLanguage: settings.customerLanguage, signal });
+      // Providers without an interpreter (tests, older adapters) still translate; tone then defaults to calm.
+      const interpreted = providers.interpret
+        ? await providers.interpret({ text: textSource, sourceLanguage: settings.agentLanguage, targetLanguage, style: settings.persona, signal })
+        : { text: await providers.translate({ text: textSource, sourceLanguage: settings.agentLanguage, targetLanguage, signal }), tone: 'calm', language: settings.agentLanguage, sentences: [] };
       if (!current()) return structuredClone(runtime.call);
-      const line = addLine(runtime, { speaker: 'agent', sourceLang: settings.agentLanguage, targetLang: settings.customerLanguage,
-        textSource, textShown, voiceId: voice.id, referenceId: voice.referenceId, delivery: 'pending' });
+      arousal = clip ? arousalOf(clip, baseVoice.baseline || undefined) : { level: 'medium', rateRatio: 1, louderDb: 0 };
+      const firstReply = !runtime.call.transcript.some(line => line.speaker === 'agent');
+      const waited = new Date(runtime.call.answeredAt || runtime.call.startedAt).getTime() - new Date(runtime.call.startedAt).getTime();
+      const chosen = chooseRegister({ override: feeling, tone: interpreted.tone, arousal, callerTone: runtime.call.callerTone, longWait: Number.isFinite(waited) && waited > 120000, firstReply });
+      register = chosen.register;
+      // The agent's own take in that register (or the workspace's, on a single desk); otherwise the default voice.
+      voice = readyVoice(settings.registers?.[register]) || baseVoice;
+      runtime.call.voiceId = voice.id;
+      tag = tagFor(register, arousal, config.fishModel || 's2.1-pro-free');
+      prosody = prosodyFor(arousal);
+      const textShown = interpreted.text;
+      const line = addLine(runtime, { speaker: 'agent', sourceLang: settings.agentLanguage, targetLang: targetLanguage,
+        textSource, textShown, voiceId: voice.id, referenceId: voice.referenceId, delivery: 'pending',
+        register, feeling: describe(register, arousal), tag, why: chosen.reason });
+      const spoken = taggedText(interpreted.sentences, textShown, register, arousal, config.fishModel || 's2.1-pro-free');
       runtime.replyLineId = line.id; runtime.call.stage = 'synthesizing'; await persist(runtime);
-      const mp3 = await providers.synthesize({ text: textShown, referenceId: voice.referenceId, signal, format: 'mp3' });
+      const mp3 = await providers.synthesize({ text: spoken, referenceId: voice.referenceId, signal, format: 'mp3', ...prosody });
       if (!current()) return structuredClone(runtime.call);
       const mulaw = await convert(mp3, 'audio/mpeg', { output: 'mulaw', sampleRate: 8000, maxSeconds: 90, signal });
       if (!current()) return structuredClone(runtime.call);
@@ -429,7 +527,7 @@ export function createCallService({
       runtime.call.phase = 'playing'; runtime.call.stage = 'playing';
       if (runtime.call.transport === 'browser') {
         if (!Buffer.isBuffer(mp3) || mp3.length > 3 * 1024 * 1024) throw new CallError('The generated reply is too long. Try a shorter sentence.', 422);
-        notifyCaller(runtime);
+        notifyCaller(runtime); captionCaller(runtime, line, 'agent');
         // Decoding above verifies duration and playability; the phone receives the original Fish MP3.
         sendBrowser(runtime, { type: 'audio', callId: runtime.call.id, mimeType: 'audio/mpeg',
           payload: mp3.toString('base64'), playbackId: runtime.mark });
@@ -458,7 +556,7 @@ export function createCallService({
       throw new CallError('The reply could not be delivered. Try again.', 502);
     }
   }
-  async function update(id, patch) {
+  async function update(id, patch, actor = '') {
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)
       || Object.keys(patch).some(key => !['issue', 'address', 'dispatch', 'confirmDispatch'].includes(key))) throw new CallError('Invalid ticket update.', 400);
     if (patch.issue !== undefined) textInput(patch.issue, 4000, 'issue', true);
@@ -471,7 +569,8 @@ export function createCallService({
       if (!call) throw new CallError('Call not found.', 404);
       for (const key of ['issue', 'address', 'dispatch']) if (patch[key] !== undefined) call.ticket[key] = patch[key];
       if (patch.confirmDispatch) {
-        call.ticket.dispatch = 'confirmed'; call.ticket.dispatchConfirmedAt = now(); call.ticket.dispatchConfirmedBy = 'Desk agent';
+        call.ticket.dispatch = 'confirmed'; call.ticket.dispatchConfirmedAt = now();
+        call.ticket.dispatchConfirmedBy = (typeof actor === 'string' && actor.trim().slice(0, 100)) || call.agentName || 'Desk agent';
       }
       result = structuredClone(call);
       if (runtime) runtime.call.ticket = structuredClone(call.ticket);
@@ -489,7 +588,7 @@ export function createCallService({
     await Promise.all([...live.values()].map(runtime => backgroundFinish(runtime, 'The server is shutting down.', true)));
   }
   return { initialize, snapshot, registerInbound, registerBrowserInbound, handleStatus, handleStream, handleBrowserStream, answer, end, stop, update, close, applySettings,
-    ptt: (id, { buffer, mimetype }) => reply(id, { buffer, mimetype }),
-    say: (id, { text }) => reply(id, { text }),
+    ptt: (id, { buffer, mimetype, feeling }) => reply(id, { buffer, mimetype, feeling }),
+    say: (id, { text, feeling }) => reply(id, { text, feeling }),
   };
 }

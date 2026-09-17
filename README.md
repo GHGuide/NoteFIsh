@@ -26,13 +26,58 @@ Open `http://127.0.0.1:3001`. For frontend development, run `npm run dev` and `n
 
 | Page | Purpose |
 | --- | --- |
+| `/floor` | Read-only view of who is waiting and which agent is on which call |
 | `/voices` | Find, preview, rename, archive/restore, import, and select approved voices |
-| `/enroll` | Record or upload a permitted voice sample and create a private Fish clone |
+| `/enroll` | Read the 45–60 s script in your language (one take per feeling: calm, warm, energetic, reassuring, apologetic, firm) and create a private Fish clone |
 | `/desk` | Answer/end, hear the caller, read captions, hold Space to reply, retain a ticket |
 | `/admin` | Demo setup, language/voice settings, and integration readiness |
 | `/caller` | Invitation-only phone calling, microphone, translated playback, and end call |
 
 Generate a caller invitation in the desk and open it on the phone. Hold Space records the agent's reply. Release submits it for transcription, translation, Fish synthesis, and playback on the phone. Only generated Fish speech reaches the caller. The desk receives the caller's original microphone audio and translated captions over a separate desk connection.
+
+## Inside any call — the companion
+
+`npm run companion -- --watch` runs on the agent's Mac and detects a call in Zoom, Google Meet, Teams, WhatsApp, FaceTime, Instagram, Messenger, Discord, Slack — or any app using the microphone — then bridges it through the desk: the other side becomes captions, your replies go into the call as its microphone in your cloned voice. One-time audio setup and options in [docs/companion.md](docs/companion.md).
+
+## Voice files
+
+Any voice exports as a small JSON file (`⋯ › Export voice file`, or **Export library**) holding the Fish reference and what the library knows about it — the take it was recorded for, its baseline. Import it on another desk from **Import Fish voice › From a NoteFIsh voice file**; Fish confirms the model exists before it joins the library.
+
+## Run a floor of agents
+
+Leave the roster empty and NoteFIsh is one desk, exactly as before. Add names
+under **Setup → Put agents on the floor** and it becomes a small call centre:
+each agent picks their name in the sidebar, takes a seat, and every waiting
+caller is offered to whoever is seated and free. The first agent to answer gets
+the call; the others see it disappear. An agent can hold one call at a time, can
+pause to step away, and hears only their own caller — audio is addressed to the
+assigned seat, never to the whole floor. Each agent can override the workspace
+voice and caller language for their own calls.
+
+**A roster entry is a seat, not an account.** Anyone who can open the workspace
+can take any name, so the workspace password is what actually controls who
+answers calls. Multi-agent requires the protected mode; the shared demo stays a
+single desk. Set `NOTEFISH_SESSION_SECRET` (32+ characters) so seats survive a
+restart. Defaults are twenty agents and twenty concurrent calls
+(`NOTEFISH_MAX_AGENTS`, `NOTEFISH_MAX_CONCURRENT_CALLS`); the single process and
+JSON file are the real ceiling, so this suits a room of five to twenty seats.
+
+## Send finished calls to your own systems
+
+A completed call can leave NoteFIsh so an existing helpdesk stays the system of
+record. Nothing comes back the other way, and no integration surface appears in
+front of the agent.
+
+| Destination | Configure |
+| --- | --- |
+| Signed webhook | `NOTEFISH_WEBHOOK_URL`, `NOTEFISH_WEBHOOK_SECRET` |
+| Zendesk ticket | `ZENDESK_SUBDOMAIN`, `ZENDESK_EMAIL`, `ZENDESK_API_TOKEN` |
+| Pull API (JSON or CSV) | `NOTEFISH_EXPORT_TOKEN` |
+
+Verify a webhook with
+`sha256=HMAC(secret, "<X-NoteFIsh-Timestamp>.<raw body>")` and reject a
+timestamp that is not recent. Pull instead with
+`curl -H "Authorization: Bearer $NOTEFISH_EXPORT_TOKEN" "$BASE/api/export/calls?format=csv"`.
 
 ## Create and keep your voice
 
@@ -42,7 +87,7 @@ The current no-login demo is a **shared workspace**. Everyone who can open the s
 
 ## Record the demo
 
-The home page opens the call desk. Select a voice, choose the two languages, and click **Create call link**. This enables desk audio and requests microphone permission before the first reply. Copy the link to your partner. Answer when they call; the live transcript stays on the right, beside the speaking controls. **Focus view** hides the surrounding navigation for the video. Call notes are collapsed, and saved transcripts remain available from **Saved conversations**.
+The home page opens the call desk. Select a voice, choose your language, set the partner's language or leave it on **Detect automatically**, and click **Create call link**. Captions always arrive in your language; when you push to talk, NoteFIsh measures how loud and fast you spoke, picks the matching register take of your voice, and speaks the reply in the caller's language with that feeling. This enables desk audio and requests microphone permission before the first reply. Copy the link to your partner. Answer when they call; the live transcript stays on the right, beside the speaking controls. **Focus view** hides the surrounding navigation for the video. Call notes are collapsed, and saved transcripts remain available from **Saved conversations**.
 
 See the [two-person demo script and verification checklist](docs/demo-video.md).
 

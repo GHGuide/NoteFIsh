@@ -81,7 +81,9 @@ export function createSecurity(config) {
 }
 
 export function validateTwilio(req, config, { websocket = false } = {}) {
-  if (!config.twilioAuthToken || !config.publicBaseUrl || !config.deskPassword) return false;
+  // The signature is what authenticates Twilio. Workspace access mode is a
+  // separate concern, so a shared demo can still take real phone calls.
+  if (!config.twilioAuthToken || !config.publicBaseUrl) return false;
   const signature = req.headers['x-twilio-signature'];
   if (typeof signature !== 'string' || !/^[A-Za-z0-9+/]{27}=$/.test(signature)) return false;
   const route = websocket ? '/ws/twilio' : req.path;
