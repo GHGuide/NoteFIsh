@@ -72,7 +72,7 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
     app.use(express.static(config.distPath, { dotfiles: 'deny', index: false, fallthrough: true }));
     app.get(['/', '/desk', '/enroll', '/admin', '/voices', '/floor', '/pill'], (req, res) => res.sendFile(path.join(config.distPath, 'index.html')));
   } else {
-    app.get('/', (req, res) => res.type('text/plain').send('NoteFIsh API is running. Start npm run dev:web, or run npm run build to serve the website here.'));
+    app.get('/', (req, res) => res.type('text/plain').send('NoteFish API is running. Start npm run dev:web, or run npm run build to serve the website here.'));
   }
   app.use((req, res) => res.status(404).json({ error: 'Page not found.' }));
   app.use(errorHandler);
@@ -189,7 +189,7 @@ async function main() {
   dotenv.config({ path: path.join(root, '.env'), override: !production, quiet: true });
   const runtime = await createRuntime();
   runtime.server.listen(runtime.config.port, runtime.config.host, () => {
-    console.log(`NoteFIsh is listening on port ${runtime.config.port}.`);
+    console.log(`NoteFish is listening on port ${runtime.config.port}.`);
   });
   let stopping = false;
   const stop = async () => { if (stopping) return; stopping = true; await runtime.close(); process.exit(0); };
@@ -199,7 +199,7 @@ async function main() {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch(error => {
     // Config messages name variables only; never print raw provider exceptions.
-    console.error(error.message?.startsWith('Invalid ') || error.message?.startsWith('NOTEFISH_') || error.message?.startsWith('PUBLIC_BASE_') || error.message?.startsWith('DATA_DIR') ? error.message : 'NoteFIsh could not start. Check configuration and local data permissions.');
+    console.error(error.message?.startsWith('Invalid ') || error.message?.startsWith('NOTEFISH_') || error.message?.startsWith('PUBLIC_BASE_') || error.message?.startsWith('DATA_DIR') ? error.message : 'NoteFish could not start. Check configuration and local data permissions.');
     process.exitCode = 1;
   });
 }

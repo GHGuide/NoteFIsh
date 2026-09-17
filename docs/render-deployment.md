@@ -1,4 +1,4 @@
-# Deploy NoteFIsh on Render
+# Deploy NoteFish on Render
 
 First demo: the agent speaks **English**, the caller speaks **French**. One Docker web service serves the website, HTTP API, and WebSocket endpoints. The caller opens a private link on their phone; the agent answers in the laptop desk. Fish speaks the translated replies; OpenAI transcribes/translates. Twilio is not required for this demo.
 
@@ -77,7 +77,7 @@ Render supports WebSockets on the same service. A server restart ends an active 
 
 Use a real phone browser and a laptop with real microphone audio. Two tabs on one laptop or generated test speech do not establish this acceptance.
 
-1. Caller opens the generated HTTPS invitation on their phone and taps Call. NoteFIsh rings on the laptop; the agent answers.
+1. Caller opens the generated HTTPS invitation on their phone and taps Call. NoteFish rings on the laptop; the agent answers.
 2. Caller says: **« Bonjour, je voudrais modifier ma réservation. »**
 3. Agent hears the caller and reads the English caption. Record any incorrect names, numbers, or meanings rather than treating plausible text as a pass.
 4. Agent holds Space, says: **“Of course. What name is the booking under?”**, then releases.

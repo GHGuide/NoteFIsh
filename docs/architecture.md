@@ -1,6 +1,6 @@
 # Architecture
 
-NoteFIsh is three providers and a desk. Do not add a fourth product surface.
+NoteFish is three providers and a desk. Do not add a fourth product surface.
 
 ```
                     PSTN
@@ -19,7 +19,7 @@ NoteFIsh is three providers and a desk. Do not add a fourth product surface.
    headset         wss://            Answer token
         │             │
         │             ▼
-        │        NoteFIsh server
+        │        NoteFish server
         │        ├─ stt (OpenAI transcribe)
         │        ├─ copy (gpt-4o-mini)
         │        ├─ tts (Fish reference_id)
@@ -49,7 +49,7 @@ Twilio can already speak. If TTS is Twilio, the customer hears a demo voice. Fis
 
 ## Why half-duplex
 
-Full-duplex translate requires barge-in, echo, overlapping TTS, and usually a generic voice. NoteFIsh is a desk: the agent listens to the street, then keys the mic. That matches dispatch work and keeps Fish clips clean.
+Full-duplex translate requires barge-in, echo, overlapping TTS, and usually a generic voice. NoteFish is a desk: the agent listens to the street, then keys the mic. That matches dispatch work and keeps Fish clips clean.
 
 ## SPA
 

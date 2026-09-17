@@ -1,20 +1,20 @@
-# AGENTS.md — NoteFIsh
+# AGENTS.md — NoteFish
 
-You are working in the **NoteFIsh** repo.
+You are working in the **NoteFish** repo.
 
-NoteFIsh is a browser call-center desk. For the current demo, a caller opens a private link on a real phone and taps Call; the laptop desk rings. The agent hears the caller and reads translated captions. They hold a button, speak, then release; the caller hears translated Fish speech in an approved voice. OpenAI handles words, Fish handles speech, and the server carries the browser audio over secure WebSockets. The site combines a voice library, voice creation, and a call desk.
+NoteFish is a browser call-center desk. For the current demo, a caller opens a private link on a real phone and taps Call; the laptop desk rings. The agent hears the caller and reads translated captions. They hold a button, speak, then release; the caller hears translated Fish speech in an approved voice. OpenAI handles words, Fish handles speech, and the server carries the browser audio over secure WebSockets. The site combines a voice library, voice creation, and a call desk.
 
 Read `finalidea.md` and `docs/hold-project.md` before changing anything.
 
 ## This is not
 
-- Twin (the earlier org-change simulation; distinct from this NoteFIsh product)
+- Twin (the earlier org-change simulation; distinct from this NoteFish product)
 - VoiceNote (WhatsApp/Telegram Chrome overlay)
 - A Flex / Genesys rebuild
 - An outbound dialer
 - Always-on Google-Translate-on-the-call (that is Twilio’s sample)
 - An integration hub **inside the desk**. Amended 15 Sep 2026 at the user's
-  explicit request: NoteFIsh does not put Slack, email, wiki or CRM surfaces in
+  explicit request: NoteFish does not put Slack, email, wiki or CRM surfaces in
   front of the agent, and it never becomes the system of record. It does emit a
   completed call outward — transcript, ticket, agent, languages — over a signed
   webhook, a read-only export API, and one worked ticket adapter. That boundary

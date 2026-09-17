@@ -175,7 +175,7 @@
       "x": 0,
       "y": -180,
       "w": 760,
-      "text": "Same window, same bones as the reference: 1000×622, 158px sidebar, inset sheet with a 12px corner, document column of 535px — title, date, three tabs, read bar, body, ask input.\nWispr's sections mapped one-to-one onto NoteFIsh: Dictation→Desk, Notetaker→Calls, Insights, Dictionary→Glossary (words that stay as written), Snippets→Phrases (saved replies), Style→Voice (your clone + register), Transforms→Floor. Bottom: Invite your team, Settings, Help.\nName, mark, icons and type are NoteFIsh's own."
+      "text": "Same window, same bones as the reference: 1000×622, 158px sidebar, inset sheet with a 12px corner, document column of 535px — title, date, three tabs, read bar, body, ask input.\nWispr's sections mapped one-to-one onto NoteFish: Dictation→Desk, Notetaker→Calls, Insights, Dictionary→Glossary (words that stay as written), Snippets→Phrases (saved replies), Style→Voice (your clone + register), Transforms→Floor. Bottom: Invite your team, Settings, Help.\nName, mark, icons and type are NoteFish's own."
     },
     {
       "id": "avatar",

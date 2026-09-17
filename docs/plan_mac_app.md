@@ -1,10 +1,10 @@
-# Plan — NoteFIsh for Mac (native shell, smooth end to end)
+# Plan — NoteFish for Mac (native shell, smooth end to end)
 
 Written 17 Sep 2026; built the same day. Status:
 - Step 1 Tauri shell — built (`src-tauri/`, `npm run app:dev`): window, tray, pill window (`/pill`), ⌥Space push-to-talk → `ptt` event the desk listens to, starts the server. Unsigned dev build only.
 - Step 2 Process-tap capture — built and verified (`companion/system-audio-tap.swift`), default input of the companion.
 - Step 3 Global PTT + call watcher — built (Tauri shortcut; watcher stays in the companion).
-- Step 4 NoteFIsh Voice virtual mic — written (`driver/`, libASPL), needs `sh driver/install.sh` (password) and a real-call check.
+- Step 4 NoteFish Voice virtual mic — written (`driver/`, libASPL), needs `sh driver/install.sh` (password) and a real-call check.
 - Step 5 Streaming captions + streaming TTS — built and verified live (`server/live-captions.mjs`, `server/fish-live.mjs`).
 - Step 6 Polish — pill done; ⌘K palette, permissions walkthrough not done.
 
@@ -35,7 +35,7 @@ reply starting to play within ~300 ms of releasing the key.
 - Known trap: do not route the tap through `AVAudioEngine`; read the aggregate device with `AudioDeviceCreateIOProcIDWithBlock`.
 
 ### Speaking into the call — one virtual microphone, ours
-- A virtual mic is the only piece macOS does not provide. Options: BlackHole (GPL-3: bundling it makes the app GPL), Rogue Amoeba Loopback (paid, per user), or **our own Audio Server Plug-in built on `libASPL` (MIT, C++17)** — a single input device named "NoteFIsh Voice" that the app writes PCM into. ~300 lines on top of the library's `SinewaveDevice` example.
+- A virtual mic is the only piece macOS does not provide. Options: BlackHole (GPL-3: bundling it makes the app GPL), Rogue Amoeba Loopback (paid, per user), or **our own Audio Server Plug-in built on `libASPL` (MIT, C++17)** — a single input device named "NoteFish Voice" that the app writes PCM into. ~300 lines on top of the library's `SinewaveDevice` example.
 - Installed with the app (needs one admin prompt, driver goes in `/Library/Audio/Plug-Ins/HAL`), signed and notarized with the app.
 - Interim: keep the BlackHole path as a documented manual option.
 
@@ -57,7 +57,7 @@ reply starting to play within ~300 ms of releasing the key.
 1. **Tauri shell around the current web app** (2 d): window, tray pill, sidecar server, Keychain keys, DMG + notarization. Ship: the desk as a Mac app, phone links and Twilio unchanged.
 2. **Process-tap capture** (2 d): Swift/Rust helper → PCM frames → existing caller socket path. Replaces the ffmpeg input side of the companion. Ship: hear any call without BlackHole.
 3. **Global push-to-talk + call watcher** (1 d): hold a key anywhere, call detected → desk rings with the app's name. Ship: the Wispr-style flow.
-4. **NoteFIsh Voice virtual mic** (3–4 d incl. signing): libASPL driver + installer step. Ship: speak into any call without BlackHole. Until then, BlackHole stays the manual path.
+4. **NoteFish Voice virtual mic** (3–4 d incl. signing): libASPL driver + installer step. Ship: speak into any call without BlackHole. Until then, BlackHole stays the manual path.
 5. **Streaming captions + streaming TTS** (3 d): Realtime transcription socket; Fish live socket with sentence-by-sentence flush; play-as-it-arrives. Ship: sub-second turns.
 6. **Polish** (1–2 d): pill window, ⌘K palette, sounds, first-run permissions walkthrough (mic, system audio, accessibility for the hotkey).
 

@@ -2,7 +2,7 @@
 
 Captured with headless Chrome at 1440×900 and 390×844 (`clone-ui` phase 0): 20 desktop viewports, 4 mobile, computed styles, animation inventory. Numbers below are measured, not guessed.
 
-## Tokens (theirs — reference only; NoteFIsh keeps its own palette)
+## Tokens (theirs — reference only; NoteFish keeps its own palette)
 - Page `rgb(255,255,235)`; ink `rgb(26,26,26)`; panel `rgb(228,228,208)`; CTA lavender `rgb(240,215,255)`; deep band `rgb(3,79,70)`; accents orange `#FFA946`, coral `#FF6C4C`, pink `#FFBCF2`, mint (testimonial), grey `#9D9C98`.
 - Display: **EB Garamond** 400 — h1/h2 96px / 91.2px line / −2.88px tracking, `em` italic for the emphasised half; h3 48px/52.8px. Body **Figtree** 500 20px/26px; nav links 16px/600; small 14px at 70% ink.
 - Containers 1240 / 1024 / 912 / 864 px. Nav card ≈ 912 wide, 66 tall, 1px `rgba(26,26,26,.15)` border, cream fill, fixed at top (wrapper 156px tall).
@@ -27,5 +27,5 @@ Captured with headless Chrome at 1440×900 and 390×844 (`clone-ui` phase 0): 20
 - Logo ticker keyframes 40s; tabs/headings opacity+transform .4–.5s; arrow links transform .35s; FAQ rows background .2s.
 - 13 Webflow interaction ids drive the scroll-linked sections; 86 elements carry inline transforms.
 
-## What NoteFIsh keeps / swaps
+## What NoteFish keeps / swaps
 Keep: the skeleton and every motion device above. Swap: type (DM Serif Display / DM Sans), palette (paper, ink, deep-sea navy, blue-tint CTA, puff accents), the curved-path sentence (the caller's French), the demo content (a live two-language call), testimonials → product artefacts from a real call (no invented people or logos), badges → product facts.

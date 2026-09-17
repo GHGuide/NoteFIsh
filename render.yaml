@@ -35,7 +35,7 @@ services:
         value: "20"
       - key: NOTEFISH_MAX_CONCURRENT_CALLS
         value: "20"
-      # Outbound delivery. Leave unset to keep calls inside NoteFIsh.
+      # Outbound delivery. Leave unset to keep calls inside NoteFish.
       - key: NOTEFISH_WEBHOOK_URL
         sync: false
       - key: NOTEFISH_WEBHOOK_SECRET

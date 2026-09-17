@@ -450,7 +450,7 @@ export function createExportRouter({ config, calls, store, integrations }) {
         row.ticket?.dispatch || 'none', row.transcript?.length || 0,
       ].map(csvCell).join(','));
       res.type('text/csv').set('Content-Disposition', 'attachment; filename="notefish-calls.csv"');
-      if (next) res.set('X-NoteFIsh-Next-Cursor', next);
+      if (next) res.set('X-NoteFish-Next-Cursor', next);
       return res.send([header.join(','), ...body].join('\n'));
     }
     res.json({ calls: rows, nextCursor: next, count: rows.length });

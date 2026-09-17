@@ -1,7 +1,7 @@
-# Integration surfaces — how NoteFIsh fits into any call centre, meeting, or HR stack
+# Integration surfaces — how NoteFish fits into any call centre, meeting, or HR stack
 
 16 Sep 2026. A survey, not a plan. It answers one question: what are *all* the
-ways NoteFIsh can attach to the environments where calls already happen, and
+ways NoteFish can attach to the environments where calls already happen, and
 which of them are worth building first.
 
 The product's one mechanic never changes across any of these: **hear the other
@@ -16,7 +16,7 @@ side" rule.
 Wispr Flow does not integrate with Zoom, Meet, or Teams. It sits at the
 operating-system audio layer, notices that a call is happening, and works
 *through* whatever app is on screen. That is the approach with the widest reach
-for NoteFIsh, and it is called the **Companion** below.
+for NoteFish, and it is called the **Companion** below.
 
 A small desktop app on the agent's machine:
 
@@ -27,17 +27,17 @@ A small desktop app on the agent's machine:
    [ app-audio capture ]         [ virtual microphone ]
           │                              ▲
           ▼                              │  only Fish speech, only after release
-   ──────────────── NoteFIsh Companion (menu bar) ────────────────
+   ──────────────── NoteFish Companion (menu bar) ────────────────
           │  captions in agent language      ▲  hold global hotkey → speak
           ▼                                  │
    ┌──────────────────────────────────────────────────┐
-   │  NoteFIsh server: transcribe → translate → Fish  │   (existing)
+   │  NoteFish server: transcribe → translate → Fish  │   (existing)
    └──────────────────────────────────────────────────┘
 ```
 
 The agent's real microphone never reaches the softphone. The virtual
 microphone is silent except while a translated reply plays. The softphone is
-simply configured to use "NoteFIsh Microphone" as its input device and never
+simply configured to use "NoteFish Microphone" as its input device and never
 knows anything is different.
 
 Why it is the highest-leverage surface: it needs **no vendor API, no vendor
@@ -56,7 +56,7 @@ inbound support calls.
 | **Companion (desktop, OS audio layer)** | Capture the app's output audio; inject replies through a virtual microphone | Any softphone, CCaaS desktop, meeting app, on any vendor | Medium–high | macOS: Core Audio process taps (14.2+) or ScreenCaptureKit app audio (13+); a userspace HAL plug-in for the virtual mic (BlackHole-style, needs signing/notarisation, not a kext). Windows: WASAPI loopback for capture; a virtual audio driver for the mic. The hard part is the driver, not the AI. |
 | **Twilio number** | Built. `<Connect><Stream>` bidirectional μ-law | Anyone who can point a number at a URL | Done, untested on a handset | Also covers BYOC: keep the existing carrier, route via SIP to Twilio. |
 | **Other CPaaS** | Same media-stream shape: Vonage, Telnyx, SignalWire, Plivo | Companies already on one of these | Low per provider | One adapter each behind the existing `handleStream` contract. Telnyx and SignalWire are near drop-ins for the Twilio code. |
-| **SIP endpoint** | NoteFIsh registers as a SIP user agent / extension, or sits behind a small media gateway (FreeSWITCH, drachtio) | Every on-prem or hosted PBX: Asterisk, FreePBX, 3CX, Cisco CUCM, Avaya, Mitel | Medium | The universal answer for call centres that own their phone system. "Transfer to extension 700" puts any call on the desk. |
+| **SIP endpoint** | NoteFish registers as a SIP user agent / extension, or sits behind a small media gateway (FreeSWITCH, drachtio) | Every on-prem or hosted PBX: Asterisk, FreePBX, 3CX, Cisco CUCM, Avaya, Mitel | Medium | The universal answer for call centres that own their phone system. "Transfer to extension 700" puts any call on the desk. |
 | **CCaaS live audio streams** | Vendor APIs that fork call audio to a WebSocket in real time | Cloud contact centres | Medium each | Amazon Connect (live media streaming to Kinesis Video Streams), Genesys Cloud AudioHook, Five9 VoiceStream. Mostly *receive*-oriented — captions are easy, returning the reply into the call is vendor-specific and sometimes not possible without the Companion or a SIP leg. Verify bidirectionality per vendor before promising it. |
 | **Meeting bots** | A participant bot joins Zoom/Meet/Teams and relays audio both ways | Meetings, no install on the agent's machine | Low via a bot vendor (Recall.ai-style), high self-built | Zoom Meeting SDK raw audio; Teams via Graph real-time media; Google Meet Media API (preview). A bot is visible in the participant list, which suits interpreting and does not suit a support agent. |
 | **Browser caller link** | Built. Phone browser opens an invitation | Demos, field use, one-off callers | Done | Stays. |
@@ -122,7 +122,7 @@ roster stops being hand-typed.
 | Roster provisioning | **SCIM 2.0** from Okta/Entra, or direct HRIS pull (Workday, Personio, HiBob, BambooHR, Rippling) | Agents appear when hired. **Offboarding must archive the agent and revoke their voice** — a cloned voice outliving employment is a real liability. |
 | Languages and skills | HRIS profile → per-agent language defaults → skill-based routing | "French callers ring French-speaking seats" comes from HR data, not from admin typing it. |
 | Shifts and presence | WFM (Calabrio, NICE WFM, Verint) or calendar | Scheduled break → auto-pause; shift end → leave seat. Adherence out. |
-| Onboarding | Voice enrolment as an onboarding step, with the consent record filed with HR | Voice is biometric-adjacent under GDPR; consent, purpose, and retention belong in the HR system, not only in NoteFIsh's JSON. |
+| Onboarding | Voice enrolment as an onboarding step, with the consent record filed with HR | Voice is biometric-adjacent under GDPR; consent, purpose, and retention belong in the HR system, not only in NoteFish's JSON. |
 | Stats out | Calls handled, languages served, handle time → HRIS / WFM / payroll | Multilingual-premium pay and coaching both want this. It is the export API plus a few fields. |
 | Erasure | Right-to-erasure request → delete transcripts, archive voice, delete the Fish model | Needs a documented, tested path. |
 
@@ -152,7 +152,7 @@ installer, an MDM profile that pre-approves the audio permissions.
 3. **The Companion, macOS first.** Core Audio process tap for capture, a
    userspace HAL virtual microphone, global hotkey, floating captions. This is
    the Wispr-style detector the user asked for and the single largest expansion
-   of where NoteFIsh can be used. Windows second.
+   of where NoteFish can be used. Windows second.
 4. **SIP endpoint** for on-prem centres, then **Amazon Connect and Genesys**
    stream adapters for cloud ones — chosen by whichever prospect appears first.
 5. **More `deliver()` targets and a read-only screen pop.**

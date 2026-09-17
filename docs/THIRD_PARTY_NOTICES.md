@@ -1,6 +1,6 @@
 # Third-party notices
 
-Checked on 2026-09-12. This file records the illustration assets and selected UI components used by NoteFIsh. Other dependencies retain their own licenses in their packages; this is not a complete dependency license inventory.
+Checked on 2026-09-12. This file records the illustration assets and selected UI components used by NoteFish. Other dependencies retain their own licenses in their packages; this is not a complete dependency license inventory.
 
 ## unDraw illustrations
 
@@ -17,7 +17,7 @@ The license permits free commercial and noncommercial decorative project use, in
 
 ## UI component sources and package versions
 
-| Component or dependency | Source and license | Use in NoteFIsh |
+| Component or dependency | Source and license | Use in NoteFish |
 | --- | --- | --- |
 | shadcn/ui | [Repository](https://github.com/shadcn-ui/ui); [LICENSE.md](https://github.com/shadcn-ui/ui/blob/main/LICENSE.md), MIT; copyright 2023 shadcn | Accessible composition patterns adapted in `web/components/ui.jsx`; local CSS |
 | Motion Primitives, Animated Background | [Source](https://github.com/ibelick/motion-primitives/blob/main/components/core/animated-background.tsx); [LICENCE.md](https://github.com/ibelick/motion-primitives/blob/main/LICENCE.md), MIT; copyright 2024 ibelick | Adapted in `web/components/animated-background.jsx` |

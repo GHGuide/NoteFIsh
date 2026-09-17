@@ -4,7 +4,7 @@ const line = entry => `[${entry.at}] ${entry.speaker === 'agent' ? 'Agent' : 'Ca
 
 /**
  * One worked adapter, so the interface is proven against a real API shape
- * rather than only against itself. Zendesk stays the system of record; NoteFIsh
+ * rather than only against itself. Zendesk stays the system of record; NoteFish
  * creates the ticket and forgets it.
  */
 export function createZendeskAdapter({ config, fetchImpl = globalThis.fetch, timeoutMs = 15000 }) {

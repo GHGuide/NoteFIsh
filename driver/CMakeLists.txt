@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(NoteFishVoice LANGUAGES CXX)
 
-# NoteFIsh Voice: a virtual microphone (Core Audio Server Plug-in) that call apps
+# NoteFish Voice: a virtual microphone (Core Audio Server Plug-in) that call apps
 # select as their mic. The companion streams the Fish voice into it over UDP.
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

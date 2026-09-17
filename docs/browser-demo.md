@@ -1,4 +1,4 @@
-# NoteFIsh browser-call demo
+# NoteFish browser-call demo
 
 The caller uses a real phone browser; the agent uses a laptop and headset. Twilio is optional. OpenAI transcribes and translates the words, and Fish renders the agent's reply in the selected approved voice.
 
@@ -9,7 +9,7 @@ For development only, keep the laptop awake and both processes running. A tempor
 1. Configure the ignored `.env` using `.env.example`. Set the actual Fish and OpenAI keys. Do not put them in client code or URLs.
 2. Run `npm ci` and `npm run build`.
 3. Start `cloudflared tunnel --url http://127.0.0.1:3002` and copy its generated HTTPS origin.
-4. Stop any previous NoteFIsh process using the same data directory, then run:
+4. Stop any previous NoteFish process using the same data directory, then run:
 
    ```sh
    node scripts/start-browser-demo.mjs https://your-generated-host.trycloudflare.com --port=3002
@@ -24,7 +24,7 @@ For development only, keep the laptop awake and both processes running. A tempor
 10. Hold Space or the talk button on the laptop, speak English, then release. The phone hears the French Fish reply. During reply processing/playback, caller capture pauses to avoid echo.
 11. End from either side. Completed calls remain selectable in the desk. This local mode stores transcripts, voice references, settings and notes in ignored `data/notefish.json`.
 
-The browser permission prompt must be accepted in the browser and, if required, macOS. NoteFIsh shows denied, pending, suspended, and disconnected states rather than substituting generated microphone input. If audio pauses, use the page's Enable audio action. Use a new invitation after a disconnect or server restart.
+The browser permission prompt must be accepted in the browser and, if required, macOS. NoteFish shows denied, pending, suspended, and disconnected states rather than substituting generated microphone input. If audio pauses, use the page's Enable audio action. Use a new invitation after a disconnect or server restart.
 
 ## Conversation acceptance
 

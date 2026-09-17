@@ -1,8 +1,8 @@
-# NoteFIsh
+# NoteFish
 
 A voice workspace and multilingual phone desk. Create approved Fish voices, manage your library, and use a selected voice to reply to a real caller in their language. First demo: **English-speaking agent ↔ French-speaking caller**.
 
-The website uses Fish Audio's clean voice-library design language, with NoteFIsh branding. In the current demo, the caller opens a private link in their phone browser and taps Call. The agent uses the laptop desk and a headset. Twilio is optional and is not required for this browser-call demo.
+The website uses Fish Audio's clean voice-library design language, with NoteFish branding. In the current demo, the caller opens a private link in their phone browser and taps Call. The agent uses the laptop desk and a headset. Twilio is optional and is not required for this browser-call demo.
 
 ## Run locally
 
@@ -41,15 +41,15 @@ Generate a caller invitation in the desk and open it on the phone. Hold Space re
 
 ## The Mac app
 
-`npm run app:dev` opens NoteFIsh as a Mac app (Tauri 2, `src-tauri/`): the desk in a window, a **pill** under the menu bar with call state and the last caption, and **⌥ Space** as a system-wide hold-to-speak key. It starts the local server if nothing answers on port 3001 (set `NOTEFISH_ROOT` when the checkout is elsewhere). `npm run app:build` makes the `.app`/DMG. Signing and notarization need a Developer ID.
+`npm run app:dev` opens NoteFish as a Mac app (Tauri 2, `src-tauri/`): the desk in a window, a **pill** under the menu bar with call state and the last caption, and **⌥ Space** as a system-wide hold-to-speak key. It starts the local server if nothing answers on port 3001 (set `NOTEFISH_ROOT` when the checkout is elsewhere). `npm run app:build` makes the `.app`/DMG. Signing and notarization need a Developer ID.
 
 ## Voice files
 
-Any voice exports as a small JSON file (`⋯ › Export voice file`, or **Export library**) holding the Fish reference and what the library knows about it — the take it was recorded for, its baseline. Import it on another desk from **Import Fish voice › From a NoteFIsh voice file**; Fish confirms the model exists before it joins the library.
+Any voice exports as a small JSON file (`⋯ › Export voice file`, or **Export library**) holding the Fish reference and what the library knows about it — the take it was recorded for, its baseline. Import it on another desk from **Import Fish voice › From a NoteFish voice file**; Fish confirms the model exists before it joins the library.
 
 ## Run a floor of agents
 
-Leave the roster empty and NoteFIsh is one desk, exactly as before. Add names
+Leave the roster empty and NoteFish is one desk, exactly as before. Add names
 under **Setup → Put agents on the floor** and it becomes a small call centre:
 each agent picks their name in the sidebar, takes a seat, and every waiting
 caller is offered to whoever is seated and free. The first agent to answer gets
@@ -68,7 +68,7 @@ JSON file are the real ceiling, so this suits a room of five to twenty seats.
 
 ## Send finished calls to your own systems
 
-A completed call can leave NoteFIsh so an existing helpdesk stays the system of
+A completed call can leave NoteFish so an existing helpdesk stays the system of
 record. Nothing comes back the other way, and no integration surface appears in
 front of the agent.
 
@@ -79,7 +79,7 @@ front of the agent.
 | Pull API (JSON or CSV) | `NOTEFISH_EXPORT_TOKEN` |
 
 Verify a webhook with
-`sha256=HMAC(secret, "<X-NoteFIsh-Timestamp>.<raw body>")` and reject a
+`sha256=HMAC(secret, "<X-NoteFish-Timestamp>.<raw body>")` and reject a
 timestamp that is not recent. Pull instead with
 `curl -H "Authorization: Bearer $NOTEFISH_EXPORT_TOKEN" "$BASE/api/export/calls?format=csv"`.
 
@@ -91,7 +91,7 @@ The current no-login demo is a **shared workspace**. Everyone who can open the s
 
 ## Record the demo
 
-The home page opens the call desk. Select a voice, choose your language, set the partner's language or leave it on **Detect automatically**, and click **Create call link**. Captions always arrive in your language; when you push to talk, NoteFIsh measures how loud and fast you spoke, picks the matching register take of your voice, and speaks the reply in the caller's language with that feeling. This enables desk audio and requests microphone permission before the first reply. Copy the link to your partner. Answer when they call; the live transcript stays on the right, beside the speaking controls. **Focus view** hides the surrounding navigation for the video. Call notes are collapsed, and saved transcripts remain available from **Saved conversations**.
+The home page opens the call desk. Select a voice, choose your language, set the partner's language or leave it on **Detect automatically**, and click **Create call link**. Captions always arrive in your language; when you push to talk, NoteFish measures how loud and fast you spoke, picks the matching register take of your voice, and speaks the reply in the caller's language with that feeling. This enables desk audio and requests microphone permission before the first reply. Copy the link to your partner. Answer when they call; the live transcript stays on the right, beside the speaking controls. **Focus view** hides the surrounding navigation for the video. Call notes are collapsed, and saved transcripts remain available from **Saved conversations**.
 
 See the [two-person demo script and verification checklist](docs/demo-video.md).
 

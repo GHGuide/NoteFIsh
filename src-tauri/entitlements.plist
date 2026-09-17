@@ -7,8 +7,8 @@
   <key>com.apple.security.device.microphone</key>
   <true/>
   <key>NSMicrophoneUsageDescription</key>
-  <string>NoteFIsh records your push-to-talk replies to speak them in your cloned voice.</string>
+  <string>NoteFish records your push-to-talk replies to speak them in your cloned voice.</string>
   <key>NSAudioCaptureUsageDescription</key>
-  <string>NoteFIsh listens to the call you are on to show live captions.</string>
+  <string>NoteFish listens to the call you are on to show live captions.</string>
 </dict>
 </plist>

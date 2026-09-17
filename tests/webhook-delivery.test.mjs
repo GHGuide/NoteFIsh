@@ -33,16 +33,16 @@ test('a completed call is signed, sent once, and never carries provider configur
   const { url, init } = sent[0];
   assert.equal(url, baseConfig.webhookUrl);
   assert.equal(init.redirect, 'error');
-  const timestamp = init.headers['X-NoteFIsh-Timestamp'];
+  const timestamp = init.headers['X-NoteFish-Timestamp'];
   const expected = createHmac('sha256', secret).update(`${timestamp}.${init.body}`).digest('hex');
-  assert.equal(init.headers['X-NoteFIsh-Signature'], `sha256=${expected}`, 'the signature covers the timestamp and the exact bytes sent');
+  assert.equal(init.headers['X-NoteFish-Signature'], `sha256=${expected}`, 'the signature covers the timestamp and the exact bytes sent');
   assert.ok(Math.abs(Date.now() / 1000 - Number(timestamp)) < 60, 'a receiver can reject a replayed timestamp');
 
   const body = JSON.parse(init.body);
   assert.equal(body.agent.name, 'Nina');
   assert.equal(body.ticket.issue, 'Locked out');
   assert.equal(body.transcript[0].textShown, 'I am locked out');
-  assert.equal('voiceId' in body, false, 'voice and provider details stay inside NoteFIsh');
+  assert.equal('voiceId' in body, false, 'voice and provider details stay inside NoteFish');
   assert.equal(JSON.stringify(body).includes(secret), false);
 
   // A live call is not a completed one.

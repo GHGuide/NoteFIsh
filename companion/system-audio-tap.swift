@@ -7,7 +7,7 @@
 //   ./bin/system-audio-tap [bundle.id] | …
 //
 // macOS asks once for "System Audio Recording" permission for the process that
-// runs this (Terminal, or the NoteFIsh app).
+// runs this (Terminal, or the NoteFish app).
 import CoreAudio
 import AudioToolbox
 import Foundation
@@ -46,7 +46,7 @@ if let bundleId {
   description = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
 }
 description.muteBehavior = .unmuted // the person keeps hearing the call
-description.name = "NoteFIsh listening"
+description.name = "NoteFish listening"
 
 var tapId = AudioObjectID(kAudioObjectUnknown)
 let tapStatus = AudioHardwareCreateProcessTap(description, &tapId)
@@ -55,7 +55,7 @@ if tapStatus != noErr { fail("Could not create the audio tap (\(tapStatus)). All
 // The tap only delivers audio through an aggregate device that lists it.
 let aggregateUID = "com.notefish.tap.\(UUID().uuidString)"
 let aggregateDescription: [String: Any] = [
-  kAudioAggregateDeviceNameKey: "NoteFIsh tap",
+  kAudioAggregateDeviceNameKey: "NoteFish tap",
   kAudioAggregateDeviceUIDKey: aggregateUID,
   kAudioAggregateDeviceIsPrivateKey: true,
   kAudioAggregateDeviceIsStackedKey: false,

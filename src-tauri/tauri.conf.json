@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "NoteFIsh",
+  "productName": "NoteFish",
   "version": "0.1.0",
   "identifier": "com.notefish.desk",
   "build": {
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "NoteFIsh",
+        "title": "NoteFish",
         "url": "http://127.0.0.1:3001/desk",
         "width": 1280,
         "height": 860,

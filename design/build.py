@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""NoteFIsh design artboards, structured 1:1 after the reference screenshot:
+"""NoteFish design artboards, structured 1:1 after the reference screenshot:
 a 1000x622 desktop window, 158px sidebar, inset content sheet, document column
 of 535px with title / date / tabs / read bar / body / ask input.
-Colours and type are NoteFIsh's own tokens from web/styles.css."""
+Colours and type are NoteFish's own tokens from web/styles.css."""
 import pathlib
 
 OUT = pathlib.Path(__file__).parent
 
-# ---- NoteFIsh tokens (web/styles.css) ----
+# ---- NoteFish tokens (web/styles.css) ----
 PAPER, PANEL, CARD = "#FAF9F7", "#F3F2EF", "#FEFDFC"
 LINE, INK, MUTED = "#D8D6D1", "#242424", "#66645F"
 GREEN, RED, AMBER = "#386149", "#A53332", "#815A25"
@@ -333,7 +333,7 @@ def window(active, sheet_inner, overlay=""):
   <span style="position: absolute; left: 68px; top: 12px; color: [[NAVTEXT]];">[[PANEL]]</span>
   <div style="position: absolute; right: 22px; top: 10px; display: flex; align-items: center; gap: 14px; color: [[NAVTEXT]];">[[BELL]][[USER]]</div>
   <aside style="position: absolute; left: 0; top: 0; width: 158px; height: 622px; padding: 44px 8px 14px; display: flex; flex-direction: column;">
-    <div style="display: flex; align-items: center; gap: 7px; padding: 0 10px; height: 24px; margin-bottom: 14px; font-size: 19px; font-weight: 650; letter-spacing: -.6px;">[[MARK]]<span>NoteFIsh<span style="color: #77736B;">.</span></span></div>
+    <div style="display: flex; align-items: center; gap: 7px; padding: 0 10px; height: 24px; margin-bottom: 14px; font-size: 19px; font-weight: 650; letter-spacing: -.6px;">[[MARK]]<span>NoteFish<span style="color: #77736B;">.</span></span></div>
     <div style="display: flex; align-items: center; gap: 8px; margin: 0 2px 14px; padding: 6px 8px; border-radius: 10px; background: [[SHEET]]; border: 1px solid [[SHEET_LINE]];">[[SEAT]]<div style="flex: 1; min-width: 0;"><strong style="display: block; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Nina Okafor</strong><span style="display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: [[GREEN]];"><span style="width: 5px; height: 5px; border-radius: 50%; background: [[GREEN]];"></span>On the floor</span></div></div>
     <nav style="display: flex; flex-direction: column; gap: 0;">[[NAV]]</nav>
     <nav style="display: flex; flex-direction: column; gap: 0; margin-top: auto;">[[BOTTOM]]</nav>
@@ -984,7 +984,7 @@ def invite_screen():
 <div style="position: absolute; inset: 0; background: rgba(36,36,36,.26);"></div>
 <div style="position: absolute; left: 310px; top: 30px; width: 380px; height: 562px; background: [[SHEET]]; border: 1px solid [[LINE]]; border-radius: 16px; box-shadow: 0 24px 60px rgba(36,36,36,.22); padding: 20px 18px 12px; display: flex; flex-direction: column; overflow: hidden;">
   <h2 style="font: 400 24px/1.15 [[SERIF]]; letter-spacing: -.6px;">Get a free month.</h2>
-  <p style="font-size: 12.5px; color: [[MUTED]]; line-height: 1.5; margin-top: 6px;">Share NoteFIsh with a friend. They get a month free, and so do you.</p>
+  <p style="font-size: 12.5px; color: [[MUTED]]; line-height: 1.5; margin-top: 6px;">Share NoteFish with a friend. They get a month free, and so do you.</p>
   <div style="display: flex; gap: 6px; margin-top: 12px;">[[T1]][[T2]][[T3]]</div>
   <div style="margin-top: 12px; background: [[PANEL]]; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;">
     <div style="display: flex; justify-content: center;">[[TICKET]]</div>
@@ -1017,7 +1017,7 @@ def logo_screen():
   <div style="display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 40px; align-items: start;">
     <div style="display: flex; flex-direction: column; align-items: center; gap: 14px;"><span style="filter: drop-shadow(0 14px 30px rgba(36,36,36,.22));">[[BIG]]</span><span style="font-size: 11px; color: [[MUTED]];">App icon · 1024 master</span></div>
     <div style="display: flex; flex-direction: column; gap: 26px;">
-      <div><div style="font-size: 10px; font-weight: 600; letter-spacing: 1.4px; color: [[MUTED]]; margin-bottom: 12px;">LOCKUP</div><div style="display: flex; align-items: center; gap: 14px; font-size: 36px; font-weight: 650; letter-spacing: -1.4px;">[[LOCK]]<span>NoteFIsh<span style="color: #77736B;">.</span></span></div></div>
+      <div><div style="font-size: 10px; font-weight: 600; letter-spacing: 1.4px; color: [[MUTED]]; margin-bottom: 12px;">LOCKUP</div><div style="display: flex; align-items: center; gap: 14px; font-size: 36px; font-weight: 650; letter-spacing: -1.4px;">[[LOCK]]<span>NoteFish<span style="color: #77736B;">.</span></span></div></div>
       <div><div style="font-size: 10px; font-weight: 600; letter-spacing: 1.4px; color: [[MUTED]]; margin-bottom: 12px;">SIZES</div><div style="display: flex; align-items: flex-end; gap: 28px;">[[SIZES]]</div></div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
         <div><div style="font-size: 10px; font-weight: 600; letter-spacing: 1.4px; color: [[MUTED]]; margin-bottom: 12px;">ONE COLOUR</div><div style="display: flex; align-items: center; gap: 18px;">[[MONO1]][[MONO2]]<span style="display: grid; place-items: center; width: 64px; height: 64px; border-radius: 16px; background: [[INK]];">[[MONO3]]</span></div></div>

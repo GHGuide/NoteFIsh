@@ -1,4 +1,4 @@
-// NoteFIsh for Mac: the desk in a window, a pill under the menu bar, and a
+// NoteFish for Mac: the desk in a window, a pill under the menu bar, and a
 // system-wide push-to-talk key. The Node server (server/index.mjs) does the work;
 // this shell finds it on 127.0.0.1:3001 or starts it, then hosts the same web UI.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -17,7 +17,7 @@ use tauri_plugin_shell::ShellExt;
 
 const DESK: &str = "http://127.0.0.1:3001";
 
-/// Where the NoteFIsh checkout lives: NOTEFISH_ROOT, else the folder above src-tauri (dev), else ~/NoteFIsh.
+/// Where the NoteFish checkout lives: NOTEFISH_ROOT, else the folder above src-tauri (dev), else ~/NoteFish.
 fn notefish_root() -> PathBuf {
     if let Ok(root) = std::env::var("NOTEFISH_ROOT") {
         return PathBuf::from(root);
@@ -26,7 +26,7 @@ fn notefish_root() -> PathBuf {
     if dev.join("server/index.mjs").exists() {
         return dev;
     }
-    dirs_home().join("NoteFIsh")
+    dirs_home().join("NoteFish")
 }
 
 fn dirs_home() -> PathBuf {
@@ -45,7 +45,7 @@ fn ensure_desk(app: &tauri::AppHandle) {
     let root = notefish_root();
     let server = root.join("server/index.mjs");
     if !server.exists() {
-        eprintln!("NoteFIsh server not found at {}. Set NOTEFISH_ROOT.", server.display());
+        eprintln!("NoteFish server not found at {}. Set NOTEFISH_ROOT.", server.display());
         return;
     }
     let shell = app.shell();
@@ -62,7 +62,7 @@ fn ensure_desk(app: &tauri::AppHandle) {
                 std::thread::sleep(Duration::from_millis(250));
             }
         }
-        Err(error) => eprintln!("Could not start the NoteFIsh server: {error}"),
+        Err(error) => eprintln!("Could not start the NoteFish server: {error}"),
     }
 }
 
@@ -85,7 +85,7 @@ fn toggle_pill(app: &tauri::AppHandle) {
     }
     let url = format!("{DESK}/pill").parse().expect("pill url");
     if let Ok(window) = WebviewWindowBuilder::new(app, "pill", WebviewUrl::External(url))
-        .title("NoteFIsh")
+        .title("NoteFish")
         .inner_size(420.0, 64.0)
         .decorations(false)
         .transparent(true)
@@ -120,7 +120,7 @@ fn main() {
             }
             let open = MenuItem::with_id(app, "open", "Open desk", true, None::<&str>)?;
             let pill = MenuItem::with_id(app, "pill", "Show / hide pill", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Quit NoteFIsh", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit NoteFish", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open, &pill, &quit])?;
             TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().cloned().expect("app icon"))
@@ -148,5 +148,5 @@ fn main() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("NoteFIsh could not start");
+        .expect("NoteFish could not start");
 }

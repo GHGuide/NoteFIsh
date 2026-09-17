@@ -1,4 +1,4 @@
-# NoteFIsh — final idea
+# NoteFish — final idea
 
 > **Latest demo direction — 12 Sep 2026:** The user explicitly approved a browser caller page and removed Twilio from the first demo. A real phone opens an invitation link, taps Call, and speaks French; a laptop desk answers, hears the caller, and displays English captions. Holding/releasing the agent microphone produces French Fish speech in the selected approved voice. Ending retains the transcript. This supersedes older “customer never uses the site” and mandatory Twilio passages below. See the current implementation contract and Render deployment guide.
 
@@ -8,14 +8,14 @@
 **Status:** locked vision, 12 Sep 2026.  
 **This file is the idea.** The build spec is [`docs/hold-project.md`](docs/hold-project.md).
 
-NoteFIsh is not a chatbot, not a WhatsApp gadget, and not a “platform.” It is a **desk**.
+NoteFish is not a chatbot, not a WhatsApp gadget, and not a “platform.” It is a **desk**.
 
 
 ## Language scope — updated 12 Sep 2026
 
-NoteFIsh supports customer languages covered by the selected Fish Audio cloning/TTS model, rather than a Dutch-only workflow. English is the initial agent-language default; the desk has an agent language and a customer language. Dutch/English is only an example pair wherever it appears in older descriptions.
+NoteFish supports customer languages covered by the selected Fish Audio cloning/TTS model, rather than a Dutch-only workflow. English is the initial agent-language default; the desk has an agent language and a customer language. Dutch/English is only an example pair wherever it appears in older descriptions.
 
-Fish currently documents 83 languages for S2.1-Pro and the same language coverage for `s2.1-pro-free`. This is provider coverage, not proof that NoteFIsh works equally well in all 83. A usable pair must also work with transcription and translation, and the enrolled voice must be checked in the target language. Keep provider-supported and phone-tested language pairs distinct. Do not claim every accent or dialect works.
+Fish currently documents 83 languages for S2.1-Pro and the same language coverage for `s2.1-pro-free`. This is provider coverage, not proof that NoteFish works equally well in all 83. A usable pair must also work with transcription and translation, and the enrolled voice must be checked in the target language. Keep provider-supported and phone-tested language pairs distinct. Do not claim every accent or dialect works.
 
 For the first implementation, select the customer language explicitly, with a queue default and an agent override. Captions target the agent language; replies target the customer language. Source transcripts retain their actual language. All English-specific pipeline examples below use the initial default and must not become hardcoded restrictions.
 
@@ -57,9 +57,9 @@ Call centers already have phones, tickets, and people who speak one language whi
 
 That demo is Twilio’s sample. It is full-duplex Google-Translate-on-the-call. It is not a desk, and it does not sound like a person the customer already knows.
 
-NoteFIsh takes the opposite bet:
+NoteFish takes the opposite bet:
 
-| Always-on translate | NoteFIsh |
+| Always-on translate | NoteFish |
 |---|---|
 | Both mouths open | Radio discipline: listen **or** speak |
 | Generic TTS | Enrolled / licensed voice |
@@ -134,7 +134,7 @@ Not a slide. Not a mock.
 2. **Captions move** in English on the desk.
 3. Agent **holds**, speaks English, and **that phone hears speech in the customer’s language** in the enrolled voice.
 
-Until those three are true, NoteFIsh is not NoteFIsh.
+Until those three are true, NoteFish is not NoteFish.
 
 ---
 
@@ -165,7 +165,7 @@ Until those three are true, NoteFIsh is not NoteFIsh.
 
 A Saturday hackathon cut named **VoiceNote** proved the *mechanic*: hold a key → STT → rewrite into their language → Fish TTS in **your** clone → land it in the habitat. The habitat there was WhatsApp Web. That is a different repo and a different product.
 
-NoteFIsh keeps the mechanic and changes the habitat to the **only** one that matters for this idea: a live inbound call.
+NoteFish keeps the mechanic and changes the habitat to the **only** one that matters for this idea: a live inbound call.
 
 Do not port the Chrome extension into this folder. Do not rebuild WhatsApp. The customer has a phone.
 
@@ -175,4 +175,4 @@ Do not port the Chrome extension into this folder. Do not rebuild WhatsApp. The 
 
 Idle desk: quiet. A ring. Answer. The customer’s language in the headset, English on the glass. Hold. Your voice, their language, in their handset. Release. Confirm. End.
 
-You do not “open NoteFIsh.” You sit the desk. The phone rings it.
+You do not “open NoteFish.” You sit the desk. The phone rings it.

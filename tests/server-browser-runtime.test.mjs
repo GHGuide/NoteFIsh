@@ -28,7 +28,7 @@ function trackedSocket(url, headers) {
 test('public caller shell and one-use socket admission never expose desk data or require Twilio', { timeout: 10000 }, async t => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'notefish-browser-'));
   await mkdir(path.join(directory, 'dist', 'assets'), { recursive: true });
-  await writeFile(path.join(directory, 'dist', 'index.html'), '<!doctype html><title>NoteFIsh caller</title>');
+  await writeFile(path.join(directory, 'dist', 'index.html'), '<!doctype html><title>NoteFish caller</title>');
   await writeFile(path.join(directory, 'dist', 'assets', 'app.js'), '/* public application bundle */');
   await writeFile(path.join(directory, 'dist', 'favicon.svg'), '<svg/>');
   const config = loadConfig({ NODE_ENV: 'production', PUBLIC_BASE_URL: 'https://example.test', NOTEFISH_DESK_PASSWORD: 'test-only-password-12345', DATA_DIR: directory }, directory);

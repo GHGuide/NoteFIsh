@@ -1,4 +1,4 @@
-# NoteFIsh — project spec
+# NoteFish — project spec
 
 > **Latest demo direction — 12 Sep 2026:** The user explicitly approved a browser caller page and removed Twilio from the first demo. A real phone opens an invitation link, taps Call, and speaks French; a laptop desk answers, hears the caller, and displays English captions. Holding/releasing the agent microphone produces French Fish speech in the selected approved voice. Ending retains the transcript. This supersedes older “customer never uses the site” and mandatory Twilio passages below. See the current implementation contract and Render deployment guide.
 
@@ -9,14 +9,14 @@
 **Locked:** 12 Sep 2026.  
 **Done:** a real phone in, captions moving, hold heard in the customer’s language on that phone.
 
-This file is the full write-up for building NoteFIsh. Another IDE should be able to implement from here without the chat history.
+This file is the full write-up for building NoteFish. Another IDE should be able to implement from here without the chat history.
 
 
 ## Language scope — updated 12 Sep 2026
 
-NoteFIsh supports customer languages covered by the selected Fish Audio cloning/TTS model, rather than a Dutch-only workflow. English is the initial agent-language default; the desk has an agent language and a customer language. Dutch/English is only an example pair wherever it appears in older descriptions.
+NoteFish supports customer languages covered by the selected Fish Audio cloning/TTS model, rather than a Dutch-only workflow. English is the initial agent-language default; the desk has an agent language and a customer language. Dutch/English is only an example pair wherever it appears in older descriptions.
 
-Fish currently documents 83 languages for S2.1-Pro and the same language coverage for `s2.1-pro-free`. This is provider coverage, not proof that NoteFIsh works equally well in all 83. A usable pair must also work with transcription and translation, and the enrolled voice must be checked in the target language. Keep provider-supported and phone-tested language pairs distinct. Do not claim every accent or dialect works.
+Fish currently documents 83 languages for S2.1-Pro and the same language coverage for `s2.1-pro-free`. This is provider coverage, not proof that NoteFish works equally well in all 83. A usable pair must also work with transcription and translation, and the enrolled voice must be checked in the target language. Keep provider-supported and phone-tested language pairs distinct. Do not claim every accent or dialect works.
 
 For the first implementation, select the customer language explicitly, with a queue default and an agent override. Captions target the agent language; replies target the customer language. Source transcripts retain their actual language. All English-specific pipeline examples below use the initial default and must not become hardcoded restrictions.
 
@@ -64,7 +64,7 @@ Customer phone  --PSTN-->  Twilio number  --Voice-->  Chrome /desk (JS SDK)
 - Cloning callers or coworkers from the live line
 - Always-on Google-Translate-on-the-call (Twilio’s sample; full-duplex)
 
-**NoteFIsh is half-duplex on purpose.** Listen or speak. Not both mouths open with a bot in the middle.
+**NoteFish is half-duplex on purpose.** Listen or speak. Not both mouths open with a bot in the middle.
 
 ---
 

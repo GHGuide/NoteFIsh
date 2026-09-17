@@ -23,9 +23,9 @@ export function createWebhookAdapter({ config, fetchImpl = globalThis.fetch, tim
           method: 'POST', redirect: 'error', signal: controller.signal,
           headers: {
             'Content-Type': 'application/json',
-            'X-NoteFIsh-Timestamp': String(timestamp),
-            'X-NoteFIsh-Signature': `sha256=${signature}`,
-            'X-NoteFIsh-Event': 'call.completed',
+            'X-NoteFish-Timestamp': String(timestamp),
+            'X-NoteFish-Signature': `sha256=${signature}`,
+            'X-NoteFish-Event': 'call.completed',
           },
           body: raw,
         });

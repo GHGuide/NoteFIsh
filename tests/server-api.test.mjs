@@ -74,5 +74,5 @@ test('atomic store serializes writes, persists across recreation, and rejects ma
   assert.deepEqual(reopened.snapshot(), store.snapshot());
   assert.equal((await stat(path.join(dir, 'notefish.json'))).mode & 0o777, 0o600);
   await writeFile(path.join(dir, 'invalid.json'), '{"version":1,"voices":"bad"}');
-  await assert.rejects(createStore(path.join(dir, 'invalid.json')), /Cannot load NoteFIsh data safely/);
+  await assert.rejects(createStore(path.join(dir, 'invalid.json')), /Cannot load NoteFish data safely/);
 });

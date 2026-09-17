@@ -1,5 +1,5 @@
 // Fish's published S2 model card lists these language codes. Coverage is a
-// provider claim, NOT NoteFIsh end-to-end phone verification.
+// provider claim, NOT NoteFish end-to-end phone verification.
 // https://huggingface.co/fishaudio/s2-pro#supported-languages (2026-09-12)
 // The S2.1 hosted model advertises 83 languages; retain this explicit catalog
 // rather than inventing unlisted languages to reach a marketing count.

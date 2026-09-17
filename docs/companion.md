@@ -1,4 +1,4 @@
-# NoteFIsh companion — your voice inside any call
+# NoteFish companion — your voice inside any call
 
 The desk works with phone numbers and caller links. The **companion** makes it work
 inside whatever you already use: Zoom, Google Meet, Teams, WhatsApp, FaceTime,
@@ -19,14 +19,14 @@ one app only, or `--in "device"` to use a capture device instead.
 
 ## Speaking into the call — one virtual microphone
 
-The call app needs a microphone that carries the Fish voice. Install **NoteFIsh
+The call app needs a microphone that carries the Fish voice. Install **NoteFish
 Voice** (our own driver, MIT, see [driver/README.md](../driver/README.md)):
 
 ```bash
 sh driver/install.sh
 ```
 
-then set the call app's **microphone** to *NoteFIsh Voice*. The companion finds it
+then set the call app's **microphone** to *NoteFish Voice*. The companion finds it
 by name and streams into it. BlackHole (`brew install blackhole-2ch`, GPL) works as
 an alternative with `--out "BlackHole 2ch"`.
 

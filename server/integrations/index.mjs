@@ -4,7 +4,7 @@ import { createZendeskAdapter } from './zendesk.mjs';
 const RETRY_MS = [1000, 5000, 20000];
 
 /**
- * Outbound only. A completed call leaves NoteFIsh as a ticket somewhere else;
+ * Outbound only. A completed call leaves NoteFish as a ticket somewhere else;
  * nothing an adapter returns re-enters the call path. `deliver(call)` is the
  * whole interface, so a new destination is one file and one line here.
  */

@@ -1,6 +1,6 @@
 # UI polish verification
 
-Verified on 12 September 2026. This receipt covers the NoteFIsh interface update and its regression checks; it is not a complete live-call acceptance result. The original release checks below predate the later, explicitly requested shared-demo access change.
+Verified on 12 September 2026. This receipt covers the NoteFish interface update and its regression checks; it is not a complete live-call acceptance result. The original release checks below predate the later, explicitly requested shared-demo access change.
 
 ## Changes
 

@@ -10,7 +10,7 @@ import { createRuntime } from '../server/index.mjs';
 test('shared demo opens the workspace without a login challenge while preserving Origin and caller transport isolation', async t => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'notefish-shared-'));
   await mkdir(path.join(directory, 'dist'));
-  await writeFile(path.join(directory, 'dist/index.html'), '<!doctype html><title>NoteFIsh test</title>');
+  await writeFile(path.join(directory, 'dist/index.html'), '<!doctype html><title>NoteFish test</title>');
   const config = loadConfig({ NODE_ENV: 'production', NOTEFISH_PUBLIC_DEMO: 'true', PUBLIC_BASE_URL: 'https://example.test', DATA_DIR: directory, FISH_API_KEY: 'fish-test-only', OPENAI_API_KEY: 'openai-test-only' }, directory);
   let providerCalls = 0;
   const providers = { async createVoice() { providerCalls++; throw new Error('Unexpected provider request'); } };

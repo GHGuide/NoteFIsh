@@ -24,19 +24,19 @@ number, and the ability to plug into existing call-centre platforms — plus
 
 ## Goal
 
-Turn the single-seat NoteFIsh desk into something a small call centre (5–20
+Turn the single-seat NoteFish desk into something a small call centre (5–20
 agents) can actually run a shift on: agents sign in, real customers dial a real
 number, calls queue and route, and finished calls leave the building as tickets
 in whatever system the centre already uses.
 
 ## Rule change required first
 
-`AGENTS.md` currently says NoteFIsh is **not** "an integration hub" and **not**
+`AGENTS.md` currently says NoteFish is **not** "an integration hub" and **not**
 a "Flex / Genesys rebuild". Workstream C contradicts the first half of that.
 
 The proposed amendment keeps the spirit and narrows the ban:
 
-> NoteFIsh is not a Flex / Genesys rebuild and does not become a surface for
+> NoteFish is not a Flex / Genesys rebuild and does not become a surface for
 > Slack, email, wiki or CRM *inside* the desk. It does emit completed calls
 > outward — transcript, ticket, audio reference — over a signed webhook and a
 > read API, so an existing ticketing system stays the system of record.
@@ -245,7 +245,7 @@ Per workstream, in order:
   concurrent real calls.
 - **C:** `npm test` with a local webhook receiver asserting signature, retry
   and ordering. Then one real ticket in the chosen system.
-- **D:** A person who has never seen NoteFIsh reaches "took a call" without
+- **D:** A person who has never seen NoteFish reaches "took a call" without
   being told what to do.
 
 Build and container checks stay intermediate evidence. The phone test is the

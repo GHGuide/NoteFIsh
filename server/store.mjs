@@ -26,7 +26,7 @@ export function migrateState(state) {
 }
 
 export function validateState(state) {
-  if (!plain(state) || state.version !== VERSION || !Array.isArray(state.voices) || state.voices.length > 1000 || !Array.isArray(state.calls) || state.calls.length > 1000 || !plain(state.settings) || !Array.isArray(state.agents) || state.agents.length > MAX_AGENTS) throw new Error('Stored NoteFIsh data has an invalid structure');
+  if (!plain(state) || state.version !== VERSION || !Array.isArray(state.voices) || state.voices.length > 1000 || !Array.isArray(state.calls) || state.calls.length > 1000 || !plain(state.settings) || !Array.isArray(state.agents) || state.agents.length > MAX_AGENTS) throw new Error('Stored NoteFish data has an invalid structure');
   for (const agent of state.agents) {
     if (!plain(agent) || !text(agent.id, 128) || !agent.id || !text(agent.name, 100) || !agent.name.trim()
       || !(agent.voiceId === null || text(agent.voiceId, 128))
@@ -66,15 +66,15 @@ export async function createStore(filePath) {
   let state = initialState();
   try {
     const info = await stat(filePath);
-    if (info.size > MAX_STATE) throw new Error('Stored NoteFIsh data exceeds the size limit');
+    if (info.size > MAX_STATE) throw new Error('Stored NoteFish data exceeds the size limit');
     state = validateState(migrateState(JSON.parse(await readFile(filePath, 'utf8'))));
   } catch (error) {
-    if (error.code !== 'ENOENT') throw new Error('Cannot load NoteFIsh data safely; inspect the local data file without sharing its private contents');
+    if (error.code !== 'ENOENT') throw new Error('Cannot load NoteFish data safely; inspect the local data file without sharing its private contents');
   }
   let pending = Promise.resolve();
   const persist = async (next) => {
     const encoded = JSON.stringify(validateState(next));
-    if (Buffer.byteLength(encoded) > MAX_STATE) throw new Error('NoteFIsh storage is full. Archive or export older call data before continuing');
+    if (Buffer.byteLength(encoded) > MAX_STATE) throw new Error('NoteFish storage is full. Archive or export older call data before continuing');
     await mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
     const temporary = `${filePath}.tmp`;
     const handle = await open(temporary, 'w', 0o600);

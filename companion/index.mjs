@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// NoteFIsh companion (macOS). Sits next to any call — Zoom, Meet, Teams, WhatsApp,
+// NoteFish companion (macOS). Sits next to any call — Zoom, Meet, Teams, WhatsApp,
 // FaceTime, Instagram, whatever is using the microphone — and bridges it through
-// your NoteFIsh desk: the other side's audio becomes captions, your replies come
+// your NoteFish desk: the other side's audio becomes captions, your replies come
 // back in your cloned voice and go into the call as its microphone.
 //
 //   npm run companion -- --watch            detect calls and bridge them
@@ -139,7 +139,7 @@ async function startBridge(label, devices) {
     });
     session.capture.on('exit', code => { session.capture = null; if (!session.ended && code) log('capture stopped', code); });
   };
-  // Streamed replies: into the NoteFIsh Voice driver over UDP (paced 20 ms packets at 48 kHz), or through ffmpeg for any other device; 'played' follows the last byte's play time.
+  // Streamed replies: into the NoteFish Voice driver over UDP (paced 20 ms packets at 48 kHz), or through ffmpeg for any other device; 'played' follows the last byte's play time.
   let stream = null;
   const udp = devices.output.udp ? dgram.createSocket('udp4') : null;
   const toDriver = (chunk16k) => {
@@ -231,10 +231,11 @@ if (args.listDevices) {
 const tap = args.in === undefined && await ensureTap();
 const input = tap ? { index: -1, name: args.bundle ? `tap · ${args.bundle}` : 'tap · system audio' } : pick(devices.inputs, args.in, ['BlackHole 16ch', 'BlackHole']);
 // Speaking into the call still needs a virtual microphone the call app can select.
-const voiceDriver = devices.inputs.find(d => d.name === 'NoteFIsh Voice') || devices.outputs.find(d => d.name === 'NoteFIsh Voice');
-const output = args.out === undefined && voiceDriver ? { index: -1, name: 'NoteFIsh Voice', udp: true } : pick(devices.outputs, args.out, ['BlackHole 2ch', 'BlackHole']);
+const isVoiceDriver = d => /^NoteF[Ii]sh Voice$/.test(d.name); // an install from before the rename still answers
+const voiceDriver = devices.inputs.find(isVoiceDriver) || devices.outputs.find(isVoiceDriver);
+const output = args.out === undefined && voiceDriver ? { index: -1, name: 'NoteFish Voice', udp: true } : pick(devices.outputs, args.out, ['BlackHole 2ch', 'BlackHole']);
 if (!input || !output) {
-  console.error(`No virtual microphone found for speaking into the call. Install the NoteFIsh Voice driver (driver/README.md) or BlackHole:\n  brew install blackhole-2ch\nthen set the call app's microphone to it. Or pass --out explicitly (see --list-devices).`);
+  console.error(`No virtual microphone found for speaking into the call. Install the NoteFish Voice driver (driver/README.md) or BlackHole:\n  brew install blackhole-2ch\nthen set the call app's microphone to it. Or pass --out explicitly (see --list-devices).`);
   process.exit(2);
 }
 if (!tap && input.name === output.name) console.error(`Warning: listening to and speaking into the same device (${input.name}) will echo your own replies back as captions. Use two devices.`);

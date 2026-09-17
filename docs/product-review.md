@@ -1,16 +1,16 @@
-# NoteFIsh — feasibility and suggested changes
+# NoteFish — feasibility and suggested changes
 
 Reviewed 12 Sep 2026. This is documentation research, not a tested integration.
 
 ## Adopted changes
 
-- Product name: **NoteFIsh**. Existing `hold-project.md` filename remains so links keep working.
+- Product name: **NoteFish**. Existing `hold-project.md` filename remains so links keep working.
 - Customer languages: those supported by the chosen Fish model, with transcription, translation, and target-language voice testing required before claiming working support. English is the initial agent default.
 - The product remains a website for agents, backed by a server. Customers use ordinary phones.
 
 ## Connecting a website to Twilio
 
-For a first prototype, obtain a voice-capable Twilio number. Deploy the NoteFIsh website and a backend with a public HTTPS incoming-call endpoint and a persistent WSS audio endpoint. Configure the number's incoming-call webhook to point to that backend. The backend returns TwiML telling Twilio how to handle the call. NoteFIsh then handles ringing/answering, captions, agent microphone capture, and translated audio playback through the chosen topology.
+For a first prototype, obtain a voice-capable Twilio number. Deploy the NoteFish website and a backend with a public HTTPS incoming-call endpoint and a persistent WSS audio endpoint. Configure the number's incoming-call webhook to point to that backend. The backend returns TwiML telling Twilio how to handle the call. NoteFish then handles ringing/answering, captions, agent microphone capture, and translated audio playback through the chosen topology.
 
 This requires application code; pasting a website homepage into Twilio does not build the audio bridge. A static website alone cannot host the persistent media processing. No account was connected and no number was purchased during this review.
 
@@ -29,7 +29,7 @@ Sources: [browser SDK](https://www.twilio.com/docs/voice/sdks/javascript), [Medi
 
 ## Proposed first topology — not yet adopted or tested
 
-Test a caller connected to a bidirectional Twilio stream, with the NoteFIsh backend forwarding caller audio and call events to the agent website over a separate browser connection. Capture agent push-to-talk separately; return only Fish speech to the caller. The browser Answer action would be an application-level acceptance action; the server must implement caller waiting, no-answer handling, and audio playback timing explicitly. This differs from answering a Twilio SDK call and may affect when Twilio considers the phone call answered.
+Test a caller connected to a bidirectional Twilio stream, with the NoteFish backend forwarding caller audio and call events to the agent website over a separate browser connection. Capture agent push-to-talk separately; return only Fish speech to the caller. The browser Answer action would be an application-level acceptance action; the server must implement caller waiting, no-answer handling, and audio playback timing explicitly. This differs from answering a Twilio SDK call and may affect when Twilio considers the phone call answered.
 
 This avoids mixing a conference and a bidirectional stream on the same caller leg, but adds browser audio transport/playback work. Compare it against an SDK-based design in a small phone experiment before replacing the existing SDK requirement. Do not claim either design works without a handset test.
 
@@ -46,4 +46,4 @@ This avoids mixing a conference and a bidirectional stream on the same caller le
 9. Measure release-to-first-audio delay, complete-turn time, translation accuracy, caller comprehension, interruptions, and cost per completed call. Provider first-audio latency is only one part of total delay.
 10. Prove the risky path first: one real phone hears one Fish-generated reply, then add browser listening/captions/PTT around it. A polished desk alone will not validate the product.
 
-Fish documents 83 languages for S2.1-Pro, including the same coverage in its free development variant. It recommends the paid model for production requirements; the free variant has fair-use limits and no time-to-first-audio guarantees. This is provider information, not a NoteFIsh performance measurement. [Fish model documentation](https://docs.fish.audio/developer-guide/models-pricing/models-overview).
+Fish documents 83 languages for S2.1-Pro, including the same coverage in its free development variant. It recommends the paid model for production requirements; the free variant has fair-use limits and no time-to-first-audio guarantees. This is provider information, not a NoteFish performance measurement. [Fish model documentation](https://docs.fish.audio/developer-guide/models-pricing/models-overview).

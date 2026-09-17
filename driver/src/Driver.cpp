@@ -1,6 +1,6 @@
-// NoteFIsh Voice — a virtual microphone for macOS built on libASPL (MIT).
+// NoteFish Voice — a virtual microphone for macOS built on libASPL (MIT).
 //
-// Call apps (Zoom, WhatsApp, Meet in a browser, FaceTime…) pick "NoteFIsh Voice" as
+// Call apps (Zoom, WhatsApp, Meet in a browser, FaceTime…) pick "NoteFish Voice" as
 // their microphone. The companion sends the Fish voice to this driver as 48 kHz
 // mono PCM16 over UDP on 127.0.0.1:47321; whatever arrives is what the call hears.
 // Nothing else ever reaches the call: no real microphone is involved.
@@ -98,8 +98,8 @@ std::shared_ptr<aspl::Driver> CreateDriver() {
     auto context = std::make_shared<aspl::Context>();
 
     aspl::DeviceParameters deviceParams;
-    deviceParams.Name = "NoteFIsh Voice";
-    deviceParams.Manufacturer = "NoteFIsh";
+    deviceParams.Name = "NoteFish Voice";
+    deviceParams.Manufacturer = "NoteFish";
     deviceParams.DeviceUID = "com.notefish.voice";
     deviceParams.ModelUID = "com.notefish.voice.model";
     deviceParams.SampleRate = kSampleRate;

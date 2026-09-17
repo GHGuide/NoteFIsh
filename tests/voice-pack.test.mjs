@@ -19,7 +19,7 @@ test('a voice pack round-trips the reference and the takes, and nothing private'
   assert.equal(parsed[0].kind, 'enrolled'); assert.equal(parsed[0].language, 'fr');
 
   assert.equal(parsePack({ referenceId: 'abcdef123456', name: 'Single' })[0].name, 'Single', 'a single exported voice also imports');
-  assert.throws(() => parsePack('{"hello":1}'), /not a NoteFIsh voice file/);
+  assert.throws(() => parsePack('{"hello":1}'), /not a NoteFish voice file/);
   assert.throws(() => parsePack({ kind: PACK_KIND, voices: [{ referenceId: 'x', name: 'Bad' }] }), /valid Fish reference/);
   assert.throws(() => parsePack({ kind: PACK_KIND, voices: [{ referenceId: 'abcdef123456', name: '' }] }), /needs a name/);
   assert.throws(() => parsePack({ kind: PACK_KIND, voices: [{ referenceId: 'abcdef123456', name: 'X', register: 'shouting' }] }), /unknown take/);

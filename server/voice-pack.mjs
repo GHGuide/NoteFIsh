@@ -1,5 +1,5 @@
 // A voice pack is what leaves and enters the library as a file: the Fish reference
-// and the metadata NoteFIsh keeps about it. The model itself stays on Fish Audio;
+// and the metadata NoteFish keeps about it. The model itself stays on Fish Audio;
 // importing a pack re-attaches to it by reference, after Fish confirms it exists.
 import { REGISTERS, canonicalRegister } from './emotion.mjs';
 
@@ -24,9 +24,9 @@ export function buildPack(voices, { exportedBy = '' } = {}) {
 /** Validates a pack from anywhere; throws with a plain message. Returns clean voices. */
 export function parsePack(input) {
   const pack = typeof input === 'string' ? JSON.parse(input) : input;
-  if (!pack || typeof pack !== 'object' || Array.isArray(pack)) throw new Error('This is not a NoteFIsh voice file.');
+  if (!pack || typeof pack !== 'object' || Array.isArray(pack)) throw new Error('This is not a NoteFish voice file.');
   const voices = pack.kind === PACK_KIND ? pack.voices : pack.referenceId ? [pack] : null;
-  if (!Array.isArray(voices) || !voices.length || voices.length > 100) throw new Error('This is not a NoteFIsh voice file.');
+  if (!Array.isArray(voices) || !voices.length || voices.length > 100) throw new Error('This is not a NoteFish voice file.');
   return voices.map((voice, index) => {
     if (!voice || typeof voice !== 'object' || !REFERENCE.test(voice.referenceId || '')) throw new Error(`Voice ${index + 1} has no valid Fish reference.`);
     if (!text(voice.name, 100) || !voice.name.trim()) throw new Error(`Voice ${index + 1} needs a name.`);

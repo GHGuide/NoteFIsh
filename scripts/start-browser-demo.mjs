@@ -40,7 +40,7 @@ async function main() {
     await runtime.close(); process.exitCode = 1;
   });
   runtime.server.listen(config.port, config.host, () => {
-    console.log(`NoteFIsh browser demo is listening on local port ${config.port}. Desk username: desk. The password remains in the ignored local .env file.`);
+    console.log(`NoteFish browser demo is listening on local port ${config.port}. Desk username: desk. The password remains in the ignored local .env file.`);
   });
   let stopping = false;
   const stop = async () => { if (stopping) return; stopping = true; await runtime.close(); process.exit(0); };

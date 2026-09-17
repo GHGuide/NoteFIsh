@@ -1,4 +1,4 @@
-# NoteFIsh demo video
+# NoteFish demo video
 
 Use the deployed HTTPS call desk at https://notefish.onrender.com/desk. The demonstration is one browser conversation: English-speaking agent, French-speaking partner, translated French replies through the selected Fish voice. Twilio is not required.
 

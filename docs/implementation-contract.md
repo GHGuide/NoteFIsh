@@ -1,4 +1,4 @@
-# NoteFIsh implementation contract
+# NoteFish implementation contract
 
 12 Sep 2026. The latest user explicitly approves a phone-browser caller page and removes Twilio from the first demo. The website includes voice library, cloning, management, call desk, setup, and invitation-only caller. English agent / French caller is the acceptance pair.
 
@@ -97,8 +97,8 @@ where a null override inherits the workspace default and `registers` maps
   `TWILIO_AUTH_TOKEN` and `PUBLIC_BASE_URL` are still required.
 - Outbound delivery, one-way. A completed call is sent to every configured
   adapter: a signed webhook (`NOTEFISH_WEBHOOK_URL` + `NOTEFISH_WEBHOOK_SECRET`,
-  header `X-NoteFIsh-Signature: sha256=HMAC(secret,"<timestamp>.<raw body>")`
-  with `X-NoteFIsh-Timestamp` for replay rejection) and Zendesk
+  header `X-NoteFish-Signature: sha256=HMAC(secret,"<timestamp>.<raw body>")`
+  with `X-NoteFish-Timestamp` for replay rejection) and Zendesk
   (`ZENDESK_SUBDOMAIN`, `ZENDESK_EMAIL`, `ZENDESK_API_TOKEN`), which files one
   ticket per call keyed by `external_id`. Retries are 1s/5s/20s; a 4xx other
   than 429 is not retried. Delivery failure never affects the call.

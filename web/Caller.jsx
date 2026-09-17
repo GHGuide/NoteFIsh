@@ -99,7 +99,7 @@ export default function Caller() {
 
   useEffect(() => {
     document.documentElement.lang = language;
-    document.title = language === 'fr' ? 'Votre appel · NoteFIsh' : 'Your call · NoteFIsh';
+    document.title = language === 'fr' ? 'Votre appel · NoteFish' : 'Your call · NoteFish';
   }, [language]);
   useEffect(() => {
     const leave = () => { const session = runtime.current; if (!session) return; session.ended = true; clearTimeout(session.timeout); session.audio?.stop(); if (session.socket?.readyState === WebSocket.OPEN) { session.socket.send(JSON.stringify({ type: 'end' })); session.socket.close(1000); } };
@@ -207,7 +207,7 @@ export default function Caller() {
   const heading = state === 'ended' ? copy.ended : state === 'unavailable' || (state === 'error' && used) ? copy.unavailable : connected ? copy.live : state === 'ringing' ? copy.ringing : state === 'connecting' ? copy.connecting : copy.title;
   const body = state === 'ended' ? copy.endedBody : state === 'unavailable' || (state === 'error' && used) ? copy.newLink : connected ? playing ? copy.playing : phase !== 'listening' ? copy.translating : microphoneMuted ? copy.mutedByYou : deviceMuted ? copy.deviceMuted : copy.listening : state === 'ringing' ? copy.waiting : state === 'connecting' ? microphoneReady ? copy.waiting : copy.preparing : copy.intro;
   return <div className="caller-page" lang={language}>
-    <header className="caller-header"><div className="wordmark"><span className="brand-mark"><AudioLines size={23} /></span>NoteFIsh<span className="wordmark-dot">.</span></div><button className="caller-language" onClick={() => setLanguage(language === 'fr' ? 'en' : 'fr')} aria-label={language === 'fr' ? 'Switch to English' : 'Passer en français'}><Globe2 size={14} />{language === 'fr' ? 'FR' : 'EN'}</button></header>
+    <header className="caller-header"><div className="wordmark"><span className="brand-mark"><AudioLines size={23} /></span>NoteFish<span className="wordmark-dot">.</span></div><button className="caller-language" onClick={() => setLanguage(language === 'fr' ? 'en' : 'fr')} aria-label={language === 'fr' ? 'Switch to English' : 'Passer en français'}><Globe2 size={14} />{language === 'fr' ? 'FR' : 'EN'}</button></header>
     <main className="caller-main"><div className={`caller-orb ${inProgress ? 'is-active' : ''} ${playing ? 'is-playing' : ''}`} aria-hidden="true">{state === 'ended' ? <CheckCircle2 size={45} strokeWidth={1} /> : playing ? <Volume2 size={45} strokeWidth={1} /> : state === 'connecting' ? <Loader2 className="spin" size={42} strokeWidth={1} /> : <AudioLines size={49} strokeWidth={1} />}</div><span className="eyebrow">{copy.label}</span><div className="caller-state" role="status" aria-live="polite"><h1>{heading}</h1><p>{body}</p></div>
       {inProgress && <div className={`caller-mic-state ${microphoneLive ? 'is-live' : ''}`}>{microphoneLive ? <Mic size={14} /> : <MicOff size={14} />}<span>{microphoneLive ? copy.microphone : copy.muted}</span></div>}
       {connected && <div className={`caller-live-audio ${playing ? 'is-playing' : ''}`}>

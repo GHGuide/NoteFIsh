@@ -72,10 +72,10 @@ export function createSecurity(config) {
     if (!canAccessDesk(req, config)) {
       if (attempt?.until > now) attempt.count++; else attempts.set(ip, { count: 1, until: now + 60_000 });
       if (!config.deskPassword || !config.publicBaseUrl) return res.status(503).json({ error: 'Public desk access requires PUBLIC_BASE_URL and NOTEFISH_DESK_PASSWORD on the server.', code: 'PUBLIC_ACCESS_UNCONFIGURED' });
-      res.set('WWW-Authenticate', 'Basic realm="NoteFIsh desk", charset="UTF-8"');
+      res.set('WWW-Authenticate', 'Basic realm="NoteFish desk", charset="UTF-8"');
       return res.status(401).json({ error: 'Sign in with username desk and the configured desk password.', code: 'AUTH_REQUIRED' });
     }
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !validOrigin(req, config)) return res.status(403).json({ error: 'This action must originate from the NoteFIsh website.', code: 'INVALID_ORIGIN' });
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !validOrigin(req, config)) return res.status(403).json({ error: 'This action must originate from the NoteFish website.', code: 'INVALID_ORIGIN' });
     next();
   };
 }

@@ -1,6 +1,6 @@
 # Pickup (other IDE)
 
-You are continuing **NoteFIsh**. This folder is the idea pack, not a running app.
+You are continuing **NoteFish**. This folder is the idea pack, not a running app.
 
 ## Read in this order
 
