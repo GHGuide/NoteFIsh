@@ -9,19 +9,26 @@ says (captions and translation appear on the desk as usual), and it speaks your
 translated replies **into the call as the microphone**. Your real voice never
 enters the call — only the Fish voice does, same as on the phone desk.
 
-## One-time audio setup (macOS)
+## Hearing the call — nothing to install
 
-Two virtual audio devices, one to hear the call and one to speak into it:
+On macOS 14.2+ the companion taps what the Mac is playing with a Core Audio process
+tap (`companion/system-audio-tap.swift`, built on first run). No virtual device, no
+Audio MIDI Setup; the call keeps playing through your speakers or headphones.
+macOS asks once for **System Audio Recording**. Pass `--bundle us.zoom.xos` to tap
+one app only, or `--in "device"` to use a capture device instead.
+
+## Speaking into the call — one virtual microphone
+
+The call app needs a microphone that carries the Fish voice. Install **NoteFIsh
+Voice** (our own driver, MIT, see [driver/README.md](../driver/README.md)):
 
 ```bash
-brew install blackhole-2ch blackhole-16ch
+sh driver/install.sh
 ```
 
-Then in **Audio MIDI Setup** (Applications › Utilities):
-
-1. `+` › **Create Multi-Output Device**: tick your speakers/headphones **and** `BlackHole 16ch`. Name it *Call + NoteFIsh*.
-2. In the call app, set the **speaker** to *Call + NoteFIsh* (or make it the system output). You still hear the call; the companion hears it too.
-3. In the call app, set the **microphone** to `BlackHole 2ch`. That is where NoteFIsh speaks.
+then set the call app's **microphone** to *NoteFIsh Voice*. The companion finds it
+by name and streams into it. BlackHole (`brew install blackhole-2ch`, GPL) works as
+an alternative with `--out "BlackHole 2ch"`.
 
 Check what the companion sees:
 
@@ -29,7 +36,7 @@ Check what the companion sees:
 npm run companion -- --list-devices
 ```
 
-Other devices work too: `--in "Name or index"` for what to listen to, `--out "Name or index"` for where to speak. Never use one device for both — you would hear your own replies as captions.
+Other devices: `--in "Name or index"` to listen to a capture device instead of the tap, `--out "Name or index"` to speak somewhere else. Never use one device for both — you would hear your own replies as captions.
 
 ## Run it
 
@@ -44,7 +51,7 @@ npm run companion -- --start "Zoom"                  # bridge right now, whateve
 npm run companion -- --watch --as Nina --auto-answer # hands-free: sign in as Nina on the roster and pick up
 ```
 
-The desk is where you talk: hold to speak or type, pick a **Sound**, use canned lines. Captions from the call print in the terminal as well.
+The desk is where you talk: hold to speak or type, pick a **Sound**, use canned lines. Captions from the call print in the terminal as well. Captions are live (OpenAI Realtime, the phrase lands ~0.4 s after they pause) and replies stream from Fish (first sound in ~1 s, played as it arrives).
 
 ## How it joins
 
@@ -52,7 +59,7 @@ The companion asks the desk for a *local* caller invitation (`POST /api/caller-i
 
 ## Limits
 
-- macOS only for now (CoreAudio, AppleScript, `ffmpeg` with avfoundation + audiotoolbox — the Homebrew build has both).
+- macOS 14.2+ (Core Audio taps). `ffmpeg` is only needed for `--in`/`--out` devices other than the driver.
 - Half-duplex, like the desk: while a reply plays, the call's audio is not captioned.
 - Detection is a best guess: tab titles and process names, then the microphone light. A false start is harmless — decline it on the desk.
 - Windows/Linux: the same bridge would run on VB-Cable / PulseAudio loopback; not built.

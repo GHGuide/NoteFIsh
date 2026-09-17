@@ -115,10 +115,56 @@ export class BrowserCallAudio {
   }
   clearPlayback() {
     this.generation += 1;
+    this.reply = null;
     const source = this.source;
     this.source = null;
     if (source) { source.onended = null; try { source.stop(); } catch {} try { source.disconnect(); } catch {} }
     this.onPlayback?.(false);
+  }
+  /** A streamed reply: PCM16 chunks scheduled back to back as they arrive; played is
+   * acknowledged when the last scheduled buffer has actually finished. */
+  beginStream(playbackId, sampleRate = 16000) {
+    this.clearPlayback();
+    if (this.disposed || this.context.state !== 'running') return;
+    this.reply = { playbackId, sampleRate, generation: this.generation, nextTime: 0, pending: 0, ended: false };
+    this.setListening(false);
+    this.onPlayback?.(true);
+  }
+  pushChunk(playbackId, payload) {
+    const stream = this.reply;
+    if (!stream || stream.playbackId !== playbackId || stream.generation !== this.generation || this.disposed) return;
+    const encoded = atob(payload);
+    const samples = new Int16Array(Math.floor(encoded.length / 2));
+    for (let index = 0; index < samples.length; index++) samples[index] = (encoded.charCodeAt(index * 2) | (encoded.charCodeAt(index * 2 + 1) << 8)) << 16 >> 16;
+    if (!samples.length) return;
+    const buffer = this.context.createBuffer(1, samples.length, stream.sampleRate);
+    const channel = buffer.getChannelData(0);
+    for (let index = 0; index < samples.length; index++) channel[index] = samples[index] / 32768;
+    const source = this.context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.playbackAnalyser);
+    const start = Math.max(this.context.currentTime + 0.02, stream.nextTime);
+    stream.nextTime = start + buffer.duration;
+    stream.pending += 1;
+    source.onended = () => {
+      source.disconnect();
+      if (this.reply !== stream) return;
+      stream.pending -= 1;
+      if (stream.ended && stream.pending === 0) this.finishStream(stream);
+    };
+    source.start(start);
+  }
+  endStream(playbackId) {
+    const stream = this.reply;
+    if (!stream || stream.playbackId !== playbackId) return;
+    stream.ended = true;
+    if (stream.pending === 0) this.finishStream(stream);
+  }
+  finishStream(stream) {
+    if (this.reply !== stream) return;
+    this.reply = null;
+    this.onPlayback?.(false);
+    this.onPlayed(stream.playbackId);
   }
   async play(payload, playbackId) {
     this.clearPlayback();

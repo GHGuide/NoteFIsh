@@ -1,0 +1,18 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The desk and the pill, served by the local NoteFIsh server.",
+  "windows": ["main", "pill"],
+  "remote": { "urls": ["http://127.0.0.1:3001/*", "http://localhost:3001/*"] },
+  "permissions": [
+    "core:default",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:event:allow-emit",
+    "core:window:allow-start-dragging",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "positioner:default"
+  ]
+}

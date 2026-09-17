@@ -19,6 +19,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import WebSocket from 'ws';
+import dgram from 'node:dgram';
 import { detectCall, processNames } from './detect.mjs';
 
 const run = promisify(execFile);
@@ -84,6 +85,12 @@ function pick(list, wanted, fallbacks) {
 
 // ---- what is going on on this Mac ----
 const micProbe = path.join(here, 'bin', 'mic-in-use');
+const tapBinary = path.join(here, 'bin', 'system-audio-tap');
+async function ensureTap() {
+  if (existsSync(tapBinary)) return true;
+  try { mkdirSync(path.dirname(tapBinary), { recursive: true }); await run('swiftc', ['-O', path.join(here, 'system-audio-tap.swift'), '-o', tapBinary]); return true; }
+  catch { return false; }
+}
 async function ensureMicProbe() {
   if (existsSync(micProbe)) return true;
   try { mkdirSync(path.dirname(micProbe), { recursive: true }); await run('swiftc', ['-O', path.join(here, 'mic-in-use.swift'), '-o', micProbe]); return true; }
@@ -120,7 +127,9 @@ async function startBridge(label, devices) {
   const stopCapture = () => { if (session.capture) { session.capture.kill('SIGTERM'); session.capture = null; } };
   const startCapture = () => {
     if (session.capture || session.ended) return;
-    session.capture = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'avfoundation', '-i', `:${devices.input.index}`, '-ac', '1', '-ar', '16000', '-f', 's16le', 'pipe:1'], { stdio: ['ignore', 'pipe', 'inherit'] });
+    session.capture = devices.tap
+      ? spawn(tapBinary, args.bundle ? [String(args.bundle)] : [], { stdio: ['ignore', 'pipe', 'inherit'] })
+      : spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'avfoundation', '-i', `:${devices.input.index}`, '-ac', '1', '-ar', '16000', '-f', 's16le', 'pipe:1'], { stdio: ['ignore', 'pipe', 'inherit'] });
     session.capture.stdout.on('data', chunk => {
       session.pending = Buffer.concat([session.pending, chunk]);
       while (session.pending.length >= FRAME) {
@@ -130,9 +139,52 @@ async function startBridge(label, devices) {
     });
     session.capture.on('exit', code => { session.capture = null; if (!session.ended && code) log('capture stopped', code); });
   };
+  // Streamed replies: into the NoteFIsh Voice driver over UDP (paced 20 ms packets at 48 kHz), or through ffmpeg for any other device; 'played' follows the last byte's play time.
+  let stream = null;
+  const udp = devices.output.udp ? dgram.createSocket('udp4') : null;
+  const toDriver = (chunk16k) => {
+    // 16 kHz → 48 kHz: each sample becomes three, linearly interpolated.
+    const frames = Math.floor(chunk16k.length / 2); const out = Buffer.allocUnsafe(frames * 6);
+    for (let i = 0; i < frames; i++) { const a = chunk16k.readInt16LE(i * 2), b = i + 1 < frames ? chunk16k.readInt16LE(i * 2 + 2) : a; out.writeInt16LE(a, i * 6); out.writeInt16LE(Math.round(a + (b - a) / 3), i * 6 + 2); out.writeInt16LE(Math.round(a + (b - a) * 2 / 3), i * 6 + 4); }
+    return out;
+  };
+  const beginStream = (playbackId, sampleRate = 16000) => {
+    endStreamNow();
+    if (udp) { stream = { playbackId, sampleRate, bytes: 0, startedAt: Date.now(), queue: [], timer: null }; session.playing = true; return; }
+    const player = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 's16le', '-ar', String(sampleRate), '-ac', '1', '-i', 'pipe:0', '-f', 'audiotoolbox', '-audio_device_index', String(devices.output.index), '-'], { stdio: ['pipe', 'ignore', 'ignore'] });
+    stream = { playbackId, sampleRate, player, bytes: 0, startedAt: Date.now() };
+    session.playing = true;
+  };
+  const pushChunk = (playbackId, payload) => {
+    if (!stream || stream.playbackId !== playbackId) return;
+    const chunk = Buffer.from(payload, 'base64'); stream.bytes += chunk.length;
+    if (udp) {
+      // Pace the driver: 20 ms of 48 kHz mono per packet, sent on the clock, so its ring never runs dry or overflows.
+      const pcm48 = toDriver(chunk);
+      for (let offset = 0; offset < pcm48.length; offset += 1920) stream.queue.push(pcm48.subarray(offset, offset + 1920));
+      if (!stream.timer) { const current = stream; stream.timer = setInterval(() => { const packet = current.queue.shift(); if (packet) udp.send(packet, 47321, '127.0.0.1'); else if (current.done) { clearInterval(current.timer); current.timer = null; } }, 20); }
+      return;
+    }
+    if (stream.player.stdin.writable) stream.player.stdin.write(chunk);
+  };
+  const endStream = playbackId => {
+    if (!stream || stream.playbackId !== playbackId) return;
+    const current = stream; if (udp) current.done = true; else current.player.stdin.end();
+    const remaining = Math.max(0, current.bytes / (current.sampleRate * 2) * 1000 - (Date.now() - current.startedAt)) + 150;
+    setTimeout(() => { if (stream === current) { stream = null; session.playing = false; if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'played', playbackId })); } }, remaining);
+  };
+  const endStreamNow = () => { if (stream) { if (stream.timer) clearInterval(stream.timer); try { stream.player?.kill('SIGTERM'); } catch { /* gone */ } stream = null; session.playing = false; } };
   const play = (payload, playbackId) => {
     const file = path.join(tmpdir(), `notefish-${playbackId}.mp3`);
     writeFileSync(file, Buffer.from(payload, 'base64'));
+    if (udp) {
+      // Decode to 16 kHz PCM with ffmpeg, then feed it like a streamed reply.
+      const decoder = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-i', file, '-ac', '1', '-ar', '16000', '-f', 's16le', 'pipe:1'], { stdio: ['ignore', 'pipe', 'ignore'] });
+      beginStream(playbackId, 16000);
+      decoder.stdout.on('data', chunk => pushChunk(playbackId, chunk.toString('base64')));
+      decoder.on('exit', () => { rmSync(file, { force: true }); endStream(playbackId); });
+      return;
+    }
     session.playing = true;
     const player = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-nostdin', '-i', file, '-f', 'audiotoolbox', '-audio_device_index', String(devices.output.index), '-'], { stdio: 'ignore' });
     player.on('exit', () => { session.playing = false; rmSync(file, { force: true }); if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'played', playbackId })); });
@@ -149,6 +201,10 @@ async function startBridge(label, devices) {
       if (message.error) log('desk:', message.error);
     }
     if (message.type === 'audio' && message.payload && message.playbackId) play(message.payload, message.playbackId);
+    if (message.type === 'audio-start' && message.playbackId) beginStream(message.playbackId, message.sampleRate);
+    if (message.type === 'audio-chunk' && message.playbackId && message.payload) pushChunk(message.playbackId, message.payload);
+    if (message.type === 'audio-end' && message.playbackId) endStream(message.playbackId);
+    if (message.type === 'clear') endStreamNow();
     if (message.type === 'caption' && message.text) log(`${message.who === 'agent' ? '   you →' : '  them →'} ${message.text}`);
     if (message.type === 'error') log('desk:', message.error);
   });
@@ -171,13 +227,17 @@ if (args.listDevices) {
   console.log('Outputs (what the companion can speak into):'); for (const d of devices.outputs) console.log(`  [${d.index}] ${d.name}`);
   process.exit(0);
 }
-const input = pick(devices.inputs, args.in, ['BlackHole 16ch', 'BlackHole']);
-const output = pick(devices.outputs, args.out, ['BlackHole 2ch', 'BlackHole']);
+// Hearing the call: the Core Audio tap (macOS 14.2+, no driver) unless --in names a device.
+const tap = args.in === undefined && await ensureTap();
+const input = tap ? { index: -1, name: args.bundle ? `tap · ${args.bundle}` : 'tap · system audio' } : pick(devices.inputs, args.in, ['BlackHole 16ch', 'BlackHole']);
+// Speaking into the call still needs a virtual microphone the call app can select.
+const voiceDriver = devices.inputs.find(d => d.name === 'NoteFIsh Voice') || devices.outputs.find(d => d.name === 'NoteFIsh Voice');
+const output = args.out === undefined && voiceDriver ? { index: -1, name: 'NoteFIsh Voice', udp: true } : pick(devices.outputs, args.out, ['BlackHole 2ch', 'BlackHole']);
 if (!input || !output) {
-  console.error(`No virtual audio device found. The companion needs one to hear the call and one to speak into it:\n  brew install blackhole-2ch blackhole-16ch\nthen in Audio MIDI Setup make a Multi-Output Device (your speakers + BlackHole 16ch) and use it as the call app's speaker;\nset the call app's microphone to BlackHole 2ch. Details: docs/companion.md. Or pass --in / --out explicitly (see --list-devices).`);
+  console.error(`No virtual microphone found for speaking into the call. Install the NoteFIsh Voice driver (driver/README.md) or BlackHole:\n  brew install blackhole-2ch\nthen set the call app's microphone to it. Or pass --out explicitly (see --list-devices).`);
   process.exit(2);
 }
-if (input.name === output.name) console.error(`Warning: listening to and speaking into the same device (${input.name}) will echo your own replies back as captions. Use two devices.`);
+if (!tap && input.name === output.name) console.error(`Warning: listening to and speaking into the same device (${input.name}) will echo your own replies back as captions. Use two devices.`);
 try { await api('GET', '/api/session'); } catch (error) { console.error(`Cannot reach the desk at ${server}: ${error.message}`); process.exit(2); }
 // --as Nina: sign in on the roster as that agent, so --auto-answer can pick up and the call carries their voice and takes.
 if (args.as) {
@@ -187,17 +247,17 @@ if (args.as) {
   await api('POST', `/api/agents/${me.id}/session`, {});
   log(`answering as ${me.name}`);
 }
-log(`desk ${server} · hear: [${input.index}] ${input.name} · speak: [${output.index}] ${output.name}`);
+log(`desk ${server} · hear: ${tap ? input.name : `[${input.index}] ${input.name}`} · speak: [${output.index}] ${output.name}`);
 const probe = await ensureMicProbe();
 log(probe ? 'microphone-in-use detection ready (any app)' : 'no swiftc: detecting known call apps and tabs only');
 
-if (args.start) { await startBridge(args.start === true ? 'Call' : String(args.start), { input, output }).catch(error => { console.error(`Could not bridge: ${error.message}`); process.exit(2); }); }
+if (args.start) { await startBridge(args.start === true ? 'Call' : String(args.start), { input, output, tap }).catch(error => { console.error(`Could not bridge: ${error.message}`); process.exit(2); }); }
 else if (args.watch) {
   let seen = 0, gone = 0;
   log('watching for calls… (Zoom, Meet, Teams, WhatsApp, FaceTime, Instagram, Messenger, Discord, Slack, or any app using the mic)');
   setInterval(async () => {
     const found = await observe().catch(() => null);
-    if (found && !bridge.active) { if (++seen >= 2) { seen = 0; log(`detected ${found.label} (${found.via})`); await startBridge(found.label, { input, output }).catch(error => log('could not bridge:', error.message)); } }
+    if (found && !bridge.active) { if (++seen >= 2) { seen = 0; log(`detected ${found.label} (${found.via})`); await startBridge(found.label, { input, output, tap }).catch(error => log('could not bridge:', error.message)); } }
     else if (!found && bridge.active) { if (++gone >= 4) { gone = 0; endBridge('call is over'); } }
     else { seen = 0; gone = 0; }
   }, interval);

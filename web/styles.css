@@ -1103,3 +1103,18 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .caller-captions li p { font-size: 14px; line-height: 1.45; margin-top: 3px; }
 .caller-captions li.you p { color: #53514C; }
 .caller-captions-empty { font-size: 12px; color: var(--muted); padding: 6px 0 10px; }
+
+/* the pill under the menu bar (Mac app) */
+.pill-page, .pill-page body { background: transparent !important; }
+.pill { height: 52px; margin: 6px 8px; display: flex; align-items: center; gap: 10px; padding: 0 8px 0 10px; border-radius: 999px; background: #242424; color: #FAF9F7; box-shadow: 0 10px 30px rgba(36,36,36,.28), inset 0 0 0 1px rgba(255,255,255,.08); font-size: 13px; user-select: none; -webkit-user-select: none; cursor: default; }
+.pill-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #3B3A37; color: #F3F1EC; flex-shrink: 0; }
+.pill-state { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
+.pill-dot { width: 7px; height: 7px; border-radius: 50%; background: #8F8B83; }
+.pill.is-live .pill-dot { background: #7FB58E; }
+.pill.is-holding .pill-dot { background: #E0736F; box-shadow: 0 0 0 4px rgba(224,115,111,.25); }
+.pill-caption { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #CFCCC5; }
+.pill-open { width: 30px; height: 30px; border: 0; border-radius: 50%; background: transparent; color: #CFCCC5; display: grid; place-items: center; }
+.pill-open:hover { background: #3B3A37; color: #FFF; }
+
+.transcript-line.is-partial > p { color: var(--muted); }
+.transcript-line.is-partial .delivery { color: var(--green); }

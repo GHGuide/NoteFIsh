@@ -17,3 +17,6 @@ playwright-report/
 # build artefacts
 companion/bin/
 design/notefish-companion-design.html
+src-tauri/target/
+src-tauri/gen/
+driver/build/

@@ -1,5 +1,16 @@
 import { randomUUID } from 'node:crypto';
-import { convertAudio, SpeechSegmenter, AudioError, ringbackTone, pcm16kToMulaw8k } from './audio.mjs';
+import { convertAudio, SpeechSegmenter, AudioError, ringbackTone, pcm16kToMulaw8k, mulawToPcm } from './audio.mjs';
+
+/** Telephone audio for the live captioner: 8 kHz PCM16 doubled to 16 kHz by linear interpolation. */
+function upsample8kTo16k(pcm8k) {
+  const frames = Math.floor(pcm8k.length / 2);
+  const out = Buffer.allocUnsafe(frames * 4);
+  for (let i = 0; i < frames; i++) {
+    const a = pcm8k.readInt16LE(i * 2), b = i + 1 < frames ? pcm8k.readInt16LE(i * 2 + 2) : a;
+    out.writeInt16LE(a, i * 4); out.writeInt16LE(Math.round((a + b) / 2), i * 4 + 2);
+  }
+  return out;
+}
 import { ProviderError } from './providers.mjs';
 import { languageCodes, isCallerLanguage } from './languages.mjs';
 import { measureClip, arousalOf, registerFor, tagFor, prosodyFor, describe, chooseRegister, taggedText, REGISTERS, canonicalRegister } from './emotion.mjs';
@@ -126,7 +137,7 @@ export function createCallService({
   }
   async function finish(runtime, reason, remote = false) {
     if (runtime.call.state === 'ended') return structuredClone(runtime.call);
-    cancelReply(runtime); runtime.captionAbort.abort(); runtime.captionQueue.length = 0;
+    cancelReply(runtime); runtime.captionAbort.abort(); runtime.captionQueue.length = 0; stopLiveCaptions(runtime);
     clearTimeout(runtime.noAnswerTimer); clearTimeout(runtime.lifetimeTimer); clearInterval(runtime.ringbackTimer); clearInterval(runtime.heartbeatTimer);
     runtime.call.state = 'ended'; runtime.call.endedAt = now(); runtime.call.mediaConnected = false;
     if (reason) runtime.call.error = reason;
@@ -168,12 +179,13 @@ export function createCallService({
     runtime.captionRunning = true;
     try {
       while (runtime.captionQueue.length && runtime.call.state === 'in_call') {
-        const { audio, sourceLanguage, targetLanguage } = runtime.captionQueue.shift();
+        const { audio, text, sourceLanguage, targetLanguage } = runtime.captionQueue.shift();
         const signal = runtime.captionAbort.signal;
         try {
           // Once the caller's language is known, keep using it as the hint; 'auto' only for the first phrases.
           const hint = sourceLanguage === 'auto' ? (runtime.call.detectedLanguage || 'auto') : sourceLanguage;
-          const textSource = await providers.transcribe({ audio, mimeType: 'audio/wav', language: hint, signal });
+          // Live captions hand us the phrase as text already; the segmenter path still transcribes a clip.
+          const textSource = text !== undefined ? text : await providers.transcribe({ audio, mimeType: 'audio/wav', language: hint, signal });
           if (!textSource?.trim()) continue;
           let textShown, spoken = hint;
           if (providers.interpret) {
@@ -206,8 +218,8 @@ export function createCallService({
     } catch { emit({ type: 'error', error: 'A caption could not be saved.' }); }
     finally { runtime.captionRunning = false; }
   }
-  function queueCaption(runtime, audio) {
-    if (!audio) return;
+  function queueCaption(runtime, audio, text) {
+    if (!audio && text === undefined) return;
     if (runtime.captionQueue.length >= 3) {
       if (Date.now() - runtime.lastQueueWarning > 10000) {
         runtime.lastQueueWarning = Date.now();
@@ -219,7 +231,7 @@ export function createCallService({
     if (!isCallerLanguage(settings.customerLanguage) || !languageCodes.has(settings.agentLanguage)) {
       warn(runtime, 'Choose supported call languages before continuing captions.'); return;
     }
-    runtime.captionQueue.push({ audio, sourceLanguage: settings.customerLanguage, targetLanguage: settings.agentLanguage });
+    runtime.captionQueue.push({ audio, text, sourceLanguage: settings.customerLanguage, targetLanguage: settings.agentLanguage });
     void drainCaptions(runtime);
   }
 
@@ -312,7 +324,7 @@ export function createCallService({
             const audio = pcm16kToMulaw8k(buffered.subarray(0, pairedBytes));
             emit({ type: 'audio', callId, payload: audio.toString('base64') }, runtime.call.agentId);
           }
-          queueCaption(runtime, runtime.segmenter.push(raw));
+          hearCaller(runtime, raw);
           return;
         }
         if (raw.length > 1024) return fail();
@@ -400,7 +412,7 @@ export function createCallService({
         if (runtime.frameBytes > 160000) return fail();
         if (runtime.call.state !== 'in_call' || runtime.busy) return;
         emit({ type: 'audio', callId: runtime.call.id, payload }, runtime.call.agentId);
-        queueCaption(runtime, runtime.segmenter.push(frame));
+        hearCaller(runtime, null, frame);
       })().catch(() => fail());
     });
     ws.on('close', () => {
@@ -425,6 +437,32 @@ export function createCallService({
     };
   }
 
+  /** Live captions for one call: the caller's frames go to the transcription session as they arrive; each finished
+   * phrase joins the caption queue as text. Without the provider, or if it fails, the segmenter path carries on. */
+  function startLiveCaptions(runtime) {
+    if (!providers.openTranscription || runtime.live) return;
+    const settings = resolveSettings(runtime.call.agentId);
+    const hint = settings.customerLanguage === 'auto' ? (runtime.call.detectedLanguage || 'auto') : settings.customerLanguage;
+    try {
+      const live = providers.openTranscription({
+        language: hint,
+        onPartial: text => { if (runtime.call.state === 'in_call' && runtime.live === live) emit({ type: 'caption-partial', callId: runtime.call.id, text }, runtime.call.agentId); },
+        onFinal: text => { if (runtime.call.state === 'in_call' && runtime.live === live) { emit({ type: 'caption-partial', callId: runtime.call.id, text: '' }, runtime.call.agentId); queueCaption(runtime, null, text); } },
+        onError: error => { if (runtime.live === live) { warn(runtime, `Live captions stopped, using segments: ${safeError(error)}`); stopLiveCaptions(runtime); } },
+      });
+      runtime.live = live;
+      live.ready.catch(error => { if (runtime.live === live) { warn(runtime, `Live captions unavailable, using segments: ${safeError(error)}`); stopLiveCaptions(runtime); } });
+    } catch (error) { warn(runtime, `Live captions unavailable: ${safeError(error)}`); }
+  }
+  function stopLiveCaptions(runtime) {
+    const live = runtime.live; runtime.live = null;
+    try { live?.close(); } catch { /* closing */ }
+  }
+  /** A caller frame goes to live captions when the session is up; otherwise to the segmenter. */
+  function hearCaller(runtime, pcm16k, mulawFrame) {
+    if (runtime.live?.open) { runtime.live.push(pcm16k ?? upsample8kTo16k(mulawToPcm(mulawFrame))); return; }
+    queueCaption(runtime, runtime.segmenter.push(pcm16k ?? mulawFrame));
+  }
   async function answer(id, agentId = null) {
     const runtime = find(id); connected(runtime);
     // Every available agent sees a ringing call. The first one through this
@@ -446,6 +484,7 @@ export function createCallService({
     clearTimeout(runtime.noAnswerTimer); clearInterval(runtime.ringbackTimer);
     send(runtime, { event: 'clear' });
     runtime.call.state = 'in_call'; runtime.call.answeredAt = now();
+    startLiveCaptions(runtime);
     runtime.call.stage = 'listening'; runtime.segmenter.reset();
     return persist(runtime);
   }
@@ -519,6 +558,12 @@ export function createCallService({
         register, feeling: describe(register, arousal), tag, why: chosen.reason });
       const spoken = taggedText(interpreted.sentences, textShown, register, arousal, config.fishModel || 's2.1-pro-free');
       runtime.replyLineId = line.id; runtime.call.stage = 'synthesizing'; await persist(runtime);
+      // Streamed replies play as Fish produces them; a provider without the live socket, or one that fails before the first chunk, takes the one-shot path below.
+      if (providers.synthesizeStream) {
+        const streamed = await streamReply(runtime, { generation, line, spoken, voice, prosody, signal, current });
+        if (streamed !== 'fallback') return streamed;
+        if (!current()) return structuredClone(runtime.call);
+      }
       const mp3 = await providers.synthesize({ text: spoken, referenceId: voice.referenceId, signal, format: 'mp3', ...prosody });
       if (!current()) return structuredClone(runtime.call);
       const mulaw = await convert(mp3, 'audio/mpeg', { output: 'mulaw', sampleRate: 8000, maxSeconds: 90, signal });
@@ -555,6 +600,47 @@ export function createCallService({
       if (error instanceof ProviderError || error instanceof AudioError || error instanceof CallError) throw error;
       throw new CallError('The reply could not be delivered. Try again.', 502);
     }
+  }
+  /** Chunk by chunk to the phone (PCM16 16 kHz) or to Twilio (G.711 8 kHz), 'played' or a mark at the end. */
+  async function streamReply(runtime, { generation, line, spoken, voice, prosody, signal, current }) {
+    const browser = runtime.call.transport === 'browser';
+    const mark = `reply-${generation}-${line.id}`;
+    let started = false, bytes = 0, tail = Buffer.alloc(0);
+    const begin = () => {
+      connected(runtime); runtime.mark = mark;
+      runtime.call.phase = 'playing'; runtime.call.stage = 'playing';
+      if (browser) { notifyCaller(runtime); captionCaller(runtime, line, 'agent'); sendBrowser(runtime, { type: 'audio-start', callId: runtime.call.id, playbackId: mark, sampleRate: 16000 }); }
+      started = true;
+    };
+    const deliver = chunk => {
+      if (!current()) return;
+      if (!started) begin();
+      bytes += chunk.length;
+      if (browser) { sendBrowser(runtime, { type: 'audio-chunk', playbackId: mark, payload: chunk.toString('base64') }); return; }
+      // G.711 needs whole 16 kHz sample pairs; carry the odd bytes to the next chunk.
+      const buffered = Buffer.concat([tail, chunk]); const usable = buffered.length - buffered.length % 4;
+      tail = Buffer.from(buffered.subarray(usable));
+      for (let offset = 0; offset < usable; offset += 6400) send(runtime, { event: 'media', media: { payload: pcm16kToMulaw8k(buffered.subarray(offset, Math.min(usable, offset + 6400))).toString('base64') } });
+    };
+    try {
+      await providers.synthesizeStream({ text: spoken, referenceId: voice.referenceId, signal, ...prosody, onChunk: deliver });
+    } catch (error) {
+      if (!started) { warn(runtime, `Live speech unavailable, using the standard path: ${safeError(error)}`); return 'fallback'; }
+      throw error;
+    }
+    if (!current()) return structuredClone(runtime.call);
+    if (!started) throw new CallError('Fish produced no speech for this reply.', 502);
+    if (browser) sendBrowser(runtime, { type: 'audio-end', playbackId: mark });
+    else send(runtime, { event: 'mark', mark: { name: mark } });
+    runtime.playbackTimer = setTimeout(() => {
+      if (!current()) return;
+      cancelReply(runtime, 'unconfirmed');
+      try { send(runtime, { event: 'clear' }); } catch {}
+      warn(runtime, `${browser ? 'The caller browser' : 'Twilio'} did not confirm playback. Ask the caller whether they heard the reply.`);
+      void persist(runtime).catch(() => emit({ type: 'error', error: 'The playback result could not be saved.' }));
+    }, Math.ceil(bytes / 32) + playbackGraceMs);
+    runtime.playbackTimer.unref?.();
+    return await persist(runtime);
   }
   async function update(id, patch, actor = '') {
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)

@@ -39,6 +39,10 @@ Generate a caller invitation in the desk and open it on the phone. Hold Space re
 
 `npm run companion -- --watch` runs on the agent's Mac and detects a call in Zoom, Google Meet, Teams, WhatsApp, FaceTime, Instagram, Messenger, Discord, Slack — or any app using the microphone — then bridges it through the desk: the other side becomes captions, your replies go into the call as its microphone in your cloned voice. One-time audio setup and options in [docs/companion.md](docs/companion.md).
 
+## The Mac app
+
+`npm run app:dev` opens NoteFIsh as a Mac app (Tauri 2, `src-tauri/`): the desk in a window, a **pill** under the menu bar with call state and the last caption, and **⌥ Space** as a system-wide hold-to-speak key. It starts the local server if nothing answers on port 3001 (set `NOTEFISH_ROOT` when the checkout is elsewhere). `npm run app:build` makes the `.app`/DMG. Signing and notarization need a Developer ID.
+
 ## Voice files
 
 Any voice exports as a small JSON file (`⋯ › Export voice file`, or **Export library**) holding the Fish reference and what the library knows about it — the take it was recorded for, its baseline. Import it on another desk from **Import Fish voice › From a NoteFIsh voice file**; Fish confirms the model exists before it joins the library.

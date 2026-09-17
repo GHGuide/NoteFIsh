@@ -109,7 +109,44 @@ function VoiceAvatar({ name = '', large = false }) { const seed = [...name].redu
 export default function App() {
   // The public caller surface never initializes authenticated workspace hooks,
   // loads voices/settings/tickets, or opens the desk WebSocket.
-  return <UiProvider>{location.pathname.replace(/\/+$/, '') === '/caller' ? <CallerEntry /> : <WorkspaceApp />}</UiProvider>;
+  const path = location.pathname.replace(/\/+$/, '');
+  return <UiProvider>{path === '/caller' ? <CallerEntry /> : path === '/pill' ? <PillEntry /> : <WorkspaceApp />}</UiProvider>;
+}
+
+/** The pill under the menu bar (Mac app): call state, the last caption, hold-to-talk feedback. */
+function PillEntry() {
+  const [calls, setCalls] = useState([]);
+  const [connection, setConnection] = useState('connecting');
+  const [holding, setHolding] = useState(false);
+  useEffect(() => { document.documentElement.classList.add('pill-page'); return () => document.documentElement.classList.remove('pill-page'); }, []);
+  useEffect(() => {
+    let socket, timer, closed = false;
+    const connect = () => {
+      socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/desk`);
+      socket.onopen = () => setConnection('connected');
+      socket.onmessage = event => { let message; try { message = JSON.parse(event.data); } catch { return; } if (message.type === 'snapshot') setCalls(message.calls || []); if (message.type === 'call' && message.call) setCalls(current => [message.call, ...current.filter(call => call.id !== message.call.id)]); };
+      socket.onclose = () => { setConnection('reconnecting'); if (!closed) timer = setTimeout(connect, 2000); };
+    };
+    connect();
+    return () => { closed = true; clearTimeout(timer); socket?.close(); };
+  }, []);
+  useEffect(() => {
+    const tauri = window.__TAURI__;
+    if (!tauri?.event?.listen) return;
+    let unlisten; tauri.event.listen('ptt', event => setHolding(!!event.payload)).then(fn => { unlisten = fn; });
+    return () => unlisten?.();
+  }, []);
+  const live = calls.find(call => call.state === 'in_call') || calls.find(call => call.state === 'ringing');
+  const last = live?.transcript?.at(-1);
+  const state = !live ? (connection === 'connected' ? 'No call' : 'Connecting…') : live.state === 'ringing' ? `${live.from || 'Call'} · ringing` : holding ? 'Recording' : live.phase === 'playing' ? 'Speaking' : live.phase === 'translating' ? 'Translating' : 'Listening';
+  const caption = last ? (last.speaker === 'agent' ? last.textSource : last.textShown) : live ? 'Hold ⌥ Space anywhere to speak.' : 'Calls appear here. Hold ⌥ Space to speak.';
+  const openDesk = () => { try { window.__TAURI__?.webviewWindow?.WebviewWindow?.getByLabel?.('main')?.then?.(w => w?.show()); } catch { /* not in the app */ } };
+  return <div className={`pill ${live ? 'is-live' : ''} ${holding ? 'is-holding' : ''}`} data-tauri-drag-region="true">
+    <span className="pill-mark"><AudioLines size={16} /></span>
+    <span className="pill-state"><span className="pill-dot" />{state}</span>
+    <span className="pill-caption" title={caption}>{caption}</span>
+    <button type="button" className="pill-open" onClick={openDesk} aria-label="Open the desk"><Maximize2 size={13} /></button>
+  </div>;
 }
 
 function CallerEntry() {
@@ -130,6 +167,7 @@ function WorkspaceApp() {
   const [focusDesk, setFocusDesk] = useState(false);
   const [invitation, setInvitation] = useState(null);
   const [data, setData] = useState({ voices: [], settings: DEFAULT_SETTINGS, calls: [], setup: null, agents: [], floor: EMPTY_FLOOR, agentId: '', session: null });
+  const [partialCaption, setPartialCaption] = useState(null); // what the caller is saying right now, before the phrase lands
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -172,6 +210,7 @@ function WorkspaceApp() {
           agentId: message.agentId === undefined ? current.agentId : message.agentId,
         }));
         if (message.type === 'floor') setData(current => ({ ...current, floor: message.floor || current.floor }));
+        if (message.type === 'caption-partial') setPartialCaption(message.text ? { callId: message.callId, text: message.text } : null);
         if (message.type === 'call') updateCall(message.call);
         if (message.type === 'audio' || message.type === 'caller-audio') player.current.play(message.payload, message.sampleRate || 8000);
         if (message.type === 'error') setError(message.error || message.message || 'The call connection needs attention.');
@@ -213,7 +252,7 @@ function WorkspaceApp() {
     pause: async reason => { const result = await api.pause(reason); setData(current => ({ ...current, floor: result.floor })); },
     resume: async () => { const result = await api.resume(); setData(current => ({ ...current, floor: result.floor })); },
   };
-  const common = { data, navigate, loading, setError, setNotice, saveSettings, refreshVoices, updateCall, sharedDemo, trainingNotes, multiAgent, hasFloor, roster, seat, seatActions, refreshFloor };
+  const common = { data, navigate, loading, setError, setNotice, saveSettings, refreshVoices, updateCall, sharedDemo, trainingNotes, multiAgent, hasFloor, roster, seat, seatActions, refreshFloor, partialCaption };
   return <div className={`app-shell ${focusDesk && page.path === '/desk' ? 'demo-focus' : ''}`}>
     <aside id="workspace-sidebar" className={`sidebar ${mobileNav ? 'is-open' : ''}`}>
       <a className="wordmark" href="/voices" onClick={event => { event.preventDefault(); navigate('/voices'); }} aria-label="NoteFIsh voice library"><span className="brand-mark"><AudioLines size={21} strokeWidth={2.2} /></span>NoteFIsh<span className="wordmark-dot">.</span></a>
@@ -529,7 +568,7 @@ function Enroll({ data, navigate, setError, setNotice, refreshVoices, saveSettin
   </div>;
 }
 
-function Desk({ data, navigate, setError, setNotice, saveSettings, updateCall, connection, invitation, setInvitation, focusDesk, setFocusDesk, audioReady, enableAudio, clearAudio, setAudioMuted, hasFloor, seat, refreshFloor }) {
+function Desk({ data, navigate, setError, setNotice, saveSettings, updateCall, connection, invitation, setInvitation, focusDesk, setFocusDesk, audioReady, enableAudio, clearAudio, setAudioMuted, hasFloor, seat, refreshFloor, partialCaption }) {
   const [selectedCallId, setSelectedCallId] = useState('');
   // With a floor, this desk shows the call assigned to this seat. Another
   // agent's live call is theirs; only the ringing queue is shared.
@@ -598,6 +637,13 @@ function Desk({ data, navigate, setError, setNotice, saveSettings, updateCall, c
     if (muted) { pointerHeld.current = false; capture.stop(true); }
     setMicrophoneMuted(muted);
   };
+  // Inside the Mac app, ⌥Space anywhere is the same hold-to-speak key.
+  useEffect(() => {
+    const tauri = window.__TAURI__;
+    if (!tauri?.event?.listen) return;
+    let unlisten; tauri.event.listen('ptt', event => { if (event.payload) startTalk(); else capture.stop(); }).then(fn => { unlisten = fn; });
+    return () => unlisten?.();
+  }, [startTalk, capture.stop]);
   useEffect(() => {
     const down = event => {
       if (event.key === 'Escape') { capture.stop(true); return; }
@@ -695,7 +741,7 @@ function Desk({ data, navigate, setError, setNotice, saveSettings, updateCall, c
     phrases: { title: 'Canned lines', className: 'card', body: <PhrasesPanel phrases={phrasesSource} onChange={savePhrases} canSpeak={canTalk} onSpeak={speakPhrase} targetLanguage={targetLanguage} editing={arranging || !active} /> },
     transcript: { label: 'Live transcript', className: 'captions-panel demo-transcript-panel', body: <>
 <header className="panel-header"><div><h2>Live transcript</h2><span>{languageName(currentCall?.agentLanguage || data.settings.agentLanguage)} above · {languageName(currentCall?.customerLanguage || data.settings.customerLanguage)} below</span></div><span className={`caption-state ${active ? 'live' : ''}`}><span />{active ? capture.recording ? 'Recording reply' : processing ? 'Replying' : 'Listening' : ringing ? 'Incoming call' : currentCall ? 'Saved' : 'Waiting for call'}</span></header>
-      <TranscriptLog lines={transcript} call={currentCall} containerRef={transcriptContainer} onScroll={transcriptScroll} stamp={stamp} empty={<div className="transcript-empty"><AudioLines size={34} strokeWidth={1} /><h3>{active ? 'Your partner can speak now.' : 'The conversation appears here.'}</h3><p>{active ? `Their ${languageName(data.settings.customerLanguage)} speech appears in ${languageName(data.settings.agentLanguage)} after each phrase.` : 'Share a call link and answer your partner. Follow their words here as you talk.'}</p><div className="language-chips"><span>{languageName(data.settings.customerLanguage)}</span><ArrowRight size={14} /><span>{languageName(data.settings.agentLanguage)}</span></div></div>} />
+      <TranscriptLog lines={transcript} call={currentCall} partial={partialCaption?.callId === currentCall?.id ? partialCaption.text : ''} containerRef={transcriptContainer} onScroll={transcriptScroll} stamp={stamp} empty={<div className="transcript-empty"><AudioLines size={34} strokeWidth={1} /><h3>{active ? 'Your partner can speak now.' : 'The conversation appears here.'}</h3><p>{active ? `Their ${languageName(data.settings.customerLanguage)} speech appears in ${languageName(data.settings.agentLanguage)} after each phrase.` : 'Share a call link and answer your partner. Follow their words here as you talk.'}</p><div className="language-chips"><span>{languageName(data.settings.customerLanguage)}</span><ArrowRight size={14} /><span>{languageName(data.settings.agentLanguage)}</span></div></div>} />
 {newCaptions && <button className="button secondary latest-captions" onClick={scrollToLatest}>New captions <ChevronDown size={14} /></button>}
 {currentCall?.error && <div className="call-error" role="alert">{currentCall.error}</div>}
 <footer className="transcript-footer"><span><ShieldCheck size={13} />{currentCall && !active && !ringing ? 'Transcript saved automatically' : 'Transcript is saved as you talk'}</span>{data.calls.some(call => callState(call) === 'ended') && <label><span className="sr-only">Saved conversations</span><select aria-label="Saved conversations" disabled={active || ringing} value={selectedCallId} onChange={event => setSelectedCallId(event.target.value)}><option value="">New conversation</option>{data.calls.filter(call => callState(call) === 'ended').map(call => <option key={call.id} value={call.id}>{new Date(call.startedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</option>)}</select></label>}</footer>

@@ -165,6 +165,9 @@ export default function Caller() {
           pendingPlayback.current = message;
           session.audio.play(message.payload, message.playbackId).then(() => { if (!session.ended && pendingPlayback.current === message) pendingPlayback.current = null; }).catch(failure => { if (!session.ended) { setError(failure.message); setAudioState(session.audio.context.state); } });
         }
+        if (message.type === 'audio-start' && message.playbackId) { session.audio.setListening(false); pendingPlayback.current = message; session.audio.beginStream(message.playbackId, message.sampleRate || 16000); }
+        if (message.type === 'audio-chunk' && message.playbackId && message.payload) session.audio.pushChunk(message.playbackId, message.payload);
+        if (message.type === 'audio-end' && message.playbackId) { session.audio.endStream(message.playbackId); if (pendingPlayback.current?.playbackId === message.playbackId) pendingPlayback.current = null; }
         if (message.type === 'clear') { pendingPlayback.current = null; session.audio.clearPlayback(); }
         if (message.type === 'caption' && typeof message.text === 'string') setCaptions(list => [...list.filter(item => item.id !== message.id).slice(-19), { id: message.id || String(Date.now()), who: message.who === 'agent' ? 'agent' : 'you', text: message.text.slice(0, 600) }]);
         if (message.type === 'error') {

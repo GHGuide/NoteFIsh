@@ -1,5 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { TONES, SENTENCE_TAGS, canonicalRegister } from './emotion.mjs';
+import { streamSpeech } from './fish-live.mjs';
+import { openTranscription as openLiveTranscription } from './live-captions.mjs';
 import { convertAudio, audioMime } from './audio.mjs';
 
 export class ProviderError extends Error {
@@ -184,6 +186,16 @@ export function createProviders(config, { fetchImpl = globalThis.fetch } = {}) {
           ...(Number.isFinite(temperature) ? { temperature: Math.min(1, Math.max(0.1, temperature)) } : {}),
           ...(Number.isFinite(speed) && speed !== 1 ? { prosody: { speed: Math.min(1.3, Math.max(0.8, speed)) } } : {}) }),
       });
+    },
+    /** Live captions: a Realtime transcription session for one call. Phrases arrive via `onFinal` as the caller pauses. */
+    openTranscription({ language, onPartial, onFinal, onError }) {
+      return openLiveTranscription({ apiKey: config.openaiApiKey, model: config.liveTranscribeModel || 'gpt-4o-mini-transcribe', language, onPartial, onFinal, onError });
+    },
+    /** Streamed speech: PCM16 16 kHz chunks via `onChunk` as Fish produces them. Rejects before the first chunk when the live socket is unavailable; the caller then falls back to `synthesize`. */
+    async synthesizeStream({ text, referenceId, signal, temperature, speed, onChunk }) {
+      text = boundedText(text, 6000); referenceId = reference(referenceId);
+      const model = config.fishModel || 's2.1-pro-free';
+      return streamSpeech({ apiKey: config.fishApiKey, model, text, referenceId, temperature, speed, sampleRate: 16000, latency: config.fishLatency || 'balanced', signal, onChunk });
     },
     async createVoice({ name, description = '', audio, mimeType, transcript = '', signal }) {
       name = boundedText(name, 120); description = boundedText(description, 1000, true); transcript = boundedText(transcript, 6000, true);
