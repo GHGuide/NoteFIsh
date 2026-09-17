@@ -41,7 +41,7 @@ Generate a caller invitation in the desk and open it on the phone. Hold Space re
 
 ## The Mac app
 
-`npm run app:dev` opens NoteFish as a Mac app (Tauri 2, `src-tauri/`): the desk in a window, a **pill** under the menu bar with call state and the last caption, **⌥ Space** as a system-wide hold-to-speak key, and a **menu-bar menu** with the current call and its timer, the last five calls, a *Listen for calls* switch that runs the companion for Zoom, WhatsApp, Meet and the rest, and the caption language. It starts the local server if nothing answers on port 3001 (set `NOTEFISH_ROOT` when the checkout is elsewhere). `npm run app:build` makes the `.app`/DMG. Signing and notarization need a Developer ID.
+`npm run app:dev` opens NoteFish as a Mac app (Tauri 2, `src-tauri/`): the desk in a window, a **pill** under the menu bar with call state and the last caption, **⌥ Space** as a system-wide hold-to-speak key, and a **menu-bar menu** with the current call and its timer, the last five calls, a *Listen for calls* switch that runs the companion for Zoom, WhatsApp, Meet and the rest, and the caption language. The pill stays hidden until a call needs it; on a MacBook with a notch it *is* the notch, a black island that grows out of it above the menu bar and never takes focus from the call app. The strip under the menu bar is the same component's other look, kept for Windows and for Macs without a notch. Hover either one for options: the caller's language, the caption language, the desk, hide, end. It starts the local server if nothing answers on port 3001 (set `NOTEFISH_ROOT` when the checkout is elsewhere). `npm run app:build` makes the `.app`/DMG. Signing and notarization need a Developer ID.
 
 ## Voice files
 

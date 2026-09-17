@@ -19,6 +19,8 @@ use tauri::{
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tauri_plugin_positioner::{Position, WindowExt};
 use tauri_plugin_shell::ShellExt;
+#[cfg(target_os = "macos")]
+use tauri_nspanel::{cocoa::appkit::NSWindowCollectionBehavior, ManagerExt as _, WebviewWindowExt as _};
 
 const DESK: &str = "http://127.0.0.1:3001";
 const HELP: &str = "https://github.com/GHGuide/NoteFish#readme";
@@ -257,12 +259,40 @@ fn show_main(app: &tauri::AppHandle) {
     }
 }
 
-/// The pill: a transparent always-on-top strip under the menu bar. It starts hidden;
-/// its page shows it when a call needs attention and sizes it to what it draws.
+/// Which look the pill gets: the island in the notch, or the strip under the menu bar
+/// (Windows, and Macs without a notch). Measured once, on the main thread.
+#[derive(Clone, Copy, Default)]
+struct PillMode {
+    notch: Option<(f64, f64)>, // (width, height) of the notch in logical px
+}
+
+#[cfg(target_os = "macos")]
+fn measure_notch() -> Option<(f64, f64)> {
+    use objc2_app_kit::NSScreen;
+    let mtm = objc2::MainThreadMarker::new()?;
+    let screen = NSScreen::mainScreen(mtm)?;
+    let insets = screen.safeAreaInsets();
+    if insets.top <= 0.0 {
+        return None;
+    }
+    let frame = screen.frame();
+    let (left, right) = unsafe { (screen.auxiliaryTopLeftArea(), screen.auxiliaryTopRightArea()) };
+    let width = frame.size.width - left.size.width - right.size.width;
+    (width > 0.0).then_some((width, insets.top))
+}
+#[cfg(not(target_os = "macos"))]
+fn measure_notch() -> Option<(f64, f64)> {
+    None
+}
+
+/// The pill: a transparent window that starts hidden; its page shows it when a call needs
+/// attention and sizes it to what it draws. On macOS it becomes a non-activating panel
+/// above the menu bar, so answering from it never pulls the call app out of front.
 fn create_pill(app: &tauri::AppHandle) {
     if app.get_webview_window("pill").is_some() {
         return;
     }
+    app.manage(PillMode { notch: measure_notch() });
     let url = format!("{DESK}/pill").parse().expect("pill url");
     if let Ok(window) = WebviewWindowBuilder::new(app, "pill", WebviewUrl::External(url))
         .title("NoteFish")
@@ -278,6 +308,14 @@ fn create_pill(app: &tauri::AppHandle) {
         .accept_first_mouse(true)
         .build()
     {
+        #[cfg(target_os = "macos")]
+        if let Ok(panel) = window.to_panel() {
+            panel.set_level(25); // NSMainMenuWindowLevel + 1: over the menu bar, where the notch is
+            panel.set_style_mask(1 << 7); // NSWindowStyleMaskNonActivatingPanel
+            panel.set_collection_behaviour(NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary);
+            panel.set_has_shadow(false);
+            panel.set_accepts_mouse_moved_events(true); // hover works without the panel ever becoming key
+        }
         let _ = window.move_window(Position::TopCenter);
     }
 }
@@ -285,22 +323,71 @@ fn create_pill(app: &tauri::AppHandle) {
 /// Sent by the pill's page with the size of what it drew. Growing keeps the
 /// horizontal centre still; `recenter` puts it back under the menu bar's middle.
 fn pill_layout(app: &tauri::AppHandle, width: f64, height: f64, recenter: bool) {
+    // AppKit traps on window calls off the main thread; the page's events arrive on a worker.
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || pill_layout_now(&handle, width, height, recenter));
+}
+fn pill_layout_now(app: &tauri::AppHandle, width: f64, height: f64, recenter: bool) {
     let Some(window) = app.get_webview_window("pill") else { return };
+    #[cfg(debug_assertions)]
+    eprintln!("pill {width}x{height}{}", if recenter { " (recenter)" } else { "" });
     let scale = window.scale_factor().unwrap_or(1.0);
     let before = window.outer_size().ok().map(|size| size.to_logical::<f64>(scale));
     let position = window.outer_position().ok().map(|point| point.to_logical::<f64>(scale));
     let _ = window.set_size(LogicalSize::new(width.max(80.0), height.max(40.0)));
-    if recenter {
+    let notch = app.try_state::<PillMode>().map(|mode| mode.notch).unwrap_or(None);
+    if notch.is_some() {
+        if let Ok(Some(monitor)) = window.primary_monitor() {
+            let scale = monitor.scale_factor();
+            let origin = monitor.position().to_logical::<f64>(scale);
+            let size = monitor.size().to_logical::<f64>(scale);
+            let _ = window.set_position(LogicalPosition::new(origin.x + (size.width - width) / 2.0, origin.y));
+        }
+    } else if recenter {
         let _ = window.move_window(Position::TopCenter);
     } else if let (Some(before), Some(position)) = (before, position) {
         let _ = window.set_position(LogicalPosition::new(position.x + (before.width - width) / 2.0, position.y));
     }
 }
 
+/// Tells the pill's page when the cursor is over it. WebKit only reports hover to a key
+/// window, and this panel never becomes key, so the shell watches the cursor instead.
+fn watch_cursor(app: &tauri::AppHandle) {
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        let mut inside = false;
+        loop {
+            let window = handle.get_webview_window("pill");
+            let visible = window.as_ref().map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false);
+            let now_inside = visible
+                && window
+                    .as_ref()
+                    .and_then(|w| Some((w.outer_position().ok()?, w.outer_size().ok()?, handle.cursor_position().ok()?)))
+                    .map(|(pos, size, cursor)| cursor.x >= pos.x as f64 && cursor.x <= (pos.x + size.width as i32) as f64 && cursor.y >= pos.y as f64 && cursor.y <= (pos.y + size.height as i32) as f64)
+                    .unwrap_or(false);
+            if now_inside != inside {
+                inside = now_inside;
+                #[cfg(debug_assertions)]
+                if let Some(w) = window.as_ref() { eprintln!("hover {inside} cursor={:?} window={:?} {:?}", handle.cursor_position().ok(), w.outer_position().ok(), w.outer_size().ok()); }
+                let _ = handle.emit("pill-hover", inside);
+            }
+            std::thread::sleep(Duration::from_millis(if visible { 80 } else { 300 }));
+        }
+    });
+}
+
 fn pill_visible(app: &tauri::AppHandle, show: bool) {
-    if let Some(window) = app.get_webview_window("pill") {
-        let _ = if show { window.show() } else { window.hide() };
-    }
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        #[cfg(target_os = "macos")]
+        if let Ok(panel) = handle.get_webview_panel("pill") {
+            if show { panel.show() } else { panel.order_out(None) }
+            return;
+        }
+        if let Some(window) = handle.get_webview_window("pill") {
+            let _ = if show { window.show() } else { window.hide() };
+        }
+    });
 }
 
 /// The pill's page speaks to this shell over events, which the capability already allows.
@@ -308,6 +395,8 @@ fn listen_to_pill(app: &tauri::App) {
     let handle = app.handle().clone();
     app.listen("pill-layout", move |event| {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(event.payload()) {
+            #[cfg(debug_assertions)]
+            eprintln!("layout for {}", v["why"].as_str().unwrap_or("?"));
             pill_layout(&handle, v["width"].as_f64().unwrap_or(360.0), v["height"].as_f64().unwrap_or(100.0), v["recenter"].as_bool().unwrap_or(false));
         }
     });
@@ -318,10 +407,22 @@ fn listen_to_pill(app: &tauri::App) {
     });
     let handle = app.handle().clone();
     app.listen("open-desk", move |_| show_main(&handle));
+    let handle = app.handle().clone();
+    app.listen("pill-hello", move |_| {
+        let notch = handle.try_state::<PillMode>().map(|mode| mode.notch).unwrap_or(None);
+        let payload = match notch {
+            Some((width, height)) => serde_json::json!({ "kind": "notch", "notch": width, "bar": height }),
+            None => serde_json::json!({ "kind": "pill" }),
+        };
+        let _ = handle.emit("pill-mode", payload);
+    });
 }
 
 fn main() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_nspanel::init());
+    builder
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
@@ -378,6 +479,7 @@ fn main() {
                 .build(app)?;
             create_pill(app.handle());
             listen_to_pill(app);
+            watch_cursor(app.handle());
             // Keep the menu current: the live call's timer, recent calls, the caption language.
             let handle = app.handle().clone();
             std::thread::spawn(move || {

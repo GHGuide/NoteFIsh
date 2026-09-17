@@ -82,3 +82,23 @@ Rough total: 2½–3 weeks of focused work. Steps 1–3 give a usable Mac app in
 - Fish live TTS: https://docs.fish.audio/api-reference/endpoint/websocket/tts-live · S2 latency: https://fish.audio/s2/
 - OpenAI realtime transcription: https://developers.openai.com/api/docs/guides/realtime-transcription
 - Wispr Flow is Electron: https://macupdater.net/app_updates/appinfo/com.electron.wispr-flow/index.html
+
+
+## The pill: two looks, one component (decided 2026-09-17)
+
+`web/pill.jsx` and `web/pill.css` draw the pill in one of two looks, chosen by Rust
+(`pill-mode` event from `src-tauri/src/main.rs`, measured once with `NSScreen`):
+
+- **notch** (MacBooks with a notch): the island. The window sits at the top centre of
+  the built-in display, above the menu bar, as a non-activating `NSPanel`
+  (`tauri-nspanel`), so answering or changing a language from it never pulls Zoom or
+  WhatsApp out of front. The top `--bar` px are black over the menu bar band; the
+  island is never narrower than the notch and its ears curve into the menu bar.
+- **pill** (Windows, Macs without a notch, external displays): the strip under the menu
+  bar from the companion design. Keep this look; it is the Windows version.
+
+Both are hidden until something happens (detected or ringing call, live call, ⌥ held,
+a reply playing, a five-second goodbye) and sized to what they draw. Hovering shows the
+options row: caller language, caption language, open the desk, hide for this call, end.
+The page drives the window over events (`pill-layout`, `pill-visible`, `open-desk`,
+`pill-hello`); Rust answers `pill-hello` with the mode.

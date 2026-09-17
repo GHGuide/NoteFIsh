@@ -140,6 +140,12 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
   });
   router.get(['/status', '/setup'], (req, res) => res.json(getStatus(config, { audioAvailable })));
   router.get('/languages', (req, res) => res.json({ languages }));
+  /** The Mac app's pill has no console anyone can read; it reports here, and only from this machine. */
+  router.post('/log', (req, res) => {
+    if (!isLocalRequest(req)) throw new InputError('Local only.', 403);
+    console.log(`[pill] ${String(req.body?.line ?? '').slice(0, 600)}`);
+    res.status(204).end();
+  });
   router.get('/bootstrap', (req, res) => res.json({
     ...store.snapshot(), calls: calls.snapshot(), setup: getStatus(config, { audioAvailable }), languages,
     floor: queue ? queue.snapshot() : null, agentId: currentAgent(req),
