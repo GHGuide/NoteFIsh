@@ -1,7 +1,7 @@
 // Settings: the workspace defaults every seat inherits, the roster, the
 // integrations, and the phone number (the old Setup page in design clothes).
 import React, { useEffect, useState } from 'react';
-import { Copy, ExternalLink, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Copy, ExternalLink, Plus, RefreshCw, Send, Trash2 } from 'lucide-react';
 import { api } from '../api.js';
 import { languages, languageName, isArchived } from '../lib.jsx';
 import { Toolbar, Title, Tabs, ReadBar, Body, Row, Setting, Status, Dot, Label, Chip, Btn, TextBtn, SelectPill, Field, Avatar, Empty, Ask } from '../shell.jsx';
@@ -66,20 +66,25 @@ function Agents({ setup, readyVoices, roster, multiAgent, refreshFloor, setNotic
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const run = async (work, message) => { setBusy(true); try { await work(); await refreshFloor(); if (message) setNotice(message); } catch (failure) { setError(failure.message); } finally { setBusy(false); } };
-  const add = () => { const trimmed = name.trim(); if (!trimmed || busy) return; run(async () => { await api.createAgent({ name: trimmed }); setName(''); }, `${trimmed} added to the roster.`); };
+  const copyLink = async (url, who) => { try { await navigator.clipboard.writeText(url); setNotice(`Invitation link copied. Send it to ${who}.`); } catch { setNotice(`Invitation link: ${url}`); } };
+  // An email invites: the link signs them up as this seat. A bare name is a seat anyone here can take.
+  const add = () => { const trimmed = name.trim(); if (!trimmed || busy) return; const email = /@/.test(trimmed); run(async () => { const result = await api.createAgent(email ? { email: trimmed } : { name: trimmed }); setName(''); if (result.inviteUrl) await copyLink(result.inviteUrl, trimmed); }, email ? '' : `${trimmed} added to the roster.`); };
+  const reinvite = agent => run(async () => { const result = await api.reinvite(agent.id); await copyLink(result.inviteUrl, agent.email); });
+  const mailto = agent => `mailto:${agent.email}?subject=${encodeURIComponent('Join our NoteFish desk')}&body=${encodeURIComponent(`Hi ${agent.name.split(' ')[0]},\n\nYou have a seat on our NoteFish desk. Open this link, set a password, and you are in:\n${agent.inviteUrl}\n\nThe link works for a week.`)}`;
   const remove = agent => { if (window.confirm(`Remove ${agent.name} from the roster?`)) run(() => api.removeAgent(agent.id), `${agent.name} removed from the roster.`); };
   if (!multiAgent) return <Body><div className="ds-info">{setup.floor?.reason || 'This deployment runs a single desk.'}</div></Body>;
   return <>
-    <ReadBar right={<Btn small disabled={busy || !name.trim()} onClick={add}>Add</Btn>}><Plus size={14} /><input value={name} maxLength={100} placeholder="Add an agent by name" aria-label="Agent name" onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') add(); }} /></ReadBar>
+    <ReadBar right={<Btn small disabled={busy || !name.trim()} onClick={add}>Add</Btn>}><Plus size={14} /><input value={name} maxLength={100} placeholder="Invite by email, or add a name" aria-label="Email or name" onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') add(); }} /></ReadBar>
     <Body>
       {roster.length ? roster.map(agent => <Row key={agent.id} lead={<Avatar who={agent} />} main={agent.name}
-        sub={`${agent.voiceId ? readyVoices.find(voice => voice.id === agent.voiceId)?.name || 'Voice unavailable' : 'Workspace voice'} · speaks to ${agent.customerLanguage ? callerName(agent.customerLanguage) : 'workspace default'}`}
+        sub={agent.email ? `${agent.email} · ${agent.userId ? 'joined' : agent.inviteUrl ? 'invited, not joined yet' : 'invitation expired'}` : 'Name only · anyone at this desk can take this seat'}
         right={<>
+          {agent.email && !agent.userId && (agent.inviteUrl ? <><TextBtn icon={<Copy size={13} />} disabled={busy} onClick={() => copyLink(agent.inviteUrl, agent.email)}>Copy link</TextBtn><a className="ds-text muted" href={mailto(agent)}><Send size={13} />Send</a></> : <TextBtn icon={<Send size={13} />} disabled={busy} onClick={() => reinvite(agent)}>Invite</TextBtn>)}
           <SelectPill aria-label={`Voice for ${agent.name}`} value={agent.voiceId || ''} disabled={busy} onChange={value => run(() => api.editAgent(agent.id, { voiceId: value || null }))} options={[{ value: '', label: 'Workspace voice' }, ...readyVoices.map(voice => ({ value: voice.id, label: voice.name }))]} />
           <SelectPill aria-label={`Caller language for ${agent.name}`} value={agent.customerLanguage || ''} disabled={busy} onChange={value => run(() => api.editAgent(agent.id, { customerLanguage: value || null }))} options={[{ value: '', label: 'Workspace default' }, { value: 'auto', label: 'Detect automatically' }, ...LANGS]} />
           <button type="button" className="ds-tool" aria-label={`Remove ${agent.name}`} disabled={busy} onClick={() => remove(agent)}><Trash2 size={14} /></button>
         </>} />) : <Empty title="Nobody on the floor yet.">With an empty roster this stays a single desk and anyone can answer.</Empty>}
-      <p className="ds-note" style={{ marginTop: 14 }}>A roster entry is a seat, not an account. Anyone who can open this workspace can take any seat, so keep the workspace password with the people who should answer calls.</p>
+      <p className="ds-note" style={{ marginTop: 14 }}>Invite by email and the link signs them up as their seat. A name on its own is a seat anyone at this desk can take.</p>
     </Body>
   </>;
 }

@@ -1,7 +1,7 @@
 // Voice: the voice callers hear (the one in use, one take per feeling, the
 // library), the puff you are on the floor, and how formal replies are.
 import React, { useEffect, useRef, useState } from 'react';
-import { Archive, ArrowDownToLine, AudioLines, Check, Globe2, Mic, MoreHorizontal, Play, RefreshCw, Search, Settings2, Square } from 'lucide-react';
+import { Share2, Archive, ArrowDownToLine, AudioLines, Check, Globe2, Mic, MoreHorizontal, Play, RefreshCw, Search, Settings2, Square } from 'lucide-react';
 import { api } from '../api.js';
 import { Toolbar, Title, Tabs, ReadBar, Body, Col, Label, Status, Chip, Row, Btn, TextBtn, Pill, SelectPill, Field, Switch, Option, Setting, Empty, Spinner, Ask, Avatar, Puff, PUFFS, SWATCHES, avatarOf } from '../shell.jsx';
 import { useCapture, VoiceModal, ImportModal, REGISTERS, READING_SCRIPTS, downloadJson, isArchived, languageName, formatDuration, callState } from '../lib.jsx';
@@ -28,11 +28,21 @@ export default function VoicePage(common) {
   const voiceId = owned('voiceId') || data.settings.voiceId || '';
   const selected = data.voices.find(item => item.id === selectedId);
   const use = async chosen => { if (await saveOwned({ voiceId: chosen.id })) { setNotice(`${chosen.name} answers your calls.`); setSelectedId(null); } };
-  const shared = { ...common, setTab, setSelectedId, setImporting, use, voiceId, me: seat || { name: 'workspace', avatar: data.settings.avatar }, voice: data.voices.find(item => item.id === voiceId), ready: data.voices.filter(item => item.status === 'ready' && !isArchived(item)), registers: owned('registers') || {} };
+  // A voice travels as a small file: the Fish reference and consent, never audio.
+  const share = async voice => { try { downloadJson(`${voice.name}.notefish-voice.json`, await api.exportVoice(voice.id)); setNotice('Voice file saved. Send it to a colleague; they drop it on Voice › Library.'); } catch (failure) { setError(failure.message); } };
+  const importFile = async file => {
+    try {
+      const pack = JSON.parse(await file.text());
+      if (!window.confirm('Import the voices in this file? Only import voices you own or have permission to use.')) return;
+      const result = await api.importPack({ pack, consent: true }); await refreshVoices();
+      setNotice(`${result.imported.length} voice${result.imported.length === 1 ? '' : 's'} imported${result.skipped.length ? `, ${result.skipped.length} already here` : ''}.`);
+    } catch (failure) { setError(failure.message.startsWith('Unexpected') ? 'That is not a NoteFish voice file.' : failure.message); }
+  };
+  const shared = { share, importFile, ...common, setTab, setSelectedId, setImporting, use, voiceId, me: seat || { name: 'workspace', avatar: data.settings.avatar }, voice: data.voices.find(item => item.id === voiceId), ready: data.voices.filter(item => item.status === 'ready' && !isArchived(item)), registers: owned('registers') || {} };
   const Section = { voice: YourVoice, takes: Takes, avatar: AvatarTab, register: Register, library: Library }[tab];
   return <>
     <Toolbar />
-    <Title title="Voice" sub={tab === 'takes' ? 'One take per feeling. The desk picks the take that matches how you spoke.' : 'How you sound to callers, and how you look on the floor'} />
+    <Title title="Voice" sub={tab === 'takes' ? 'One take is enough. Record more feelings only if you want them to sound exactly like you.' : 'How you sound to callers, and how you look on the floor'} />
     <Tabs items={TABS} value={tab} onChange={setTab} />
     <Section {...shared} />
     <Ask placeholder="Ask how a reply will sound" scope="settings" />
@@ -41,7 +51,7 @@ export default function VoicePage(common) {
   </>;
 }
 
-function YourVoice({ data, seat, owned, saveOwned, me, voice, ready, registers, setTab, setSelectedId }) {
+function YourVoice({ data, seat, owned, saveOwned, me, voice, ready, registers, setTab, setSelectedId, share }) {
   const own = owned('voiceId') || '';
   const ownVoice = data.voices.find(item => item.id === own);
   const choices = ownVoice && !ready.includes(ownVoice) ? [ownVoice, ...ready] : ready;
@@ -49,11 +59,11 @@ function YourVoice({ data, seat, owned, saveOwned, me, voice, ready, registers, 
   const taken = REGISTERS.filter(item => registers[item.key]);
   return <Body>
     <div className="ds-card"><Avatar who={me} size={54} /><div><strong>{voice ? `${voice.name} · ${voice.kind === 'licensed' ? 'licensed voice' : 'your voice'}` : 'No voice yet'}</strong><span>{voice ? [voice.createdAt && `Recorded ${dateOf(voice.createdAt)}`, languageName(voice.language || 'en'), kindOf(voice)].filter(Boolean).join(' · ') : 'Read one short passage and callers hear you in their language.'}</span></div>
-      <div className="actions">{voice && <Btn pill kind="ghost" icon={<Play size={12} />} onClick={() => setSelectedId(voice.id)}>Hear it</Btn>}<Btn pill icon={<Mic size={13} />} onClick={() => setTab('takes')}>{voice ? 'Re-record' : 'Record'}</Btn></div></div>
+      <div className="actions">{voice && <Btn pill kind="ghost" icon={<Play size={12} />} onClick={() => setSelectedId(voice.id)}>Hear it</Btn>}{voice && <Btn pill kind="ghost" icon={<Share2 size={12} />} onClick={() => share(voice)}>Share</Btn>}<Btn pill icon={<Mic size={13} />} onClick={() => setTab('takes')}>{voice ? 'Re-record' : 'Record'}</Btn></div></div>
     <h3>Voice for calls</h3>
     <Setting main="Which voice answers" sub={seat ? 'Your own voice on calls, or the workspace voice when you have none.' : 'The voice every reply is spoken in.'}><SelectPill aria-label="Which voice answers" value={own} onChange={id => saveOwned({ voiceId: id || null })} options={options} /></Setting>
     <h3>Takes</h3>
-    <Setting main={`${taken.length} of ${REGISTERS.length} feelings recorded`} sub={taken.length ? taken.map(item => item.label).join(', ') : 'Each feeling gets its own take; the desk picks the one that matches how you spoke.'}><TextBtn onClick={() => setTab('takes')}>{taken.length ? 'Record more' : 'Record a take'}</TextBtn></Setting>
+    <Setting main={taken.length ? `${taken.length} of ${REGISTERS.length} feelings recorded` : 'One take is enough'} sub={taken.length ? taken.map(item => item.label).join(', ') : 'The desk adds the feeling itself. A take per feeling makes it sound exactly like you.'}><TextBtn onClick={() => setTab('takes')}>{taken.length ? 'Record more' : 'Record a take'}</TextBtn></Setting>
   </Body>;
 }
 
@@ -155,7 +165,8 @@ function Register({ seat, owned, saveOwned }) {
   </Body>;
 }
 
-function Library({ data, loading, voiceId, trainingNotes, setError, setNotice, refreshVoices, setSelectedId, setImporting, setTab, use }) {
+function Library({data, loading, voiceId, trainingNotes, setError, setNotice, refreshVoices, setSelectedId, setImporting, setTab, use, importFile, share }) {
+  const [over, setOver] = useState(false);
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState('');
   const attempt = fn => fn().catch(failure => setError(failure.message));
@@ -168,7 +179,7 @@ function Library({ data, loading, voiceId, trainingNotes, setError, setNotice, r
     { id: 'edit', label: 'Edit voice details', icon: Settings2, opensDialog: true, onSelect: () => setSelectedId(voice.id) },
     { separator: true },
     { id: 'refresh', label: 'Refresh voice status', icon: RefreshCw, onSelect: () => act(voice, async () => { await api.refreshVoice(voice.id); await refreshVoices(); setNotice('Voice status refreshed.'); }) },
-    { id: 'export', label: 'Export voice file', icon: ArrowDownToLine, onSelect: () => act(voice, async () => { downloadJson(`${voice.name}.notefish-voice.json`, await api.exportVoice(voice.id)); setNotice('Voice file downloaded. Import it on any other desk.'); }) },
+    { id: 'export', label: 'Share voice file', icon: ArrowDownToLine, onSelect: () => act(voice, async () => { downloadJson(`${voice.name}.notefish-voice.json`, await api.exportVoice(voice.id)); setNotice('Voice file downloaded. Import it on any other desk.'); }) },
     { separator: true },
     { id: 'archive', label: isArchived(voice) ? 'Restore voice' : 'Archive voice', icon: Archive, onSelect: () => act(voice, async () => { await api.editVoice(voice.id, { archived: !isArchived(voice) }); await refreshVoices(); setNotice(isArchived(voice) ? 'Voice restored.' : 'Voice archived. You can restore it from Archived.'); }) },
   ];
@@ -183,6 +194,10 @@ function Library({ data, loading, voiceId, trainingNotes, setError, setNotice, r
   return <>
     <ReadBar right={<><TextBtn onClick={() => setImporting(true)}>Import</TextBtn><TextBtn onClick={() => attempt(async () => { downloadJson('notefish-voices.json', await api.exportVoices()); setNotice('Voice library exported.'); })}>Export library</TextBtn></>}><Search size={14} /><input type="search" placeholder="Search voices" aria-label="Search voices" value={query} onChange={event => setQuery(event.target.value)} /></ReadBar>
     <Body tight className="voice-lib">
+      <label className={`voice-drop ${over ? 'over' : ''}`} onDragOver={event => { event.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={event => { event.preventDefault(); setOver(false); const file = event.dataTransfer.files?.[0]; if (file) importFile(file); }}>
+        <ArrowDownToLine size={16} /><span>Drop a NoteFish voice file here, or <b>choose one</b>. Share yours with the Share button on any voice.</span>
+        <input type="file" accept="application/json,.json" hidden onChange={event => { const file = event.target.files?.[0]; if (file) importFile(file); event.target.value = ''; }} />
+      </label>
       {loading ? <div className="ds-info"><Spinner size={14} />Loading your voices…</div>
         : !data.voices.length ? <Empty icon={<AudioLines size={34} strokeWidth={1.4} />} title="Every conversation starts with a voice." actions={<><Btn small icon={<Mic size={14} />} onClick={() => setTab('takes')}>Record</Btn><Btn small kind="ghost" icon={<ArrowDownToLine size={14} />} onClick={() => setImporting(true)}>Import</Btn></>}>Add a short recording to make your first voice clone, or import a Fish voice you already have.</Empty>
         : <>{shown.map(line)}{!shown.length && <p className="ds-note voice-none">{query ? 'No voices match. Try another name or language.' : 'Your active voices appear here.'}</p>}{archived.length > 0 && <><Label style={{ margin: '18px 0 2px' }}>Archived</Label>{archived.map(line)}</>}</>}

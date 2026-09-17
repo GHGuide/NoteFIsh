@@ -11,6 +11,7 @@ const TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,24}$/;
 const MAX_USERS = 500;
 const ID = /^[0-9a-f-]{36}$/;
+const INVITE_TTL = 7 * 24 * 60 * 60 * 1000;
 
 export function hashPassword(password) {
   const salt = randomBytes(16);
@@ -37,7 +38,44 @@ export function createAccounts(config, store, { now = Date.now } = {}) {
   const users = () => store.snapshot().users || [];
   const failures = new Map(); // ip → { count, until }
 
+  // An invitation names a seat and an email. Whoever opens it signs up as that email and
+  // owns the seat from then on; signing in later takes the seat again.
+  const invites = {
+    async issue(agent) {
+      const token = `${randomUUID()}${randomUUID().replace(/-/g, '')}`;
+      await store.update(state => {
+        state.invites = (state.invites || []).filter(item => item.agentId !== agent.id);
+        state.invites.push({ token, agentId: agent.id, email: agent.email, expires: now() + INVITE_TTL, createdAt: new Date(now()).toISOString() });
+      });
+      return { token, expiresAt: new Date(now() + INVITE_TTL).toISOString() };
+    },
+    find(token) {
+      if (typeof token !== 'string' || token.length > 128) return null;
+      const state = store.snapshot();
+      const invite = (state.invites || []).find(item => item.token === token && item.expires > now());
+      const agent = invite && state.agents.find(item => item.id === invite.agentId && !item.archived);
+      return invite && agent ? { ...invite, agent } : null;
+    },
+    pending(agentId) {
+      const invite = (store.snapshot().invites || []).find(item => item.agentId === agentId && item.expires > now());
+      return invite ? { token: invite.token, expiresAt: new Date(invite.expires).toISOString() } : null;
+    },
+    async accept(token, user) {
+      const invite = invites.find(token);
+      if (!invite) throw new AuthError('This invitation is no longer valid. Ask for a new one.', 410);
+      await store.update(state => {
+        const agent = state.agents.find(item => item.id === invite.agentId);
+        if (agent) { agent.userId = user.id; agent.email = user.email; }
+        state.invites = (state.invites || []).filter(item => item.token !== token);
+      });
+      return invite.agent.id;
+    },
+  };
+  const seatOf = userId => store.snapshot().agents.find(agent => agent.userId === userId && !agent.archived)?.id || '';
+
   return {
+    invites,
+    seatOf,
     count: () => users().length,
     find: id => publicUser(users().find(user => user.id === id)),
     read(req) {
@@ -100,7 +138,8 @@ export class AuthError extends Error {
 }
 
 /** /api/auth: reachable without being signed in, which is the point. */
-export function createAuthRouter({ config, accounts }) {
+export function createAuthRouter({ config, accounts, sessions = null }) {
+  const withSeat = (res, userId, agentId) => { const cookies = [accounts.cookie(userId)]; if (sessions && agentId) cookies.push(sessions.cookie(agentId)); res.set('Set-Cookie', cookies); return res; };
   const router = express.Router();
   router.use((req, res, next) => {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !validOrigin(req, config)) return res.status(403).json({ error: 'This action must originate from the NoteFish website.', code: 'INVALID_ORIGIN' });
@@ -110,19 +149,30 @@ export function createAuthRouter({ config, accounts }) {
     const id = accounts.read(req);
     res.json({ user: id ? accounts.find(id) : null, users: accounts.count(), local: isLocalRequest(req), google: false });
   });
+  router.get('/invite/:token', (req, res) => {
+    const invite = accounts.invites.find(req.params.token);
+    if (!invite) return res.status(410).json({ error: 'This invitation is no longer valid. Ask for a new one.', code: 'INVITE_GONE' });
+    res.json({ email: invite.email, name: invite.agent.name, expiresAt: new Date(invite.expires).toISOString() });
+  });
   router.post('/signup', async (req, res, next) => {
     try {
-      const user = await accounts.signUp(req.body || {});
-      res.set('Set-Cookie', accounts.cookie(user.id)).status(201).json({ user });
+      const body = { ...(req.body || {}) };
+      const invite = body.invite ? accounts.invites.find(body.invite) : null;
+      if (body.invite && !invite) throw new AuthError('This invitation is no longer valid. Ask for a new one.', 410);
+      if (invite) { body.email = invite.email; body.name = body.name || invite.agent.name; }
+      const user = await accounts.signUp(body);
+      const agentId = invite ? await accounts.invites.accept(body.invite, user) : '';
+      withSeat(res, user.id, agentId).status(201).json({ user, agentId: agentId || null });
     } catch (error) { next(error); }
   });
   router.post('/signin', async (req, res, next) => {
     try {
       const user = await accounts.signIn(req.body || {}, req.socket?.remoteAddress || '');
-      res.set('Set-Cookie', accounts.cookie(user.id)).json({ user });
+      const agentId = accounts.seatOf(user.id);
+      withSeat(res, user.id, agentId).json({ user, agentId: agentId || null });
     } catch (error) { next(error); }
   });
-  router.post('/signout', (req, res) => res.set('Set-Cookie', accounts.clearCookie()).status(204).end());
+  router.post('/signout', (req, res) => res.set('Set-Cookie', sessions ? [accounts.clearCookie(), sessions.clearCookie()] : accounts.clearCookie()).status(204).end());
   router.use((error, req, res, next) => {
     if (error instanceof AuthError) return res.status(error.status).json({ error: error.message, code: 'AUTH' });
     next(error);

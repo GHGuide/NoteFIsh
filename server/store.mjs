@@ -42,8 +42,11 @@ export function validateState(state) {
     if (!layoutOk(agent.layout) || !phrasesOk(agent.phrases)) throw new Error('Stored agent data is invalid');
     if (!(agent.persona === undefined || agent.persona === null || text(agent.persona, 300))) throw new Error('Stored agent data is invalid');
     if (!formalityOk(agent.formality) || !avatarOk(agent.avatar)) throw new Error('Stored agent data is invalid');
+    if (!([undefined, null].includes(agent.email) || text(agent.email, 254)) || !([undefined, null].includes(agent.userId) || text(agent.userId, 128))) throw new Error('Stored agent data is invalid');
   }
   if (new Set(state.agents.map(agent => agent.id)).size !== state.agents.length) throw new Error('Stored agent data is invalid');
+  const invites = state.invites ?? [];
+  if (!Array.isArray(invites) || invites.length > 200 || invites.some(item => !plain(item) || !text(item.token, 128) || !text(item.agentId, 128) || !text(item.email, 254) || typeof item.expires !== 'number')) throw new Error('Stored invitation data is invalid');
   const users = state.users ?? []; // older files have no accounts yet
   if (!Array.isArray(users) || users.length > 500) throw new Error('Stored account data is invalid');
   for (const user of users) {

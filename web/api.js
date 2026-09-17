@@ -49,6 +49,8 @@ export const api = {
   tryLine: (body) => request('/try', { method: 'POST', body: JSON.stringify(body) }),
   tryClip: (blob) => { const body = new FormData(); body.append('audio', blob, `try.${blob.type.includes('mp4') ? 'm4a' : 'webm'}`); return request('/try', { method: 'POST', body }); },
   me: () => request('/auth/me'),
+  invite: (token) => request(`/auth/invite/${encodeURIComponent(token)}`),
+  reinvite: (id) => request(`/agents/${encodeURIComponent(id)}/invite`, { method: 'POST', body: '{}' }),
   signUp: (body) => request('/auth/signup', { method: 'POST', body: JSON.stringify(body) }),
   signIn: (body) => request('/auth/signin', { method: 'POST', body: JSON.stringify(body) }),
   signOut: () => request('/auth/signout', { method: 'POST' }),

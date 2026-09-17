@@ -221,7 +221,7 @@ export default function DeskPage({ data, navigate, route, setError, setNotice, s
 
   // ---- the home screen, between calls
   const takes = REGISTERS.filter(item => (owned('registers') || {})[item.key]).length;
-  const voiceReady = takes >= REGISTERS.length;
+  const voiceReady = data.voices.some(item => item.kind === 'enrolled' && item.status === 'ready' && !item.archived && !item.archivedAt); // one recording is enough
   const week = data.calls.filter(item => new Date(item.startedAt) >= monday());
   const minutes = Math.round(week.reduce((sum, item) => sum + secs(item.answeredAt, item.endedAt), 0) / 60);
   const answeredDays = new Set(data.calls.filter(item => item.answeredAt).map(item => daysAgo(item.startedAt)));
@@ -245,8 +245,8 @@ export default function DeskPage({ data, navigate, route, setError, setNotice, s
             <h2>Your voice is ready.</h2><p>Send a caller a link, or turn on Listen for calls in the menu bar to catch Zoom and WhatsApp.</p>
             <Btn icon={inviteBusy ? <Spinner size={15} /> : <Link2 size={15} />} disabled={!browserReady || inviteBusy} onClick={createInvitation}>{inviteBusy ? 'Preparing your call…' : 'Create call link'}</Btn>
           </> : <>
-            <h2>Make the desk sound like <em>you</em>.</h2><p>Record one short take per feeling. The desk plays the one that matches how you spoke.</p>
-            <Btn icon={<Mic size={15} />} onClick={() => navigate('/voice?tab=takes')}>Record a take</Btn>
+            <h2>Make the desk sound like <em>you</em>.</h2><p>One minute of reading aloud is enough. The desk adds the feeling itself; record more takes later if you want them exact.</p>
+            <Btn icon={<Mic size={15} />} onClick={() => navigate('/voice?tab=takes')}>Record your voice</Btn>
           </>}</div>
           <div className="desk-art" aria-hidden="true"><Puff variant="bloom" color={SWATCHES[7][1]} size={92} /><Puff variant="pom" color={SWATCHES[4][1]} size={62} face={false} /><Puff variant="sheep" color={SWATCHES[6][1]} size={52} face={false} /><Puff variant="cloud" color={SWATCHES[9][1]} size={44} face={false} /></div>
         </div>

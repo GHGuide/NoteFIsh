@@ -29,7 +29,7 @@ export default function FloorPage({ data, navigate, route, seat, roster, multiAg
     const call = agent.state === 'on_call' ? callOf(agent.callId) : null;
     const lang = person.customerLanguage || data.settings.customerLanguage;
     const sub = call ? [call.from || 'Caller', formatDuration(since(call.answeredAt || call.startedAt)), (call.detectedLanguage || call.customerLanguage || '').slice(0, 2).toUpperCase()].filter(Boolean).join(' · ')
-      : agent.state === 'on_call' ? 'On a call' : agent.state === 'paused' ? agent.pauseReason || 'Paused' : agent.state === 'offline' ? 'Not signed in' : lang === 'auto' ? 'Speaks to any language' : `Speaks to ${languageName(lang)}`;
+      : agent.state === 'on_call' ? 'On a call' : agent.state === 'paused' ? agent.pauseReason || 'Paused' : agent.state === 'offline' ? 'Not signed in' : lang === 'auto' ? 'Ready · detects the caller’s language' : `Ready · callers in ${languageName(lang)}`;
     return <Row key={agent.id} lead={<Avatar who={person} size={32} />} main={agent.id === seat?.id ? <>{agent.name} <span className="ds-chip">you</span></> : agent.name} sub={sub} right={<Status tone={TONE[agent.state]}>{AGENT_STATE[agent.state]}</Status>} />;
   });
   const nobody = <p className="ds-note">No agents yet. Add them in Settings.</p>;

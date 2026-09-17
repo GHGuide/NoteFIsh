@@ -12,7 +12,7 @@ import { createStore } from './store.mjs';
 import { createProviders } from './providers.mjs';
 import { createCallService } from './calls.mjs';
 import { createSecurity, securityHeaders, canAccessDesk, validOrigin, validateTwilio } from './security.mjs';
-import { createApiRouter, createTwilioRouter, createExportRouter, errorHandler } from './routes.mjs';
+import { createApiRouter, createTwilioRouter, createExportRouter, errorHandler, roster } from './routes.mjs';
 import { createCallerAccess, CallerAccessError } from './caller-access.mjs';
 import { createSessions } from './session.mjs';
 import { createAccounts, createAuthRouter } from './accounts.mjs';
@@ -68,14 +68,14 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
   // Token-authenticated and read-only, so it sits outside the workspace gate.
   app.use('/api/export', createExportRouter({ config, calls, store, integrations }));
   // Signing in has to work before being signed in; the pages are public shells whose data is not.
-  app.use('/api/auth', express.json({ limit: '8kb', strict: true }), createAuthRouter({ config, accounts }));
-  app.get(['/', '/desk', '/enroll', '/admin', '/voices', '/voice', '/floor', '/calls', '/calls/:id', '/insights', '/glossary', '/phrases', '/settings'], (req, res) => res.sendFile(path.join(config.distPath, 'index.html'), error => { if (error && !res.headersSent) res.status(404).end(); }));
+  app.use('/api/auth', express.json({ limit: '8kb', strict: true }), createAuthRouter({ config, accounts, sessions }));
+  app.get(['/', '/desk', '/enroll', '/admin', '/voices', '/voice', '/floor', '/calls', '/calls/:id', '/insights', '/glossary', '/phrases', '/settings', '/join'], (req, res) => res.sendFile(path.join(config.distPath, 'index.html'), error => { if (error && !res.headersSent) res.status(404).end(); }));
   app.use(createSecurity(config, accounts));
-  app.use('/api', express.json({ limit: '32kb', strict: true }), createApiRouter({ config, store, providers, calls, broadcast, audioAvailable, callerAccess, sessions, queue, integrations, floorEvent }));
+  app.use('/api', express.json({ limit: '32kb', strict: true }), createApiRouter({ config, store, providers, calls, broadcast, audioAvailable, callerAccess, accounts, sessions, queue, integrations, floorEvent }));
   app.use('/api', (req, res) => res.status(404).json({ error: 'API route not found.' }));
   if (hasBuild) {
     app.use(express.static(config.distPath, { dotfiles: 'deny', index: false, fallthrough: true }));
-    app.get(['/', '/desk', '/enroll', '/admin', '/voices', '/voice', '/floor', '/pill', '/calls', '/calls/:id', '/insights', '/glossary', '/phrases', '/settings'], (req, res) => res.sendFile(path.join(config.distPath, 'index.html')));
+    app.get(['/', '/desk', '/enroll', '/admin', '/voices', '/voice', '/floor', '/pill', '/calls', '/calls/:id', '/insights', '/glossary', '/phrases', '/settings', '/join'], (req, res) => res.sendFile(path.join(config.distPath, 'index.html')));
   } else {
     app.get('/', (req, res) => res.type('text/plain').send('NoteFish API is running. Start npm run dev:web, or run npm run build to serve the website here.'));
   }
@@ -137,7 +137,7 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
     });
     ws.send(JSON.stringify({
       type: 'snapshot', calls: calls.snapshot(), settings: store.snapshot().settings,
-      agents: store.snapshot().agents, floor: queue.snapshot(), agentId,
+      agents: roster(store, accounts, config), floor: queue.snapshot(), agentId,
     }));
   });
   twilioWss.on('connection', (ws, req) => { ws.on('error', () => {}); calls.handleStream(ws, req); });

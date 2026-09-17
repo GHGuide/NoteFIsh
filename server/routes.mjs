@@ -85,7 +85,13 @@ const findVoice = (store, id, ready = false) => {
   return voice;
 };
 
-export function createApiRouter({ config, store, providers, calls, broadcast, audioAvailable, callerAccess, sessions, queue, integrations, floorEvent = () => {} }) {
+/** The roster as the desk sees it: each seat with its pending invitation link, if any. */
+export function roster(store, accounts, config) {
+  const base = config.publicBaseUrl || `http://127.0.0.1:${config.port}`;
+  return store.snapshot().agents.map(agent => { const invite = accounts?.invites.pending(agent.id); return { ...agent, inviteUrl: invite ? `${base}/join#${invite.token}` : null, inviteExpiresAt: invite?.expiresAt || null }; });
+}
+
+export function createApiRouter({ config, store, providers, calls, broadcast, audioAvailable, callerAccess, sessions, queue, integrations, accounts = null, floorEvent = () => {} }) {
   const router = express.Router();
   // A shared demo cannot tell one anonymous visitor from another, so it stays a
   // single desk. Named agents require the protected access mode.
@@ -117,7 +123,7 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     activeExpensive++;
     try { await handler(req, res); } catch (error) { next(error); } finally { activeExpensive--; }
   };
-  const stateEvent = () => broadcast({ type: 'snapshot', calls: calls.snapshot(), settings: store.snapshot().settings, agents: store.snapshot().agents, floor: queue ? queue.snapshot() : null });
+  const stateEvent = () => broadcast({ type: 'snapshot', calls: calls.snapshot(), settings: store.snapshot().settings, agents: roster(store, accounts, config), floor: queue ? queue.snapshot() : null });
   router.get('/session', (req, res) => {
     const agentId = currentAgent(req);
     const agent = agentId ? store.snapshot().agents.find(item => item.id === agentId && !item.archived) : null;
@@ -321,13 +327,27 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     stateEvent(); res.json({ settings });
   };
   router.put('/settings', saveSettings); router.patch('/settings', saveSettings);
-  router.get('/agents', (req, res) => res.json({ agents: store.snapshot().agents, floor: queue ? queue.snapshot() : null, agentId: currentAgent(req) }));
+  const rosterView = () => roster(store, accounts, config);
+  const joinUrl = token => `${config.publicBaseUrl || `http://127.0.0.1:${config.port}`}/join#${token}`;
+  router.get('/agents', (req, res) => res.json({ agents: rosterView(), floor: queue ? queue.snapshot() : null, agentId: currentAgent(req) }));
+  router.post('/agents/:id/invite', async (req, res) => {
+    requireFloor();
+    const agent = findAgent(req.params.id);
+    if (!agent.email) throw new InputError('Give this agent an email first.');
+    if (!accounts) throw new InputError('Invitations need accounts on this server.', 503);
+    const invite = await accounts.invites.issue(agent);
+    stateEvent();
+    res.json({ inviteUrl: joinUrl(invite.token), expiresAt: invite.expiresAt });
+  });
   router.post('/agents', async (req, res) => {
     requireFloor();
-    allowed(req.body, ['name', 'voiceId', 'agentLanguage', 'customerLanguage']);
-    const name = text(req.body.name, 'agent name', 100);
+    allowed(req.body, ['name', 'voiceId', 'agentLanguage', 'customerLanguage', 'email']);
+    // An email makes the seat an invitation: the person who opens the link signs up as that seat.
+    const email = req.body.email ? text(req.body.email, 'email', 254).trim().toLowerCase() : '';
+    if (email && !/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,24}$/.test(email)) throw new InputError('That email address does not look right.');
+    const name = text(req.body.name || (email ? email.split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : ''), 'agent name', 100);
     const agent = {
-      id: randomUUID(), name,
+      id: randomUUID(), name, ...(email ? { email, userId: null } : {}),
       voiceId: req.body.voiceId ? findVoice(store, req.body.voiceId, true).id : null,
       agentLanguage: req.body.agentLanguage ? language(req.body.agentLanguage) : null,
       customerLanguage: req.body.customerLanguage ? callerLanguage(req.body.customerLanguage) : null,
@@ -337,10 +357,12 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
       const active = state.agents.filter(item => !item.archived);
       if (active.length >= config.maxAgents) throw new InputError(`The roster is limited to ${config.maxAgents} agents.`, 409);
       if (active.some(item => item.name.toLowerCase() === name.toLowerCase())) throw new InputError('An agent with that name is already on the roster.', 409);
+      if (email && active.some(item => item.email === email)) throw new InputError('Someone with that email is already on the roster.', 409);
       state.agents.push(agent);
     });
+    const invite = email && accounts ? await accounts.invites.issue(agent) : null;
     stateEvent(); floorEvent();
-    res.status(201).json({ agent });
+    res.status(201).json({ agent, inviteUrl: invite ? joinUrl(invite.token) : null, expiresAt: invite?.expiresAt || null });
   });
   router.patch('/agents/:id', async (req, res) => {
     requireFloor();

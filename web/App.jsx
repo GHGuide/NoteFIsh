@@ -48,10 +48,15 @@ export default function App() {
 function Gate() {
   const [me, setMe] = useState(null); // { user, users }
   useEffect(() => { api.me().then(setMe).catch(() => setMe({ user: null, users: 0 })); }, []);
+  // /join#token: an invitation to a seat. The page signs them up as that seat.
+  const token = location.pathname.replace(/\/+$/, '') === '/join' ? location.hash.slice(1) : '';
+  const [invite, setInvite] = useState(token ? undefined : null);
+  useEffect(() => { if (token) api.invite(token).then(found => setInvite({ ...found, token })).catch(failure => setInvite({ token, error: failure.message })); }, [token]);
   // Skipping is a local convenience: the server's loopback bypass already opens the API here.
   const [skipped, setSkipped] = useState(() => { try { return localStorage.getItem('notefish.skipAuth') === '1'; } catch { return false; } });
   const skip = value => { setSkipped(value); try { value ? localStorage.setItem('notefish.skipAuth', '1') : localStorage.removeItem('notefish.skipAuth'); } catch { /* fine */ } };
-  if (!me) return null;
+  if (!me || invite === undefined) return null;
+  if (invite && !me.user) return <AuthPage users={me.users} invite={invite} onSignedIn={user => { history.replaceState({}, '', '/desk'); setMe({ ...me, user }); }} />;
   if (!me.user && !(skipped && me.local)) return <AuthPage users={me.users} local={me.local} onSignedIn={user => setMe({ ...me, user })} onSkip={() => skip(true)} />;
   return <WorkspaceApp user={me.user} onSignedOut={() => { skip(false); setMe({ ...me, user: null, users: Math.max(1, me.users) }); }} />;
 }

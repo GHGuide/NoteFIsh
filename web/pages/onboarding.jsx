@@ -86,7 +86,7 @@ export default function Onboarding({ data, seat, owned, saveSettings, navigate, 
         {ready.length ? ready.map(item => <Option key={item.id} on={item.id === voiceId} main={item.name} sub={`${item.kind === 'licensed' ? 'Licensed voice' : 'Your voice'} · ${languageName(item.language || 'en')}${item.register ? ` · ${REGISTERS.find(r => r.key === item.register)?.label || item.register} take` : ''}`} onClick={() => saveSettings({ voiceId: item.id })} />)
           : <p className="ob-note">No voice is ready yet. Record yours, or import one under Voice › Library.</p>}
       </div>
-      <div className="ob-actions"><Btn kind="ghost" icon={<Mic size={15} />} onClick={() => pause('/voice?tab=takes')}>Record my own voice</Btn><span className="ob-hint">{takes ? `${takes} of ${REGISTERS.length} feelings recorded` : 'You come back here when it is done.'}</span></div>
+      <div className="ob-actions"><Btn kind="ghost" icon={<Mic size={15} />} onClick={() => pause('/voice?tab=takes')}>Record my own voice</Btn><span className="ob-hint">{takes ? 'Recorded. One take is enough.' : 'One minute is enough. You come back here when it is done.'}</span></div>
     </>,
     try: <>
       <span className="ob-eyebrow">Step {index} of {steps.length - 2}</span>
