@@ -40,7 +40,8 @@ test('public caller shell and one-use socket admission never expose desk data or
   const sockets = [];
   t.after(async () => { for (const socket of sockets) socket.terminate(); await runtime.close(); await rm(directory, { recursive: true, force: true }); });
   for (const route of ['/caller', '/assets/app.js', '/favicon.svg', '/healthz']) assert.equal((await fetch(`${base}${route}`)).status, 200);
-  for (const route of ['/', '/desk', '/api/settings', '/api/voices', '/api/calls', '/api/status']) assert.equal((await fetch(`${base}${route}`)).status, 401);
+  for (const route of ['/', '/desk']) assert.equal((await fetch(`${base}${route}`)).status, 200, 'the shell is public so the sign-in page can render');
+  for (const route of ['/api/settings', '/api/voices', '/api/calls', '/api/status']) assert.equal((await fetch(`${base}${route}`)).status, 401);
   assert.equal((await fetch(`${base}/api/caller-invitations`, { method: 'POST', headers: { Origin: 'https://example.test' } })).status, 401);
   const invitationResponse = await fetch(`${base}/api/caller-invitations`, { method: 'POST', headers, body: '{}' });
   assert.equal(invitationResponse.status, 201);

@@ -2,7 +2,7 @@
 // the pages inside it. State (calls, settings, the desk socket, seats) lives
 // here and flows to every page as `common`; web/pages/* draw the sheets.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AudioLines, Bell, CheckCircle2, ChevronDown, Maximize2, Menu, PhoneCall, X } from 'lucide-react';
+import { AudioLines, Bell, CheckCircle2, ChevronDown, LogOut, Maximize2, Menu, PhoneCall, X } from 'lucide-react';
 import { api } from './api.js';
 import { mergeTrainingStatus, monitorVoiceTraining } from './voice-training.js';
 import { CallerAudio } from './audio.js';
@@ -20,6 +20,7 @@ import VoicePage from './pages/voice.jsx';
 import FloorPage from './pages/floor.jsx';
 import SettingsPage from './pages/settings.jsx';
 import FreeMonth from './pages/free.jsx';
+import AuthPage from './pages/auth.jsx';
 import { Mic, Disc, BarChart3, BookOpen, Quote, Users, Gift, Settings, CircleHelp } from 'lucide-react';
 
 const HELP_URL = 'https://github.com/GHGuide/NoteFish#readme';
@@ -39,7 +40,16 @@ export default function App() {
   // The public caller surface never initializes authenticated workspace hooks,
   // loads voices/settings/tickets, or opens the desk WebSocket.
   const path = location.pathname.replace(/\/+$/, '');
-  return <UiProvider>{path === '/caller' ? <CallerEntry /> : path === '/pill' ? <PillEntry /> : <WorkspaceApp />}</UiProvider>;
+  return <UiProvider>{path === '/caller' ? <CallerEntry /> : path === '/pill' ? <PillEntry /> : <Gate />}</UiProvider>;
+}
+
+/** Nobody signed in: the sign-in / sign-up screen. The first person to arrive creates the desk. */
+function Gate() {
+  const [me, setMe] = useState(null); // { user, users }
+  useEffect(() => { api.me().then(setMe).catch(() => setMe({ user: null, users: 0 })); }, []);
+  if (!me) return null;
+  if (!me.user) return <AuthPage users={me.users} onSignedIn={user => setMe({ ...me, user })} />;
+  return <WorkspaceApp user={me.user} onSignedOut={() => setMe({ ...me, user: null, users: Math.max(1, me.users) })} />;
 }
 
 function CallerEntry() {
@@ -65,7 +75,7 @@ function parseRoute(route) {
   return { path: NAV.some(item => item.path === base) || base === '/settings' ? base : '/desk', params: {}, query, full: route };
 }
 
-function WorkspaceApp() {
+function WorkspaceApp({ user, onSignedOut }) {
   const [route, setRoute] = useState(location.pathname + location.search);
   const [mobileNav, setMobileNav] = useState(false);
   const [focus, setFocus] = useState(false);
@@ -180,6 +190,7 @@ function WorkspaceApp() {
         <button type="button" onClick={() => setFree(true)}><Gift size={16} strokeWidth={1.7} />Get a free month</button>
         <a href="/settings" className={parsed.path === '/settings' ? 'active' : ''} onClick={event => { event.preventDefault(); navigate('/settings'); }}><Settings size={16} strokeWidth={1.7} />Settings</a>
         <a href={HELP_URL} target="_blank" rel="noreferrer"><CircleHelp size={16} strokeWidth={1.7} />Help</a>
+        <button type="button" title={user?.email || ''} onClick={() => api.signOut().catch(() => {}).finally(onSignedOut)}><LogOut size={16} strokeWidth={1.7} />Sign out{user?.name ? ` · ${user.name.split(' ')[0]}` : ''}</button>
         <div className="ds-side-foot"><i className={connection === 'connected' ? 'connected' : ''} />{connection === 'connected' ? 'Desk connected' : connection === 'connecting' ? 'Connecting…' : 'Reconnecting…'}</div>
       </nav>
     </aside>

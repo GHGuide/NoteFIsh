@@ -6,7 +6,7 @@ import { REGISTERS, canonicalRegister } from './emotion.mjs';
 const MAX_STATE = 16 * 1024 * 1024;
 export const VERSION = 2;
 export const MAX_AGENTS = 50;
-const initialState = () => ({ version: VERSION, voices: [], settings: { voiceId: null, agentLanguage: 'en', customerLanguage: 'fr', queueName: 'Main line' }, agents: [], calls: [] });
+const initialState = () => ({ version: VERSION, voices: [], settings: { voiceId: null, agentLanguage: 'en', customerLanguage: 'fr', queueName: 'Main line' }, agents: [], calls: [], users: [] });
 const plain = value => value && typeof value === 'object' && !Array.isArray(value);
 const text = (value, max) => typeof value === 'string' && value.length <= max;
 const phrasesOk = value => value === undefined || (Array.isArray(value) && value.length <= 30 && value.every(item => plain(item) && text(item.id, 64) && text(item.text, 300) && item.text.trim()));
@@ -21,6 +21,7 @@ const avatarOk = value => value === undefined || value === null || (plain(value)
 export function migrateState(state) {
   if (!plain(state)) return state;
   if (state.version === 1) state = { ...state, version: VERSION, agents: [] };
+  if (plain(state) && !Array.isArray(state.users)) state.users = [];
   // Registers renamed on 17 Sep 2026 (brisk -> energetic): old files keep loading, old takes keep their slot.
   const rename = map => plain(map) ? Object.fromEntries(Object.entries(map).map(([k, v]) => [canonicalRegister(k), v])) : map;
   for (const voice of Array.isArray(state.voices) ? state.voices : []) if (plain(voice) && voice.register) voice.register = canonicalRegister(voice.register);
@@ -43,6 +44,12 @@ export function validateState(state) {
     if (!formalityOk(agent.formality) || !avatarOk(agent.avatar)) throw new Error('Stored agent data is invalid');
   }
   if (new Set(state.agents.map(agent => agent.id)).size !== state.agents.length) throw new Error('Stored agent data is invalid');
+  const users = state.users ?? []; // older files have no accounts yet
+  if (!Array.isArray(users) || users.length > 500) throw new Error('Stored account data is invalid');
+  for (const user of users) {
+    if (!plain(user) || !text(user.id, 128) || !text(user.name, 100) || !text(user.email, 254) || !text(user.passwordHash, 400) || !text(user.createdAt, 50)) throw new Error('Stored account data is invalid');
+  }
+  if (!([undefined, null].includes(state.authSecret) || text(state.authSecret, 128))) throw new Error('Stored account data is invalid');
   const settings = state.settings;
   if (!(settings.voiceId === null || text(settings.voiceId, 128)) || !text(settings.agentLanguage, 40) || !text(settings.customerLanguage, 40) || !text(settings.queueName, 100)) throw new Error('Stored settings are invalid');
   if (settings.registers !== undefined && (!plain(settings.registers) || Object.entries(settings.registers).some(([k, v]) => !REGISTERS.includes(k) || !(v === null || text(v, 128))))) throw new Error('Stored settings are invalid');

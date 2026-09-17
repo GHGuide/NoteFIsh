@@ -18,7 +18,7 @@ test('single production service protects app/API/desk socket and exposes only mi
   t.after(async () => { await runtime.close(); await rm(directory, { recursive: true, force: true }); });
   const health = await fetch(`${base}/healthz`);
   assert.deepEqual(await health.json(), { status: 'ok' });
-  assert.equal((await fetch(base)).status, 401);
+  assert.equal((await fetch(base)).status, 404, 'the sign-in shell is public; this deployment has no built bundle to serve'); // data stays behind the gate below
   assert.equal((await fetch(`${base}/api/status`)).status, 401);
   const authenticated = await fetch(`${base}/api/settings`, { headers: { Authorization: auth } });
   assert.equal(authenticated.status, 200);

@@ -1,0 +1,50 @@
+/* Sign in / sign up: the two-column window from the design canvas. */
+.au { position: fixed; inset: 0; display: grid; grid-template-columns: 1fr 1fr; background: var(--paper); color: var(--ink); font-family: var(--sans); }
+.au-left { display: flex; flex-direction: column; justify-content: space-between; padding: 40px 48px 36px; }
+.au-lockup { display: flex; align-items: center; gap: 8px; font-size: 19px; font-weight: 650; letter-spacing: -.6px; }
+.au-lockup .dot { color: #77736B; }
+.au-promise { display: flex; flex-direction: column; gap: 14px; max-width: 400px; }
+.au-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: #6B6861; }
+.au-promise h1 { margin: 0; font: 400 40px/1.1 var(--serif); letter-spacing: -.9px; }
+.au-promise p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--muted); }
+.au-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; max-width: 340px; }
+.au-steps li { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--navtext); }
+.au-steps i { display: grid; place-items: center; width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--sheet); font-size: 10px; font-style: normal; color: var(--muted); }
+.au-demo { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.au-cap { width: 300px; padding: 10px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--sheet-line); box-shadow: 0 8px 24px rgba(36, 36, 36, .08); }
+.au-cap > span { display: block; font-size: 9.5px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: #8F8B83; }
+.au-cap p { margin: 2px 0 0; font-size: 13px; line-height: 1.4; }
+.au-cap p.sub { margin-top: 3px; font-size: 11px; color: var(--muted); }
+.au-cap p.sub b { font-weight: 600; margin-right: 5px; }
+.au-pill { display: inline-flex; align-items: center; gap: 9px; height: 40px; padding: 0 14px 0 10px; border-radius: 999px; background: #242424; color: #FFF; box-shadow: 0 10px 30px rgba(36, 36, 36, .28); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.au-pill .wave { display: inline-flex; align-items: center; gap: 3px; height: 18px; }
+.au-pill .wave i { display: block; width: 3px; border-radius: 2px; background: #FFF; }
+.au-pill .dim { opacity: .5; }
+.au-pill kbd { font: inherit; font-size: 10px; border: 1px solid #777; padding: 2px 6px; border-radius: 4px; color: #E2E0DB; }
+.au-right { display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 40px 48px 28px; background: var(--sheet); border-left: 1px solid var(--sheet-line); }
+.au-form { width: 340px; margin-top: 8vh; display: flex; flex-direction: column; gap: 13px; }
+.au-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.au-head h2 { margin: 0; font: 400 28px/1.15 var(--serif); letter-spacing: -.5px; }
+.au-head p { margin: 0; font-size: 13px; color: var(--muted); }
+.au-google { display: flex; align-items: center; justify-content: center; gap: 10px; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: #FFF; color: var(--ink); font: 600 13.5px var(--sans); cursor: pointer; }
+.au-google:hover { background: #F6F5F1; }
+.au-or { display: flex; align-items: center; gap: 12px; font-size: 11px; color: #8F8B83; }
+.au-or span { flex: 1; height: 1px; background: var(--sheet-line); }
+.au-field { display: flex; flex-direction: column; gap: 5px; }
+.au-field > span { font-size: 11px; font-weight: 600; color: var(--muted); }
+.au-field > span.row { display: flex; justify-content: space-between; align-items: center; }
+.au-field > span a { font-weight: 500; color: var(--navtext); text-decoration: none; }
+.au-field input { height: 40px; padding: 0 12px; border: 1px solid var(--sheet-line); border-radius: 9px; background: #FFF; font: 400 13.5px var(--sans); color: var(--ink); outline: none; }
+.au-field input::placeholder { color: var(--placeholder); }
+.au-field input:focus { border-color: #8F8B83; box-shadow: 0 0 0 3px rgba(36, 36, 36, .08); }
+.au-check { display: flex; align-items: flex-start; gap: 9px; font-size: 12px; line-height: 1.45; color: var(--navtext); cursor: pointer; }
+.au-check input { margin: 2px 0 0; accent-color: var(--ink); }
+.au-submit { height: 44px; margin-top: 2px; border: 1px solid var(--ink); border-radius: 10px; background: var(--ink); color: #FFF; font: 600 13.5px var(--sans); cursor: pointer; }
+.au-submit:hover:not(:disabled) { background: #3B3A37; }
+.au-submit:disabled { opacity: .55; cursor: wait; }
+.au-switch { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); text-align: center; }
+.au-switch a { font-weight: 600; color: var(--ink); text-decoration: none; }
+.au-note { margin: 0; padding: 9px 12px; border-radius: 9px; background: var(--bar); font-size: 12.5px; color: var(--muted); }
+.au-error { margin: 0; padding: 9px 12px; border-radius: 9px; background: #FFF3F1; font-size: 12.5px; color: #8F2C2B; }
+.au-legal { margin: 0; max-width: 340px; font-size: 11px; line-height: 1.5; color: #8F8B83; text-align: center; }
+@media (max-width: 860px) { .au { grid-template-columns: 1fr; overflow: auto; } .au-left { padding: 28px 24px 16px; gap: 24px; } .au-demo, .au-steps { display: none; } .au-right { border-left: 0; border-top: 1px solid var(--sheet-line); padding: 24px; } .au-form { width: 100%; max-width: 360px; margin-top: 0; } }

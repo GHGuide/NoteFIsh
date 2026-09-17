@@ -15,6 +15,7 @@ import { createSecurity, securityHeaders, canAccessDesk, validOrigin, validateTw
 import { createApiRouter, createTwilioRouter, createExportRouter, errorHandler } from './routes.mjs';
 import { createCallerAccess, CallerAccessError } from './caller-access.mjs';
 import { createSessions } from './session.mjs';
+import { createAccounts, createAuthRouter } from './accounts.mjs';
 import { createQueue } from './queue.mjs';
 import { createIntegrations } from './integrations/index.mjs';
 
@@ -26,6 +27,7 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
   const providers = suppliedProviders || createProviders(config);
   const callerAccess = createCallerAccess(config);
   const sessions = createSessions(config);
+  const accounts = createAccounts(config, store);
   const integrations = createIntegrations({ config });
   // ws -> agentId ('' for a desk with no agent selected yet).
   const clients = new Map();
@@ -65,7 +67,10 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
   app.use('/twilio', createTwilioRouter({ config, calls }));
   // Token-authenticated and read-only, so it sits outside the workspace gate.
   app.use('/api/export', createExportRouter({ config, calls, store, integrations }));
-  app.use(createSecurity(config));
+  // Signing in has to work before being signed in; the pages are public shells whose data is not.
+  app.use('/api/auth', express.json({ limit: '8kb', strict: true }), createAuthRouter({ config, accounts }));
+  app.get(['/', '/desk', '/enroll', '/admin', '/voices', '/voice', '/floor', '/calls', '/calls/:id', '/insights', '/glossary', '/phrases', '/settings'], (req, res) => res.sendFile(path.join(config.distPath, 'index.html'), error => { if (error && !res.headersSent) res.status(404).end(); }));
+  app.use(createSecurity(config, accounts));
   app.use('/api', express.json({ limit: '32kb', strict: true }), createApiRouter({ config, store, providers, calls, broadcast, audioAvailable, callerAccess, sessions, queue, integrations, floorEvent }));
   app.use('/api', (req, res) => res.status(404).json({ error: 'API route not found.' }));
   if (hasBuild) {
@@ -83,7 +88,7 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
   const denyUpgrade = (socket, status = 403) => { socket.write(`HTTP/1.1 ${status} Forbidden\r\nConnection: close\r\n\r\n`); socket.destroy(); };
   server.on('upgrade', (req, socket, head) => {
     if (req.url === '/ws/desk') {
-      if (!canAccessDesk(req, config) || !validOrigin(req, config)) return denyUpgrade(socket);
+      if (!canAccessDesk(req, config, accounts) || !validOrigin(req, config)) return denyUpgrade(socket);
       // Two tabs per seat is ordinary; the cap is on tabs, not on agents.
       if (clients.size >= Math.max(5, config.maxAgents * 2)) return denyUpgrade(socket, 429);
       deskWss.handleUpgrade(req, socket, head, ws => deskWss.emit('connection', ws, req));

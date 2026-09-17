@@ -34,8 +34,8 @@ export function isAuthenticated(req, config) {
 
 // Shared demo access is an explicit deployment choice. It grants workspace
 // access without pretending that an anonymous visitor authenticated.
-export function canAccessDesk(req, config) {
-  return (config.publicDemo === true && Boolean(config.publicBaseUrl)) || isAuthenticated(req, config);
+export function canAccessDesk(req, config, accounts = null) {
+  return (config.publicDemo === true && Boolean(config.publicBaseUrl)) || isAuthenticated(req, config) || Boolean(accounts?.read(req));
 }
 
 export function validOrigin(req, config) {
@@ -60,7 +60,7 @@ export function securityHeaders(req, res, next) {
   next();
 }
 
-export function createSecurity(config) {
+export function createSecurity(config, accounts = null) {
   const attempts = new Map();
   let requests = 0;
   return function protect(req, res, next) {
@@ -69,9 +69,10 @@ export function createSecurity(config) {
     const ip = req.socket.remoteAddress || 'unknown';
     const attempt = attempts.get(ip);
     if (attempt?.until > now && attempt.count >= 20) return res.status(429).json({ error: 'Too many sign-in attempts. Try again in one minute.', code: 'AUTH_RATE_LIMIT' });
-    if (!canAccessDesk(req, config)) {
+    if (!canAccessDesk(req, config, accounts)) {
       if (attempt?.until > now) attempt.count++; else attempts.set(ip, { count: 1, until: now + 60_000 });
       if (!config.deskPassword || !config.publicBaseUrl) return res.status(503).json({ error: 'Public desk access requires PUBLIC_BASE_URL and NOTEFISH_DESK_PASSWORD on the server.', code: 'PUBLIC_ACCESS_UNCONFIGURED' });
+      if (accounts && req.path.startsWith('/api/')) return res.status(401).json({ error: 'Sign in to use the desk.', code: 'AUTH_REQUIRED' });
       res.set('WWW-Authenticate', 'Basic realm="NoteFish desk", charset="UTF-8"');
       return res.status(401).json({ error: 'Sign in with username desk and the configured desk password.', code: 'AUTH_REQUIRED' });
     }

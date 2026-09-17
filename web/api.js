@@ -46,4 +46,8 @@ export const api = {
   ptt: (id, blob, feeling) => { const body = new FormData(); body.append('audio', blob, `reply.${blob.type.includes('mp4') ? 'm4a' : 'webm'}`); if (feeling && feeling !== 'auto') body.append('feeling', feeling); return request(`/calls/${encodeURIComponent(id)}/reply`, { method: 'POST', body }); },
   ticket: (id, body) => request(`/calls/${encodeURIComponent(id)}/ticket`, { method: 'PATCH', body: JSON.stringify(body) }),
   ask: (body, signal) => request('/ask', { method: 'POST', body: JSON.stringify(body), signal }),
+  me: () => request('/auth/me'),
+  signUp: (body) => request('/auth/signup', { method: 'POST', body: JSON.stringify(body) }),
+  signIn: (body) => request('/auth/signin', { method: 'POST', body: JSON.stringify(body) }),
+  signOut: () => request('/auth/signout', { method: 'POST' }),
 };
