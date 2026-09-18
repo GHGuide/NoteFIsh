@@ -86,7 +86,7 @@ export default function PillEntry() {
         if (message.type === 'snapshot') setCalls(message.calls || []);
         if (message.type === 'call' && message.call) setCalls(current => [message.call, ...current.filter(call => call.id !== message.call.id)]);
         if (message.type === 'caption-partial') setPartial(message.text ? { callId: message.callId, text: message.text, shown: message.shown || '' } : null);
-        if (message.type === 'level') setLevel({ at: Date.now(), value: Math.max(0, Math.min(1, Number(message.level) || 0)) });
+        if (message.type === 'level') setLevel({ at: Date.now(), callId: message.callId, value: Math.max(0, Math.min(1, Number(message.level) || 0)) });
       };
       socket.onclose = () => { setConnection('reconnecting'); if (!closed) timer = setTimeout(connect, 2000); };
       socket.onerror = () => socket.close();
@@ -170,7 +170,8 @@ export default function PillEntry() {
 
   // A meter that has not been fed for a moment rests at nothing, which is the truth:
   // no audio is reaching the desk. Silence on the line still feeds it, quietly.
-  const heard = level && now - level.at < LEVEL_LIFE ? level.value : (live ? 0 : null);
+  const mineNow = level && level.callId === live?.id;
+  const heard = mineNow && now - level.at < LEVEL_LIFE ? level.value : (live ? 0 : null);
   const answeredFor = live?.answeredAt ? now - new Date(live.answeredAt).getTime() : 0;
   // While a reply is being translated or played the desk sets the caller's audio aside,
   // so no levels arrive and none are meant to. Only the time spent actually listening
@@ -180,7 +181,7 @@ export default function PillEntry() {
   // Nothing for a while, rather than nothing yet: a bridge that dies halfway through a
   // call goes just as quiet as one that never worked, and silence on the line still
   // sends levels, so this only fires when no audio is reaching the desk at all.
-  const heardAt = Math.max(level?.at || 0, busyAt.current, live?.answeredAt ? new Date(live.answeredAt).getTime() : 0);
+  const heardAt = Math.max(mineNow ? level.at : 0, busyAt.current, live?.answeredAt ? new Date(live.answeredAt).getTime() : 0);
   const deaf = !!live && answeredFor > DEAF_AFTER && now - heardAt > DEAF_AFTER;
 
   // The window is exactly the box we draw. A ResizeObserver sees every change of that box
@@ -238,7 +239,6 @@ export default function PillEntry() {
     thinking: <><Loader2 className="spin" size={15} /><span>Translating</span>{pair}</>,
     speaking: <>
       <span className="dim2"><Volume2 size={15} /></span><span>Playing in your voice</span>
-      <span className="bar"><i style={{ width: `${Math.min(100, played * 22)}%` }} /></span>
       <span className="dim">{clock(played)}</span>
     </>,
     ended: endedFresh && <><span className="dim2"><Check size={15} /></span><span>Call ended</span><span className="dim">{endedFresh.answeredAt ? clock((new Date(endedFresh.endedAt) - new Date(endedFresh.answeredAt)) / 1000) : 'not answered'}</span></>,

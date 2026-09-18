@@ -37,8 +37,6 @@
 .pill-page .act:disabled { opacity: .45; cursor: not-allowed; }
 .pill-page .rec { width: 9px; height: 9px; border-radius: 50%; background: #C43B36; box-shadow: 0 0 0 4px rgba(196, 59, 54, .28); animation: pill-blink 1.2s ease-in-out infinite; flex-shrink: 0; }
 @keyframes pill-blink { 50% { opacity: .35; } }
-.pill-page .bar { width: 84px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .18); overflow: hidden; }
-.pill-page .bar i { display: block; height: 100%; background: #FFF; border-radius: 2px; transition: width .25s linear; }
 .pill-page .wave { display: inline-flex; align-items: center; gap: 3px; height: 22px; }
 .pill-page .wave i { width: 3px; border-radius: 2px; background: currentColor; height: var(--h, 10px); transform-origin: center; animation: pill-wave 1s ease-in-out infinite; animation-delay: var(--d, 0s); }
 .pill-page .wave.real i { animation: none; transition: height .12s linear; }

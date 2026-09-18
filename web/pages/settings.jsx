@@ -182,7 +182,7 @@ function Phone({ data, setup, readyVoices, navigate, copy }) {
 
 function Integrations({ setup }) {
   const [recent, setRecent] = useState(null);
-  useEffect(() => { let live = true; api.integrations().then(result => { if (live) setRecent(result.recent || []); }).catch(() => { if (live) setRecent([]); }); return () => { live = false; }; }, []);
+  useEffect(() => { let live = true; api.integrations().then(result => { if (live) setRecent(result.recent || []); }).catch(failure => { if (live) setRecent({ error: failure.message }); }); return () => { live = false; }; }, []);
   const hooks = setup.integrations || {};
   return <>
     <Panel>
@@ -192,8 +192,10 @@ function Integrations({ setup }) {
     </Panel>
     <p className="ds-note set-foot">A finished call can leave as a ticket. Nothing an integration returns comes back into a call.</p>
     <Label style={{ margin: '22px 0 2px' }}>Recent deliveries</Label>
-    {recent?.length ? recent.map((entry, index) => <Row key={index} main={entry.adapter} sub={`${when(entry.at)}${entry.error ? ` · ${entry.error}` : ''}`} right={<Status tone={entry.ok ? 'green' : 'red'}>{entry.ok ? 'Delivered' : 'Failed'}</Status>} />)
-      : <p className="ds-note">{recent ? 'Nothing delivered yet.' : 'Loading…'}</p>}
+    {recent?.error ? <p className="ds-note">Deliveries could not be loaded: {recent.error} Try the refresh button above.</p>
+      : recent?.length ? recent.map((entry, index) => <Row key={index} main={entry.adapter} sub={`${when(entry.at)}${entry.error ? ` · ${entry.error}` : ''}`} right={<Status tone={entry.ok ? 'green' : 'red'}>{entry.ok ? 'Delivered' : 'Failed'}</Status>} />)
+      : recent ? <p className="ds-note">Nothing delivered yet.</p>
+      : <p className="ds-note">Loading deliveries…</p>}
   </>;
 }
 

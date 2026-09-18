@@ -173,12 +173,12 @@ export default function InsightsPage({ data, route, navigate, setNotice, setErro
   }, [data.calls, now]);
 
   const share = async () => {
-    const text = `NoteFish · last 30 days\n${plural(m.answered.length, 'call')} answered · ${plural(m.minutes, 'minute')} translated\n${plural(m.played.length, 'reply', 'replies')} spoken in my own voice across ${plural(m.byLang.length, 'language')}`;
+    const text = `NoteFish · last 30 days\n${plural(m.answered.length, 'call')} answered · ${plural(m.minutes, 'minute')} translated\n${plural(m.played.length, 'reply', 'replies')} spoken in a cloned voice across ${plural(m.byLang.length, 'language')}`;
     try { await navigator.clipboard.writeText(text); setNotice?.('Copied your month to the clipboard.'); }
     catch { setError?.('Clipboard access is unavailable. Select the numbers and copy them by hand.'); }
   };
 
-  const nothing = !m.calls.length;
+  const nothing = !m.month.length;
   const rate = m.month.length ? m.answered.length / m.month.length : 0;
   const named = m.month.filter(call => call.agentName).length;
 
@@ -194,13 +194,15 @@ export default function InsightsPage({ data, route, navigate, setNotice, setErro
         sub="Every number here comes from calls that really happened. A card with nothing behind it yet says so, rather than showing you a confident zero."
         examples={[
           { say: 'a green day', then: 'a day you answered somebody' },
-          { say: 'replies in your voice', then: 'lines the caller heard as you' },
+          { say: 'replies spoken', then: 'lines the caller heard in a cloned voice' },
         ]}
         action={{ label: 'Go to the desk', onClick: () => navigate('/desk') }}
       />
 
-      {nothing ? <Empty icon={<Sparkles size={26} />} title="Nothing to count yet">
-        Answer a call and this fills in: how long you talked, which languages came up, and which of your voices did the talking.
+      {nothing ? <Empty icon={<Sparkles size={26} />} title={m.calls.length ? 'Nothing in the last 30 days' : 'Nothing to count yet'}>
+        {m.calls.length
+          ? `This desk has ${plural(m.calls.length, 'call')} in total, all of them older than a month. Answer one and these fill in again.`
+          : 'Answer a call and this fills in: how long you talked, which languages came up, and which of your voices did the talking.'}
       </Empty> : tab === 'desk' ? <>
         <div className="in-grid">
           <div className="in-card">
@@ -212,10 +214,10 @@ export default function InsightsPage({ data, route, navigate, setNotice, setErro
 
           <div className="in-card">
             <span className="in-n">{m.played.length}</span>
-            <span className="in-lab">Replies in your voice <Info size={12} aria-label="Lines you spoke that were translated and played to the caller" /></span>
+            <span className="in-lab">Replies spoken aloud <Info size={12} aria-label="Lines you spoke that were translated and played to the caller in a cloned voice" /></span>
             <div className="in-rule" />
             <div className="in-line"><b>{m.spokenWords.toLocaleString()}</b> words spoken aloud</div>
-            <div className={`in-line ${m.failed.length ? 'warn' : ''}`}>{m.failed.length ? <><b>{m.failed.length}</b> never played</> : 'Every reply reached the caller'}</div>
+            <div className={`in-line ${m.failed.length ? 'warn' : ''}`}>{m.failed.length ? <><b>{m.failed.length}</b> never played</> : m.played.length ? 'Every reply reached the caller' : 'No replies spoken this month'}</div>
           </div>
 
           <div className="in-card">

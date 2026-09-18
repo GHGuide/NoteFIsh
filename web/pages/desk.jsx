@@ -213,7 +213,10 @@ export default function DeskPage({ data, navigate, route, setError, setNotice, s
     {last?.ticket?.issue && <span><CheckCircle2 size={13} />Last ticket · {last.ticket.issue}</span>}
     {last && <TextBtn onClick={() => navigate(`/calls/${last.id}`)}>Open last call<ChevronRight size={12} /></TextBtn>}
   </Col> : null;
-  const hint = recording ? `The caller hears ${targetName} in your voice when you let go.` : `Hold ${window.__TAURI__ ? '⌥ Space' : 'Space'} anywhere, or the mic. The caller hears ${targetName} in your voice.`;
+  const down = connection !== 'connected';
+  const hint = down ? 'The caller cannot hear you until the desk reconnects.'
+    : recording ? `The caller hears ${targetName} in your voice when you let go.`
+    : `Hold ${window.__TAURI__ ? '⌥ Space' : 'Space'} anywhere, or the mic. The caller hears ${targetName} in your voice.`;
 
   // ---- the home screen, between calls
   const takes = REGISTERS.filter(item => (owned('registers') || {})[item.key]).length;
@@ -282,8 +285,8 @@ export default function DeskPage({ data, navigate, route, setError, setNotice, s
     </>}
 
     {active && <>
-      <Col className={`ds-strip ${recording ? 'red' : microphoneMuted && !replying ? 'muted' : ''}`}>
-        <span className="state"><Dot tone={recording ? 'red' : microphoneMuted && !replying ? 'muted' : 'green'} />{recording ? 'Recording' : replying ? 'Replying' : microphoneMuted ? 'Muted' : 'Listening'}</span>
+      <Col className={`ds-strip ${down ? 'red' : recording ? 'red' : microphoneMuted && !replying ? 'muted' : ''}`}>
+        <span className="state"><Dot tone={down ? 'red' : recording ? 'red' : microphoneMuted && !replying ? 'muted' : 'green'} />{down ? 'Reconnecting' : recording ? 'Recording' : replying ? 'Replying' : microphoneMuted ? 'Muted' : 'Listening'}</span>
         {tab === 'notes' ? <span className="note">Hold {window.__TAURI__ ? '⌥ Space' : 'Space'} to speak from any tab · {call.from || 'the caller'} is on the line</span> : <span className="ctls">
           <span className="desk-pair">{languageName(call.agentLanguage || agentLanguage)}<span className="arrow">→</span><SelectPill aria-label="Caller language" value={customerLanguage} onChange={changeCallerLanguage} options={LANGUAGE_OPTIONS} disabled={languageSaving || connection !== 'connected'} /></span>
           <button type="button" className="ds-pill ctl" aria-pressed={microphoneMuted} onClick={toggleMicrophone}>{microphoneMuted ? <Mic size={13} /> : <MicOff size={13} />}{microphoneMuted ? 'Unmute' : 'Mute'}</button>
