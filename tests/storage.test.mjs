@@ -82,3 +82,15 @@ test('a database that refuses to answer stops the desk rather than quietly losin
     /connection refused/,
   );
 });
+
+// Values pasted into a web form arrive with a newline on the end and nothing shows it.
+test('a setting pasted with surrounding whitespace is taken as meant, a broken one is not', async () => {
+  const { loadConfig } = await import('../server/config.mjs');
+  const base = { NODE_ENV: 'production', HOST: '0.0.0.0', PUBLIC_BASE_URL: 'https://desk.example', NOTEFISH_ADMIN_EMAIL: 'nina@acme.example', DATA_DIR: '/tmp' };
+  const pasted = loadConfig({ ...base, OPENAI_API_KEY: 'sk-a-real-key\n', FISH_API_KEY: '  fish-key  ', DATABASE_URL: 'postgres://desk@example/notefish\n' }, '/tmp');
+  assert.equal(pasted.openaiApiKey, 'sk-a-real-key', 'a trailing newline is not part of the key');
+  assert.equal(pasted.fishApiKey, 'fish-key');
+  assert.equal(pasted.databaseUrl, 'postgres://desk@example/notefish', 'and not part of a connection string either');
+  assert.equal(loadConfig({ ...base, NOTEFISH_ADMIN_EMAIL: '  Nina@Acme.Example \n' }, '/tmp').adminEmail, 'nina@acme.example');
+  assert.throws(() => loadConfig({ ...base, OPENAI_API_KEY: 'sk-broken\npaste' }, '/tmp'), /Invalid OPENAI_API_KEY/, 'a break in the middle is still refused');
+});

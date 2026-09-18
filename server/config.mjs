@@ -9,9 +9,13 @@ export class ConfigError extends Error {
 }
 
 export function loadConfig(env = process.env, root = process.cwd()) {
+  // Surrounding whitespace is a copy-and-paste artifact, never part of a value:
+  // a key pasted into a web form arrives with a newline on the end and nothing
+  // shows it. Trim it. A break in the middle is still refused, because that is
+  // not a stray keystroke and these values end up in request headers.
   const read = (key, max = 1024) => {
-    const value = env[key] || '';
-    if (typeof value !== 'string' || value.length > max || /[\r\n\0]/.test(value)) throw new ConfigError(`Invalid ${key}`);
+    const value = typeof env[key] === 'string' ? env[key].trim() : '';
+    if (value.length > max || /[\r\n\0]/.test(value)) throw new ConfigError(`Invalid ${key}`);
     return value;
   };
   const portText = read('PORT') || '3001';
@@ -40,7 +44,7 @@ export function loadConfig(env = process.env, root = process.cwd()) {
   const macBuildVersion = read('NOTEFISH_MAC_BUILD_VERSION', 40);
   // Hosts that get the marketing page at / instead of the desk. Comma separated.
   const siteHosts = read('NOTEFISH_SITE_HOSTS', 400).split(',').map(item => item.trim().toLowerCase()).filter(Boolean);
-  const adminEmail = read('NOTEFISH_ADMIN_EMAIL', 254).trim().toLowerCase();
+  const adminEmail = read('NOTEFISH_ADMIN_EMAIL', 254).toLowerCase();
   if (adminEmail && !/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,24}$/.test(adminEmail)) throw new ConfigError('Invalid NOTEFISH_ADMIN_EMAIL');
   if (!['127.0.0.1', '::1'].includes(host) && !deskPassword && !publicDemo && !adminEmail) throw new ConfigError('A public HOST needs NOTEFISH_ADMIN_EMAIL (who may create the first account) or NOTEFISH_DESK_PASSWORD');
   const twilioAccountSid = read('TWILIO_ACCOUNT_SID');
