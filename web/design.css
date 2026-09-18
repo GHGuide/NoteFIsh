@@ -468,3 +468,36 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 @keyframes ds-drop-in { from { opacity: 0; transform: translate(-50%, -8px); } }
 @keyframes ds-rise-in { from { opacity: 0; transform: translate(-50%, 8px); } }
 @media (prefers-reduced-motion: reduce) { .ds-banner, .ds-toast { animation: none; } }
+
+/* ---- the last of the operating system's own controls ---- */
+
+/* A checkbox with accent-color is still an AppKit square; this is the app's own. */
+.ds-check input, .au-check input, .checkbox-label input { appearance: none; -webkit-appearance: none; position: relative; width: 17px; height: 17px; margin: 2px 0 0; flex-shrink: 0; border: 1.5px solid var(--line); border-radius: 5px; background: var(--card); cursor: pointer; transition: background .14s var(--ease), border-color .14s; }
+.ds-check input:hover, .au-check input:hover, .checkbox-label input:hover { border-color: var(--navtext); }
+.ds-check input:checked, .au-check input:checked, .checkbox-label input:checked { background: var(--ink); border-color: var(--ink); }
+.ds-check input:checked::after, .au-check input:checked::after, .checkbox-label input:checked::after { content: ''; position: absolute; left: 5px; top: 1.5px; width: 4px; height: 9px; border: solid #FFF; border-width: 0 2px 2px 0; transform: rotate(42deg); }
+
+/* WebKit's own file button, and its search field's ⓧ, are the system's. Hide both. */
+input[type="file"]::-webkit-file-upload-button, input[type="file"]::file-selector-button { display: none; }
+input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
+
+/* Safari paints autofilled fields yellow. Keep the app's own paper. */
+input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus, textarea:-webkit-autofill, select:-webkit-autofill {
+  -webkit-text-fill-color: var(--ink);
+  -webkit-box-shadow: 0 0 0 40px var(--sheet) inset;
+  caret-color: var(--ink);
+  transition: background-color 9999s ease-out 0s;
+}
+
+/* The disclosure triangle on the caller's microphone help is WebKit's. */
+summary { list-style: none; cursor: pointer; }
+summary::-webkit-details-marker, summary::marker { display: none; content: ''; }
+
+/* Right-clicking the Mac window gave WebKit's page menu — Reload, Inspect Element,
+   Services — on a desk with no page to reload. Text you might want to copy is still
+   selectable; the chrome around it is not. */
+.ds-app, .pill-page body { -webkit-user-select: none; user-select: none; }
+.ds-body, .ds-cap, .ds-title, .set-body, input, textarea, .ds-explain, [data-copyable] { -webkit-user-select: text; user-select: text; }
+
+.ds-confirm-body { margin: 10px 0 0; font-size: 14px; line-height: 1.55; color: var(--muted); }
+.ds-confirm-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }

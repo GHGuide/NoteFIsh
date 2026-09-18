@@ -13,6 +13,7 @@ import { CallerAudio } from './audio.js';
 import { DEFAULT_SETTINGS, callState } from './lib.jsx';
 import { Avatar, LogoMark } from './shell.jsx';
 import { UiProvider, RouteTransition } from './components/ui.jsx';
+import { ConfirmProvider } from './components/confirm.jsx';
 import TopBar from './components/topbar.jsx';
 import VoiceMenu from './components/voice-menu.jsx';
 import Caller from './Caller.jsx';
@@ -61,7 +62,7 @@ function Gate() {
   if (!me) return null;
   if (!me.user && !(skipped && me.local)) return <AuthPage users={me.users} open={me.open !== false} local={me.local} onSignedIn={user => setMe({ ...me, user })} onSkip={() => skip(true)} />;
   // Signed in once and that is the end of it: there is no way back out of the desk.
-  return <WorkspaceApp user={me.user} />;
+  return <ConfirmProvider><WorkspaceApp user={me.user} /></ConfirmProvider>;
 }
 
 function CallerEntry() {

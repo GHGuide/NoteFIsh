@@ -9,6 +9,7 @@ import { ActionMenu } from '../components/ui.jsx';
 import AudioWaveform from '../components/AudioWaveform.jsx';
 import RecordedAudio from '../components/RecordedAudio.jsx';
 import Explainer from '../components/explainer.jsx';
+import { useConfirm } from '../components/confirm.jsx';
 import './voice.css';
 
 const TABS = [{ key: 'voice', label: 'Your voice' }, { key: 'takes', label: 'Takes' }, { key: 'avatar', label: 'Avatar' }, { key: 'register', label: 'Register' }, { key: 'library', label: 'Library' }];
@@ -20,6 +21,7 @@ const feelingOf = key => REGISTERS.find(item => item.key === key);
 const dateOf = value => new Date(value).toLocaleDateString([], { month: 'short', day: 'numeric' });
 
 export default function VoicePage(common) {
+  const ask = useConfirm();
   const { data, navigate, route, setError, setNotice, saveOwned, owned, refreshVoices, user } = common;
   const [localTab, setLocalTab] = useState('voice');
   const tab = TABS.some(item => item.key === route.query.tab) ? route.query.tab : localTab;
@@ -34,7 +36,12 @@ export default function VoicePage(common) {
   const importFile = async file => {
     try {
       const pack = JSON.parse(await file.text());
-      if (!window.confirm('Import the voices in this file? Only import voices you own or have permission to use.')) return;
+      const names = (pack?.voices || []).map(item => item.name).filter(Boolean);
+      if (!await ask({
+        title: names.length === 1 ? `Import ${names[0]}?` : `Import ${names.length || 'these'} voices?`,
+        body: 'Import only voices you recorded yourself, or have the speaker\u2019s permission to use. They join your library and can answer calls.',
+        confirm: 'Import',
+      })) return;
       const result = await api.importPack({ pack, consent: true }); await refreshVoices();
       setNotice(`${result.imported.length} voice${result.imported.length === 1 ? '' : 's'} imported${result.skipped.length ? `, ${result.skipped.length} already here` : ''}.`);
     } catch (failure) { setError(failure.message.startsWith('Unexpected') ? 'That is not a NoteFish voice file.' : failure.message); }
@@ -177,6 +184,7 @@ function Register({ owned, saveOwned }) {
 }
 
 function Library({data, loading, voiceId, trainingNotes, setError, setNotice, refreshVoices, setSelectedId, setImporting, setTab, use, importFile, share }) {
+  const ask = useConfirm();
   const [over, setOver] = useState(false);
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState('');
@@ -194,7 +202,7 @@ function Library({data, loading, voiceId, trainingNotes, setError, setNotice, re
     mine && { id: 'export', label: 'Share voice file', icon: ArrowDownToLine, onSelect: () => act(voice, async () => { downloadJson(`${voice.name}.notefish-voice.json`, await api.exportVoice(voice.id)); setNotice('Voice file downloaded. Import it on any other desk.'); }) },
     mine && { separator: true },
     mine && { id: 'archive', label: isArchived(voice) ? 'Restore voice' : 'Archive voice', icon: Archive, onSelect: () => act(voice, async () => { await api.editVoice(voice.id, { archived: !isArchived(voice) }); await refreshVoices(); setNotice(isArchived(voice) ? 'Voice restored.' : 'Voice archived. You can restore it from Archived.'); }) },
-    mine && voice.kind === 'enrolled' && { id: 'delete', label: 'Delete for good', icon: Trash2, onSelect: () => { if (window.confirm(`Delete ${voice.name} at Fish and from this library? This cannot be undone.`)) act(voice, async () => { await api.deleteVoice(voice.id); await refreshVoices(); setNotice(`${voice.name} deleted at Fish and removed here.`); }); } },
+    mine && voice.kind === 'enrolled' && { id: 'delete', label: 'Delete for good', icon: Trash2, onSelect: async () => { if (await ask({ title: `Delete ${voice.name}?`, body: 'The clone is removed from Fish Audio as well as from this library, and any call set to answer in it falls back to the desk\u2019s other voice. This cannot be undone.', confirm: 'Delete for good', tone: 'red' })) act(voice, async () => { await api.deleteVoice(voice.id); await refreshVoices(); setNotice(`${voice.name} deleted at Fish and removed here.`); }); } },
   ].filter(Boolean); };
   const line = voice => {
     const [tone, word] = toneOf(voice);

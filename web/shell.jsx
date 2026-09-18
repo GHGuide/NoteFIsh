@@ -102,9 +102,9 @@ export function Row({ lead, main, sub, right, onClick, solid = false, title }) {
   const Tag = onClick ? 'button' : 'div';
   return <Tag type={onClick ? 'button' : undefined} className={`ds-row ${solid ? 'solid' : ''}`} onClick={onClick} title={title}>{lead}<div><strong>{main}</strong>{sub && <span>{sub}</span>}</div>{right && <div className="right">{right}</div>}</Tag>;
 }
-export function Btn({ kind = 'ink', small = false, pill = false, grow = false, icon, children, className = '', ...props }) {
-  return <button type="button" className={`ds-btn ${kind} ${small ? 'small' : ''} ${pill ? 'pill' : ''} ${grow ? 'grow' : ''} ${className}`} {...props}>{icon}{children}</button>;
-}
+export const Btn = React.forwardRef(function Btn({ kind = 'ink', small = false, pill = false, grow = false, icon, children, className = '', ...props }, ref) {
+  return <button type="button" ref={ref} className={`ds-btn ${kind} ${small ? 'small' : ''} ${pill ? 'pill' : ''} ${grow ? 'grow' : ''} ${className}`} {...props}>{icon}{children}</button>;
+});
 export function TextBtn({ muted = false, icon, children, className = '', ...props }) { return <button type="button" className={`ds-text ${muted ? 'muted' : ''} ${className}`} {...props}>{icon}{children}</button>; }
 export function Pill({ on = false, children, className = '', ...props }) { return <button type="button" className={`ds-pill ${on ? 'on' : ''} ${className}`} aria-pressed={on} {...props}>{children}</button>; }
 // Kept as a name because eight call sites use it; it is a menu in the app's own clothes
@@ -143,6 +143,22 @@ export function Ask({ placeholder = 'Ask anything', scope = 'calls', callId }) {
 
 /** A small modal in the design's clothes (the free month, confirmations). */
 export function Sheet({ title, children, onClose, intro }) {
-  useEffect(() => { const key = event => { if (event.key === 'Escape') onClose(); }; window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key); }, [onClose]);
-  return <div className="ds-modal-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}><div className="ds-modal" role="dialog" aria-modal="true" aria-label={title}><h2>{title}</h2>{intro && <p>{intro}</p>}{children}</div></div>;
+  const card = useRef(null);
+  // Escape closes, Tab stays inside, and whatever was focused before gets it back —
+  // otherwise the keyboard walks out of an open dialog into the page behind it.
+  useEffect(() => {
+    const came = document.activeElement;
+    const key = event => {
+      if (event.key === 'Escape') { onClose(); return; }
+      if (event.key !== 'Tab') return;
+      const able = card.current?.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (!able?.length) return;
+      const first = able[0], last = able[able.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    window.addEventListener('keydown', key);
+    return () => { window.removeEventListener('keydown', key); if (came instanceof HTMLElement) came.focus(); };
+  }, [onClose]);
+  return <div className="ds-modal-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}><div className="ds-modal" ref={card} role="dialog" aria-modal="true" aria-label={title}><h2>{title}</h2>{intro && <p>{intro}</p>}{children}</div></div>;
 }
