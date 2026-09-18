@@ -14,7 +14,8 @@ function Attention({ data, connection, navigate, close }) {
   const voice = (data.voices || []).find(item => item.id === data.settings.voiceId && !item.archived);
   const notes = [];
   if (connection !== 'connected') notes.push({ tone: 'amber', main: 'Not connected to the desk', sub: 'Calls cannot ring until this reconnects.' });
-  if (!voice) notes.push({ tone: 'amber', main: 'No voice chosen', sub: 'Record one on Voice and callers hear you.', go: '/voice' });
+  const spare = (data.voices || []).some(item => !item.archived && item.status === 'ready');
+  if (!voice) notes.push({ tone: 'amber', main: 'No voice chosen', sub: spare ? 'Pick which one answers, in the sidebar.' : 'Record one on Voice and callers hear you.', go: '/voice' });
   for (const line of blockers) notes.push({ tone: 'amber', main: line, sub: '', go: '/settings' });
   return <>
     <div className="ds-pop-head"><strong>Needs attention</strong></div>

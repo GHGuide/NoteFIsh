@@ -145,7 +145,7 @@ export default function Onboarding({ data, owned, saveSettings, saveOwned, navig
         <TextBtn muted icon={<ArrowLeft size={14} />} onClick={() => go(-1)}>Back</TextBtn>
         <span className="ob-spacer" />
         <TextBtn muted onClick={finish} disabled={busy}>Skip setup</TextBtn>
-        <Btn onClick={() => go(1)} disabled={busy}>{index === steps.length - 2 ? 'Finish' : 'Next'}<ArrowRight size={15} /></Btn>
+        <Btn onClick={() => go(1)} disabled={busy}>{index === steps.length - 2 ? 'Next' : 'Next'}<ArrowRight size={15} /></Btn>
       </div>}
     </section>
   </div>;

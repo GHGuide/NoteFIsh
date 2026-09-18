@@ -31,7 +31,7 @@ export default function AuthPage({ users = 0, open = true, local = false, onSign
     <section className="au-left">
       <div className="au-lockup"><LogoMark size={24} /><span>NoteFish<span className="dot">.</span></span></div>
       <div className="au-promise">
-        <span className="au-eyebrow">Call-centre desk</span>
+        <span className="au-eyebrow">One desk, any language</span>
         <h1>{signup ? 'One call. Two languages.' : 'Your voice, in their language.'}</h1>
         <p>{signup ? 'Read a minute aloud so the desk learns your voice. Your next call can be in any language.' : 'Answer callers in the language they speak, in a voice that is yours. Sign in to open your desk.'}</p>
       </div>
@@ -50,7 +50,7 @@ export default function AuthPage({ users = 0, open = true, local = false, onSign
         {error && <p className="au-error" role="alert">{error}</p>}
         {signup && <label className="au-field"><span>Your name</span><input type="text" autoComplete="name" placeholder="Nina Okafor" value={form.name} onChange={set('name')} required maxLength={100} /></label>}
         <label className="au-field"><span>Work email</span><input type="email" autoComplete="email" placeholder="nina@acme.example" value={form.email} onChange={set('email')} required /></label>
-        <label className="au-field"><span className="row">Password{!signup && <a href="#reset" onClick={event => { event.preventDefault(); setNote('Ask whoever runs this desk to reset your password.'); }}>Forgot it?</a>}</span><input type="password" autoComplete={signup ? 'new-password' : 'current-password'} placeholder={signup ? 'At least 10 characters' : '••••••••••'} value={form.password} onChange={set('password')} required minLength={signup ? 10 : 1} /></label>
+        <label className="au-field"><span className="row">Password{!signup && <a href="#reset" onClick={event => { event.preventDefault(); setNote('There is no reset. On this Mac you can skip signing in; on a hosted desk the password is the one set in its environment.'); }}>Forgot it?</a>}</span><input type="password" autoComplete={signup ? 'new-password' : 'current-password'} placeholder={signup ? 'At least 10 characters' : '••••••••••'} value={form.password} onChange={set('password')} required minLength={signup ? 10 : 1} /></label>
         {signup && <label className="au-check"><input type="checkbox" checked={form.agree} onChange={set('agree')} required /><span>I agree to the Terms and the Privacy Policy, and I will only clone a voice I own or have permission to use.</span></label>}
         <button type="submit" className="au-submit" disabled={busy}>{busy ? (signup ? 'Creating…' : 'Signing in…') : signup ? 'Create account' : 'Sign in'}</button>
         <p className="au-switch">{signup ? <>Already have a desk? <a href="#signin" onClick={event => { event.preventDefault(); setMode('signin'); setError(''); }}>Sign in</a></> : open ? <>New here? <a href="#signup" onClick={event => { event.preventDefault(); setMode('signup'); setError(''); }}>Create your desk</a></> : <>This desk already belongs to someone. Sign in above.</>}</p>

@@ -12,7 +12,10 @@ import { Toolbar, Title, Tabs, Body, Col, Label, Dot, Status, Chip, Row, Btn, Te
 import { languages, languageName, REGISTERS, useCapture, callState, isArchived, needsDispatch, stamp, formatDuration } from '../lib.jsx';
 import './desk.css';
 
-const transportLabel = call => call?.transport === 'twilio' ? 'phone' : call?.transport === 'companion' ? 'companion' : 'browser link';
+// What the caller actually came in on, in the words the rest of the desk uses. It read
+// `transport`, which is never 'companion', so a call bridged out of Zoom was labelled a
+// browser link; and "companion" is an internal word that appears in no other string.
+const transportLabel = call => call?.transport === 'twilio' ? 'phone' : call?.via === 'companion' ? 'on this Mac' : 'call link';
 const and = names => names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0] || '';
 const day = value => value ? new Date(value).toLocaleDateString([], { day: 'numeric', month: 'short' }) : '';
 const since = (from, to = Date.now()) => Math.max(0, Math.floor((to - new Date(from).getTime()) / 1000));

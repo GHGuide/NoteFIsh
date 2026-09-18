@@ -52,7 +52,7 @@ const phrasesInput = value => {
   if (!Array.isArray(value) || value.length > 30) throw new InputError('Canned lines are a list of at most 30 lines.');
   return value.map(item => {
     const raw = item && typeof item === 'object' ? item.text : item;
-    if (typeof raw !== 'string' || !raw.trim() || raw.length > 300) throw new InputError('Each canned line is 1 to 300 characters.');
+    if (typeof raw !== 'string' || !raw.trim() || raw.length > 300) throw new InputError('Each phrase is 1 to 300 characters.');
     return { id: typeof item?.id === 'string' && /^[\w-]{1,64}$/.test(item.id) ? item.id : randomUUID(), text: raw.trim() };
   });
 };
@@ -204,7 +204,7 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
       const wav = await convertAudio(req.file.buffer, req.file.mimetype, { output: 'wav', sampleRate: 16000, maxSeconds: 120, minSeconds: 3 });
       const clip = measureClip(wav, transcript ? transcript.trim().split(/\s+/u).length : 0);
       // Digital silence measures as nothing at all; only a real signal drowned in noise is refused.
-      if (clip.voicedSeconds >= 1 && clip.snr < 15 && clip.loudness > -70) throw new InputError('We can hear the room more than your voice. Find a quieter spot and record again.', 422, 'NOISY_SAMPLE');
+      if (clip.voicedSeconds >= 1 && clip.snr < 15 && clip.loudness > -70) throw new InputError('The room is louder than your voice. Find a quieter spot and record again.', 422, 'NOISY_SAMPLE');
       baseline = { loudness: clip.loudness, rate: clip.rate, snr: clip.snr, seconds: clip.voicedSeconds };
     } catch (error) { if (error instanceof InputError) throw error; /* measurement is best-effort */ }
     const result = await providers.createVoice({ name, description, audio: req.file.buffer, mimeType: req.file.mimetype, transcript });

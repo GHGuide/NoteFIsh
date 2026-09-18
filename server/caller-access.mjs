@@ -28,11 +28,11 @@ export function createCallerAccess(config, { now = Date.now, lifetimeMs = 10 * 6
       return { ...(config.publicBaseUrl ? { url: `${config.publicBaseUrl}/caller#${invitation.token}` } : {}), ...(local ? { token: invitation.token } : {}), expiresAt: new Date(invitation.expires).toISOString(), ...(clean ? { label: clean } : {}) };
     },
     consume(token) {
-      if (typeof token !== 'string' || !TOKEN.test(token)) throw new CallerAccessError('This caller link is invalid, expired, or already used. Ask the agent for a new link.');
+      if (typeof token !== 'string' || !TOKEN.test(token)) throw new CallerAccessError('This caller link is invalid, expired, or already used. Ask the person at the desk for a new one.');
       prune();
       let matched;
       for (const invitation of invitations) if (constantTimeEqual(token, invitation.token)) matched = invitation;
-      if (!matched) throw new CallerAccessError('This caller link is invalid, expired, or already used. Ask the agent for a new link.');
+      if (!matched) throw new CallerAccessError('This caller link is invalid, expired, or already used. Ask the person at the desk for a new one.');
       invitations.delete(matched);
       return { label: matched.label || '', via: matched.via || 'link' };
     },

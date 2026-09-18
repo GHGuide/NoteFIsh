@@ -41,7 +41,7 @@ export default function CallsPage(common) {
     <Toolbar />
     <Title title="Calls" sub={`This week · ${week.length} call${week.length === 1 ? '' : 's'} · ${longMinutes(week.reduce((sum, call) => sum + length(call), 0))} translated`} />
     <Tabs items={tabs} value={tab} onChange={setTab} />
-    <ReadBar><Search size={14} /><input value={q} placeholder="Search callers, words, or ticket numbers" aria-label="Search calls" onChange={event => setQ(event.target.value)} /></ReadBar>
+    <ReadBar><Search size={14} /><input value={q} placeholder="Search callers, notes, or what was said" aria-label="Search calls" onChange={event => setQ(event.target.value)} /></ReadBar>
     <Body>
       <Explainer
         id="calls" puff="squish" color="#2F6FE0"
