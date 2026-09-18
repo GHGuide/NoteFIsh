@@ -185,14 +185,30 @@ function WorkspaceApp({ user, onSignedOut }) {
   // deployment never has to think about seats.
   const hasFloor = multiAgent && roster.length > 0;
   const seat = roster.find(agent => agent.id === data.agentId) || null;
+  // Sit back down by ourselves. Only for a seat that is still on the roster, and
+  // only while nobody else is in it, so this never takes a colleague's seat.
+  const retaking = useRef(false);
+  useEffect(() => {
+    if (loading || seat || retaking.current || !roster.length) return;
+    let remembered = ''; try { remembered = localStorage.getItem(SEAT_KEY) || ''; } catch { /* fine */ }
+    const free = roster.find(agent => agent.id === remembered && !agent.archived);
+    if (!free) return;
+    retaking.current = true;
+    seatActions.take(free.id).catch(() => { /* the person can pick it by hand */ }).finally(() => { retaking.current = false; });
+  }, [loading, seat, roster.length]);
   const mine = data.floor?.agents?.find(agent => agent.id === seat?.id);
   const refreshFloor = useCallback(async () => {
     try { const result = await api.agents(); setData(current => ({ ...current, agents: result.agents || [], floor: result.floor || current.floor, agentId: result.agentId ?? current.agentId })); }
     catch (failure) { setError(failure.message); }
   }, []);
+  // Which seat this desk answers as, kept here as well as in the cookie. A restart
+  // of the server, or a fresh web view, loses the cookie, and a desk that quietly
+  // stops being anybody stops ringing without saying so.
+  const SEAT_KEY = 'notefish.seat';
+  const rememberSeat = id => { try { id ? localStorage.setItem(SEAT_KEY, id) : localStorage.removeItem(SEAT_KEY); } catch { /* fine */ } };
   const seatActions = {
-    take: async id => { await api.takeSeat(id); await refreshFloor(); reconnect.current?.(); },
-    leave: async () => { await api.leaveSeat(); await refreshFloor(); reconnect.current?.(); },
+    take: async id => { await api.takeSeat(id); rememberSeat(id); await refreshFloor(); reconnect.current?.(); },
+    leave: async () => { await api.leaveSeat(); rememberSeat(''); await refreshFloor(); reconnect.current?.(); },
     pause: async reason => { const result = await api.pause(reason); setData(current => ({ ...current, floor: result.floor })); },
     resume: async () => { const result = await api.resume(); setData(current => ({ ...current, floor: result.floor })); },
   };
