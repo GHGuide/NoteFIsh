@@ -209,11 +209,11 @@ function WorkspaceApp({ user }) {
         voice={voice} voices={voices} connection={connection} sharedDemo={sharedDemo}
         onPick={useVoice} onRecord={() => navigate('/voice?tab=takes')}
       />
-      <nav className="ds-nav" aria-label="Main navigation">{NAV.map(item => <a href={item.path} key={item.path} className={parsed.path === item.path ? 'active' : ''} aria-current={parsed.path === item.path ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate(item.path); }}><item.icon size={16} strokeWidth={1.7} />{item.label}{item.path === '/desk' && incoming && <span className="ring" aria-label="Incoming call" />}</a>)}</nav>
+      <nav className="ds-nav" aria-label="Main navigation">{NAV.map(item => <a href={item.path} key={item.path} className={parsed.path === item.path ? 'active' : ''} aria-current={parsed.path === item.path ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate(item.path); }}><item.icon size={18} strokeWidth={1.7} />{item.label}{item.path === '/desk' && incoming && <span className="ring" aria-label="Incoming call" />}</a>)}</nav>
       <nav className="ds-nav bottom" aria-label="More">
-        <button type="button" onClick={() => setFree(true)}><Gift size={16} strokeWidth={1.7} />Get a free month</button>
-        {role === 'admin' && <a href="/settings" className={settingsOpen ? 'active' : ''} onClick={event => { event.preventDefault(); navigate('/settings'); }}><Settings size={16} strokeWidth={1.7} />Settings</a>}
-        <a href={HELP_URL} target="_blank" rel="noreferrer"><CircleHelp size={16} strokeWidth={1.7} />Help</a>
+        <button type="button" onClick={() => setFree(true)}><Gift size={18} strokeWidth={1.7} />Get a free month</button>
+        {role === 'admin' && <a href="/settings" className={settingsOpen ? 'active' : ''} onClick={event => { event.preventDefault(); navigate('/settings'); }}><Settings size={18} strokeWidth={1.7} />Settings</a>}
+        <a href={HELP_URL} target="_blank" rel="noreferrer"><CircleHelp size={18} strokeWidth={1.7} />Help</a>
         <div className="ds-side-foot" title={user?.email || ''}><i className={connection === 'connected' ? 'connected' : ''} />{connection === 'connected' ? 'Desk connected' : connection === 'connecting' ? 'Connecting…' : 'Reconnecting…'}</div>
       </nav>
     </aside>

@@ -16,7 +16,8 @@
 .pill-page .pillrow { display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; }
 .pill-page .mark { display: grid; place-items: center; border: 0; background: transparent; padding: 0; cursor: pointer; flex-shrink: 0; border-radius: 50%; opacity: .95; transition: opacity .15s, transform .15s cubic-bezier(.2, .7, .2, 1); }
 .pill-page .mark:hover { opacity: 1; transform: scale(1.08); }
-.pill-page .dim { opacity: .5; } .dim2 { opacity: .6; display: inline-flex; }
+.pill-page .dim { opacity: .5; }
+.pill-page .dim2 { opacity: .6; display: inline-flex; }
 .pill-page .warn { color: #E7A72F; display: inline-flex; align-items: center; }
 .pill-page .pillrow b { font-weight: 600; }
 .pill-page .pillrow kbd { font: inherit; font-size: 11px; border: 1px solid #777; padding: 3px 7px; border-radius: 4px; color: #E2E0DB; }
@@ -42,11 +43,10 @@
 .pill-page .wave i { width: 3px; border-radius: 2px; background: currentColor; height: var(--h, 10px); transform-origin: center; animation: pill-wave 1s ease-in-out infinite; animation-delay: var(--d, 0s); }
 .pill-page .wave.real i { animation: none; transition: height .12s linear; }
 @keyframes pill-wave { 0%, 100% { transform: scaleY(.45); } 50% { transform: scaleY(1); } }
-.spin { animation: pill-spin 1s linear infinite; }
 @keyframes pill-spin { to { transform: rotate(360deg); } }
 
 /* the options that appear on hover: languages, the desk, hide, end */
-.acts { display: flex; flex-direction: column; align-items: stretch; gap: 8px; white-space: nowrap; width: 100%; }
+.pill-page .acts { display: flex; flex-direction: column; align-items: stretch; gap: 8px; white-space: nowrap; width: 100%; }
 .pill-page .acts .actrow { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; }
 .pill-page .acts .lab { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: rgba(255, 255, 255, .45); margin-right: 2px; }
 .pill-page .acts .sel { position: relative; display: inline-flex; align-items: center; height: 28px; border-radius: 999px; background: rgba(255, 255, 255, .12); color: #FFF; }
@@ -81,10 +81,10 @@
   .pill-page .pillcap .ic { --lab: rgba(241, 239, 233, .45); --said: rgba(241, 239, 233, .62); --now: #F1EFE9; --sub: rgba(241, 239, 233, .55); --me: #E7A72F; }
 }
 .pill-page .pill { display: inline-flex; align-items: center; gap: 10px; height: 46px; padding: 0 16px 0 12px; border-radius: 999px; background: #242424; color: #FFF; box-shadow: 0 10px 30px rgba(36, 36, 36, .28), inset 0 0 0 1px rgba(255, 255, 255, .10); font: 500 14px/1 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; white-space: nowrap; }
-@media (prefers-color-scheme: dark) { .pill { background: #2E2D2A; box-shadow: 0 12px 34px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 255, 255, .18); } }
+@media (prefers-color-scheme: dark) { .pill-page .pill { background: #2E2D2A; box-shadow: 0 12px 34px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 255, 255, .18); } }
 .pill-page .pill.is-recording { background: #3A2422; }
 .pill-page .pillacts { display: inline-flex; width: 420px; box-sizing: border-box; justify-content: center; padding: 6px 8px; border-radius: 999px; background: #242424; color: #FFF; box-shadow: 0 10px 30px rgba(36, 36, 36, .28), inset 0 0 0 1px rgba(255, 255, 255, .10); font: 500 13px/1 'DM Sans', sans-serif; }
-@media (prefers-color-scheme: dark) { .pillacts { background: #2E2D2A; } }
+@media (prefers-color-scheme: dark) { .pill-page .pillacts { background: #2E2D2A; } }
 
 /* ---- "notch": the island ---- */
 /* The top --bar px sit over the menu bar band and are the notch's own black; the island

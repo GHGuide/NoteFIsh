@@ -113,7 +113,7 @@ export const SelectPill = Select;
 export function Field({ label, children, className = '' }) { return <label className={`ds-field ${className}`}>{label && <span>{label}</span>}{children}</label>; }
 export function Switch({ checked, onChange, label }) { return <button type="button" role="switch" aria-checked={checked} aria-label={label} className="ds-switch" onClick={() => onChange(!checked)}><i /></button>; }
 export function Option({ on, main, sub, onClick }) { return <button type="button" className={`ds-option ${on ? 'on' : ''}`} onClick={onClick} aria-pressed={on}><span className="mark">{on && <Check size={11} strokeWidth={2.6} />}</span><div><strong>{main}</strong><span>{sub}</span></div></button>; }
-export function Setting({ main, sub, children }) { return <div className="ds-setting"><div><strong>{main}</strong>{sub && <span>{sub}</span>}</div><div className="ctl">{children}</div></div>; }
+export function Setting({ main, sub, children }) { return <div className="ds-setting"><div className="txt"><strong>{main}</strong>{sub && <span>{sub}</span>}</div><div className="ctl">{children}</div></div>; }
 export function Wave({ className = '' }) { return <span className={`ds-wave ${className}`} aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>; }
 export function Typing() { return <span className="ds-typing" aria-hidden="true"><i /><i /><i /></span>; }
 export function Empty({ icon, title, children, actions }) { return <div className="ds-empty">{icon}<h2>{title}</h2>{children && <p>{children}</p>}{actions && <div className="actions">{actions}</div>}</div>; }

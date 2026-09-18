@@ -16,7 +16,8 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 a { color: inherit; text-decoration: none; }
 a:hover { text-decoration-color: currentColor; }
 svg { vertical-align: middle; flex-shrink: 0; }
-.lucide { stroke-width: 1.65; }
+/* A global stroke-width here overrode every strokeWidth prop in the app, because
+   lucide always writes the attribute. Icons set their own weight now. */
 h1, h2, h3, p { margin: 0; }
 h2 { font-size: 21px; font-weight: 600; letter-spacing: -.55px; line-height: 1.3; }
 h3 { font-size: 16px; font-weight: 600; letter-spacing: -.2px; line-height: 1.4; }
@@ -344,8 +345,8 @@ input::placeholder, textarea::placeholder { color: #726C62; opacity: 1; }
 .setup-blockers ul { margin: 8px 0; padding-left: 16px; }
 .setup-blockers li { display: list-item; font-size: 11px; margin-bottom: 8px; }
 /* Radix / shadcn composition: focus traps, keyboard menus and semantic tabs. */
-.ui-dialog-overlay { position: fixed; inset: 0; z-index: 70; background: #24242459; }
-.ui-dialog-content { position: fixed; z-index: 71; left: 50%; top: 50%; transform: translate(-50%,-50%); width: min(540px,calc(100vw - 32px)); max-height: min(88dvh,920px); overflow: auto; padding: 0 25px 25px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); box-shadow: 0 16px 55px #2424241A; }
+.ui-dialog-overlay { position: fixed; inset: 0; z-index: var(--z-modal); background: #24242459; }
+.ui-dialog-content { position: fixed; z-index: var(--z-modal); left: 50%; top: 50%; transform: translate(-50%,-50%); width: min(540px,calc(100vw - 32px)); max-height: min(88dvh,920px); overflow: auto; padding: 0 25px 25px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); box-shadow: 0 16px 55px #2424241A; }
 .ui-dialog-content.wide { width: min(720px,calc(100vw - 32px)); }
 .modal > header { position: sticky; top: 0; z-index: 2; background: var(--paper); display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 19px 0; margin-bottom: 22px; border-bottom: 1px dashed var(--line); }
 .modal > header h2 { font-size: 22px; }

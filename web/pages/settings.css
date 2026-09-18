@@ -1,7 +1,7 @@
 /* Settings sits over the desk: a rail of sections on the left, one quiet container of
    rows on the right. Nothing here shouts; it is a place you visit and leave. */
 
-.set-overlay { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 28px; background: rgba(36, 36, 36, .3); animation: set-fade .16s var(--ease); }
+.set-overlay { position: fixed; inset: 0; z-index: var(--z-modal); display: grid; place-items: center; padding: 28px; background: rgba(36, 36, 36, .3); animation: set-fade .16s var(--ease); }
 .set-card { display: grid; grid-template-columns: 268px minmax(0, 1fr); width: min(1020px, 100%); height: min(760px, 100%); border-radius: 20px; background: var(--card); box-shadow: 0 30px 80px rgba(36, 36, 36, .3); overflow: hidden; outline: none; animation: set-rise .18s var(--ease); }
 @keyframes set-fade { from { opacity: 0; } }
 @keyframes set-rise { from { opacity: 0; transform: translateY(10px) scale(.99); } }
@@ -45,3 +45,9 @@
   .set-top { padding: 16px 18px 0; }
   .set-body { padding: 16px 18px 24px; }
 }
+
+/* A pill's fill is one shade from the panel it sits on, so in here it needs an edge to
+   read as a button at all. */
+.set-panel .ds-btn.pill { background: var(--card); box-shadow: inset 0 0 0 1px var(--sheet-line); }
+.set-panel .ds-btn.pill:hover:not(:disabled) { background: var(--bar); }
+.set-panel .ds-select { background: var(--card); }

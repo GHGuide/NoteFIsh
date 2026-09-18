@@ -14,18 +14,19 @@
   --sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --serif: 'DM Serif Display', Georgia, serif;
   --side: 224px; --col: 900px; --sheet-top: 46px; --ease: cubic-bezier(.2, .7, .2, 1);
+  --z-nav: 30; --z-scrim: 40; --z-modal: 60; --z-menu: 90; --z-toast: 110;
 }
 html, body { height: 100%; }
 body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(--paper); font-size: 14.5px; -webkit-font-smoothing: antialiased; letter-spacing: -.005em; }
 .ds-app { position: relative; min-height: 100dvh; background: var(--paper); }
 
 /* ---- window chrome: traffic lights are the OS's; we leave room for them ---- */
-.ds-topbar { position: fixed; top: 0; left: var(--side); right: 0; height: var(--sheet-top); display: flex; align-items: center; justify-content: flex-end; gap: 14px; padding: 0 22px; color: var(--navtext); z-index: 20; -webkit-app-region: drag; }
-.ds-topbar > * { -webkit-app-region: no-drag; }
-.ds-toggle { position: fixed; top: 10px; left: 76px; z-index: 25; display: none; }
+.ds-topbar { position: fixed; top: 0; left: var(--side); right: 0; height: var(--sheet-top); display: flex; align-items: center; justify-content: flex-end; gap: 14px; padding: 0 22px; color: var(--navtext); z-index: var(--z-menu); pointer-events: none; -webkit-app-region: drag; }
+.ds-topbar > * { -webkit-app-region: no-drag; pointer-events: auto; }
+.ds-toggle { position: fixed; top: 10px; left: 76px; z-index: calc(var(--z-nav) - 5); display: none; }
 
 /* ---- sidebar ---- */
-.ds-side { position: fixed; left: 0; top: 0; bottom: 0; width: var(--side); padding: 50px 14px 16px; display: flex; flex-direction: column; background: var(--paper); z-index: 30; }
+.ds-side { position: fixed; left: 0; top: 0; bottom: 0; width: var(--side); padding: 50px 14px 16px; display: flex; flex-direction: column; background: var(--paper); z-index: var(--z-nav); }
 .ds-lockup { display: flex; align-items: center; gap: 9px; padding: 0 10px; height: 28px; margin-bottom: 22px; font-size: 22px; font-weight: 650; letter-spacing: -.6px; color: var(--ink); }
 .ds-lockup .dot { color: #77736B; }
 .ds-identity { display: flex; align-items: center; gap: 10px; margin: 0 2px 18px; padding: 9px 10px; border-radius: 12px; background: var(--sheet); border: 1px solid var(--sheet-line); min-height: 52px; }
@@ -46,14 +47,13 @@ body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(-
 .ds-nav a, .ds-nav button { display: flex; align-items: center; gap: 11px; height: 38px; padding: 0 11px; border: 0; border-radius: 10px; background: transparent; color: var(--navtext); font: 500 15px var(--sans); letter-spacing: -.1px; white-space: nowrap; text-decoration: none; cursor: pointer; text-align: left; width: 100%; transition: background .12s var(--ease), color .12s; }
 .ds-nav a:hover, .ds-nav button:hover { background: var(--nav-active); color: var(--ink); }
 .ds-nav a.active { background: var(--nav-active); color: var(--ink); font-weight: 600; }
-.ds-nav svg { width: 18px; height: 18px; }
 .ds-nav .badge { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--ink); color: #FFF; font-size: 10.5px; font-weight: 600; display: grid; place-items: center; }
 .ds-nav .ring { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(56, 97, 73, .18); animation: ds-ring 1.4s ease-in-out infinite; }
 @keyframes ds-ring { 50% { box-shadow: 0 0 0 7px rgba(56, 97, 73, .06); } }
 .ds-side-foot { display: flex; align-items: center; gap: 6px; padding: 12px 11px 0; font-size: 11.5px; color: var(--muted); }
 .ds-side-foot i { width: 6px; height: 6px; border-radius: 50%; background: #B9B5AC; }
 .ds-side-foot i.connected { background: var(--green); }
-.ds-scrim { display: none; position: fixed; inset: 0; background: rgba(36, 36, 36, .22); z-index: 29; border: 0; }
+.ds-scrim { display: none; position: fixed; inset: 0; background: rgba(36, 36, 36, .22); z-index: calc(var(--z-nav) - 1); border: 0; }
 
 /* ---- the sheet ---- */
 /* One card on a page, inset on every side and rounded on every corner. It used to run
@@ -73,7 +73,8 @@ body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(-
 .ds-toolbar { height: 60px; flex-shrink: 0; display: flex; align-items: center; }
 .ds-toolbar .ds-col { display: flex; align-items: center; justify-content: space-between; }
 .ds-toolbar .right { display: flex; align-items: center; gap: 4px; }
-.ds-tool { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; min-width: 30px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--navtext); font: 500 13px var(--sans); cursor: pointer; }
+.ds-tool { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; min-width: 30px; padding: 0; border: 0; border-radius: 9px; background: transparent; color: var(--navtext); font: 500 13px var(--sans); cursor: pointer; transition: background .14s var(--ease), color .14s, transform .14s var(--ease); }
+.ds-tool:active:not(:disabled) { transform: scale(.94); }
 .ds-tool.filled { background: var(--bar); color: var(--ink); padding: 0 11px; }
 .ds-tool.square { width: 34px; background: var(--bar); color: var(--ink); }
 .ds-tool.back { width: 32px; height: 32px; border-radius: 9px; background: var(--bar); color: var(--ink); }
@@ -133,7 +134,7 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 .ds-bar > span:nth-child(2) i { display: block; height: 100%; background: var(--ink); border-radius: 4px; }
 .ds-bar > span:last-child { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 .ds-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 260px; height: 100%; text-align: center; color: var(--muted); padding: 20px 0; }
-.ds-empty svg { color: #9A958B; }
+.ds-empty > svg { color: #9A958B; }
 .ds-empty h2 { font: 400 26px/1.3 var(--serif); color: var(--ink); margin: 14px 0 0; letter-spacing: -.3px; }
 .ds-empty p { font-size: 14px; margin: 6px 0 0; max-width: 360px; line-height: 1.5; }
 .ds-empty .actions { display: flex; gap: 8px; margin-top: 16px; }
@@ -145,7 +146,8 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 .ds-btn.ghost { background: var(--sheet); border-color: var(--sheet-line); color: var(--ink); } .ds-btn.ghost:hover:not(:disabled) { background: var(--bar); }
 .ds-btn.red { background: #FFF6F4; border-color: #DDBBB7; color: #982E2D; } .ds-btn.red:hover:not(:disabled) { background: #FDEBE7; }
 .ds-btn.small { height: 34px; padding: 0 12px; border-radius: 9px; }
-.ds-btn.pill { height: 30px; padding: 0 11px; border-radius: 8px; font-weight: 500; background: var(--bar); border-color: transparent; color: var(--ink); }
+.ds-btn.pill { height: 30px; padding: 0 13px; border-radius: 999px; font-weight: 500; background: var(--bar); border-color: transparent; color: var(--ink); transition: background .14s var(--ease), transform .14s var(--ease); }
+.ds-btn.pill:active:not(:disabled) { transform: scale(.96); }
 .ds-btn.pill.ink { background: var(--ink); color: #FFF; }
 .ds-btn.pill:hover:not(:disabled) { background: var(--nav-active); }
 .ds-btn.pill.ink:hover:not(:disabled) { background: #3B3A37; }
@@ -196,9 +198,9 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 .ds-option strong { display: block; font-size: 15px; font-weight: 600; }
 .ds-option span { font-size: 12px; color: var(--muted); }
 .ds-setting { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--sheet-line); }
-.ds-setting > div:first-child { flex: 1; min-width: 0; }
+.ds-setting > .txt { flex: 1; min-width: 0; }
 .ds-setting strong { display: block; font-size: 16px; font-weight: 600; }
-.ds-setting > div > span { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; line-height: 1.45; }
+.ds-setting > .txt > span { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; line-height: 1.45; }
 .ds-setting .ctl { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .ds-setting .ctl .ds-select { max-width: 210px; }
 
@@ -251,9 +253,9 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 @keyframes ds-wave { 50% { transform: scaleY(.45); } }
 .ds-who { display: flex; align-items: center; gap: 14px; padding: 18px; border: 1px solid #B2C6B7; border-radius: 14px; background: #F8FBF7; margin-top: 16px; flex-shrink: 0; }
 .ds-who .icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; background: var(--sheet); border: 1px solid #BACDBE; color: var(--green); flex-shrink: 0; }
-.ds-who > div { flex: 1; min-width: 0; }
+.ds-who > div:not(.actions) { flex: 1; min-width: 0; }
 .ds-who strong { display: block; font: 400 22px/1.2 var(--serif); letter-spacing: -.4px; }
-.ds-who span { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; }
+.ds-who > div > span { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; }
 .ds-who .actions { display: flex; gap: 8px; flex-shrink: 0; }
 .ds-done { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
 .ds-foot { display: flex; align-items: center; gap: 10px; padding: 14px 0 16px; border-top: 1px solid var(--sheet-line); flex-shrink: 0; }
@@ -262,7 +264,7 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 .ds-script .head { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; color: var(--muted); margin-bottom: 10px; }
 .ds-script p { font-size: 16px; line-height: 1.6; letter-spacing: -.1px; margin: 0; }
 .ds-card { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid var(--sheet-line); border-radius: 12px; background: var(--sheet); }
-.ds-card > div { flex: 1; min-width: 0; }
+.ds-card > div:not(.actions) { flex: 1; min-width: 0; }
 .ds-card strong { display: block; font-size: 15px; font-weight: 600; }
 .ds-card span { font-size: 12px; color: var(--muted); }
 .ds-card .actions { display: flex; gap: 8px; flex-shrink: 0; }
@@ -293,7 +295,7 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 .ds-ask .answer .close:hover { color: var(--ink); }
 
 /* modals from the design (free month) */
-.ds-modal-overlay { position: fixed; inset: 0; background: rgba(36, 36, 36, .26); z-index: 60; display: grid; place-items: center; padding: 20px; }
+.ds-modal-overlay { position: fixed; inset: 0; background: rgba(36, 36, 36, .26); z-index: var(--z-modal); display: grid; place-items: center; padding: 20px; }
 .ds-modal { width: min(400px, 100%); max-height: calc(100dvh - 40px); overflow: auto; background: var(--sheet); border: 1px solid var(--sheet-line); border-radius: 16px; box-shadow: 0 24px 60px rgba(36, 36, 36, .22); padding: 20px 18px 14px; display: flex; flex-direction: column; }
 .ds-modal h2 { font: 400 24px/1.15 var(--serif); letter-spacing: -.6px; margin: 0; }
 .ds-modal > p { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 6px 0 0; }
@@ -317,12 +319,12 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 .ds-modal .tabs { display: flex; gap: 6px; margin-top: 12px; }
 
 /* banners and toasts */
-.ds-banner { position: fixed; top: calc(var(--sheet-top) + 12px); left: 50%; transform: translateX(calc(-50% + var(--side) / 2)); z-index: 50; display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 999px; background: var(--ink); color: #FFF; font-size: 13px; box-shadow: 0 10px 30px rgba(36, 36, 36, .28); }
+.ds-banner { position: fixed; top: calc(var(--sheet-top) + 12px); left: calc(50% + var(--side) / 2); transform: translateX(-50%); z-index: var(--z-toast); animation: ds-drop-in .2s var(--ease); display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 999px; background: var(--ink); color: #FFF; font-size: 13px; box-shadow: 0 10px 30px rgba(36, 36, 36, .28); }
 .ds-banner.error { background: #6E2524; }
 .ds-banner button { height: 28px; padding: 0 11px; border-radius: 999px; border: 0; background: #FFF; color: var(--ink); font: 600 12px var(--sans); cursor: pointer; }
 .ds-banner button.x { width: 28px; padding: 0; background: transparent; color: #FFF; opacity: .7; }
 .ds-banner button.x:hover { opacity: 1; }
-.ds-toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(calc(-50% + var(--side) / 2)); z-index: 50; display: flex; align-items: center; gap: 8px; padding: 9px 12px 9px 14px; border-radius: 999px; background: var(--ink); color: #FFF; font-size: 13px; box-shadow: 0 10px 30px rgba(36, 36, 36, .28); }
+.ds-toast { position: fixed; left: calc(50% + var(--side) / 2); bottom: 22px; transform: translateX(-50%); z-index: var(--z-toast); animation: ds-rise-in .2s var(--ease); display: flex; align-items: center; gap: 8px; padding: 9px 12px 9px 14px; border-radius: 999px; background: var(--ink); color: #FFF; font-size: 13px; box-shadow: 0 10px 30px rgba(36, 36, 36, .28); }
 .ds-toast svg { color: #7FBF95; }
 .ds-toast button { width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent; color: #FFF; opacity: .7; cursor: pointer; display: grid; place-items: center; }
 .spin { animation: ds-spin 1s linear infinite; }
@@ -342,7 +344,7 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
   .ds-title h1 { font-size: 27px; }
   .ds-stats, .ds-stats.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ds-fields { flex-direction: column; }
-  .ds-banner, .ds-toast { transform: translateX(-50%); }
+  .ds-banner, .ds-toast { left: 50%; }
 }
 @media (prefers-reduced-motion: reduce) { .ds-wave i, .ds-typing i, .ds-nav .ring { animation: none; } }
 
@@ -350,7 +352,7 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 .ds-sheet .route-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 
 /* the sidebar toggle, top-left beside the traffic lights */
-.ds-collapse { position: fixed; top: 10px; left: 84px; z-index: 31; display: grid; place-items: center; width: 30px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--navtext); cursor: pointer; }
+.ds-collapse { position: fixed; top: 10px; left: 84px; z-index: calc(var(--z-nav) + 1); display: grid; place-items: center; width: 30px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--navtext); cursor: pointer; }
 .ds-collapse:hover { background: var(--nav-active); color: var(--ink); }
 .ds-app.is-focus .ds-collapse { left: 84px; }
 @media (max-width: 900px) { .ds-collapse { display: none; } }
@@ -361,7 +363,7 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 .ds-pop-btn:active { transform: scale(.94); }
 .ds-pop-btn:hover, .ds-pop-btn.on { background: var(--nav-active); color: var(--ink); }
 .ds-pop-badge { position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 2px var(--paper); }
-.ds-pop { position: absolute; top: calc(100% + 9px); width: 358px; padding: 7px; border: 1px solid var(--sheet-line); border-radius: 20px; background: var(--card); box-shadow: 0 2px 6px rgba(36, 36, 36, .05), 0 22px 54px rgba(36, 36, 36, .2); z-index: 60; animation: ds-pop-in .16s var(--ease); transform-origin: top right; }
+.ds-pop { position: absolute; top: calc(100% + 9px); width: 358px; z-index: var(--z-menu); padding: 7px; border: 1px solid var(--sheet-line); border-radius: 20px; background: var(--card); box-shadow: 0 2px 6px rgba(36, 36, 36, .05), 0 22px 54px rgba(36, 36, 36, .2); animation: ds-pop-in .16s var(--ease); transform-origin: top right; }
 .ds-pop.left { transform-origin: top left; }
 .ds-pop.right { right: 0; } .ds-pop.left { left: 0; }
 @keyframes ds-pop-in { from { opacity: 0; transform: translateY(-6px) scale(.97); } }
@@ -384,10 +386,9 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 .ds-pop-row .txt strong { display: block; font-size: 13.5px; font-weight: 600; }
 .ds-pop-row .txt span { display: block; font-size: 12px; color: var(--muted); margin-top: 1px; line-height: 1.4; }
 .ds-pop-row > svg { color: var(--placeholder); flex-shrink: 0; }
-.ds-pop .ds-btn.pill { border-radius: 999px; height: 32px; padding: 0 14px; flex-shrink: 0; transition: background .14s var(--ease), transform .14s var(--ease); }
+.ds-pop .ds-btn.pill { height: 32px; padding: 0 14px; flex-shrink: 0; }
 .ds-pop .ds-btn.pill:not(.ink) { background: var(--sheet); box-shadow: inset 0 0 0 1px var(--sheet-line); }
 .ds-pop .ds-btn.pill:not(.ink):hover { background: var(--bar); }
-.ds-pop .ds-btn.pill:active { transform: scale(.96); }
 
 /* ---- the card that says what a screen is for ---- */
 .ds-explain { position: relative; overflow: hidden; margin-top: 20px; padding: 30px 32px 28px; border-radius: 18px; background: var(--ink); color: #F3F1EC; }
@@ -449,7 +450,7 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 .ds-select.on .chev { transform: rotate(180deg); }
 
 /* Drawn into the body, because the sheet clips its overflow and the rows scroll. */
-.ds-menu { position: fixed; z-index: 90; display: flex; flex-direction: column; gap: 1px; padding: 6px; border: 1px solid var(--sheet-line); border-radius: 16px; background: var(--card); box-shadow: 0 2px 6px rgba(36, 36, 36, .05), 0 20px 48px rgba(36, 36, 36, .2); overflow: auto; overscroll-behavior: contain; animation: ds-menu-in .15s var(--ease); transform-origin: top center; }
+.ds-menu { position: fixed; z-index: var(--z-menu); display: flex; flex-direction: column; gap: 1px; padding: 6px; border: 1px solid var(--sheet-line); border-radius: 16px; background: var(--card); box-shadow: 0 2px 6px rgba(36, 36, 36, .05), 0 20px 48px rgba(36, 36, 36, .2); overflow: auto; overscroll-behavior: contain; animation: ds-menu-in .15s var(--ease); transform-origin: top center; }
 .ds-menu.up { transform-origin: bottom center; }
 @keyframes ds-menu-in { from { opacity: 0; transform: translateY(-5px) scale(.98); } }
 .ds-menu-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 32px; padding: 6px 10px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: 500 13px var(--sans); text-align: left; cursor: pointer; }
@@ -459,3 +460,11 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 .ds-menu-item.on { font-weight: 650; }
 .ds-menu-item:disabled { opacity: .45; cursor: not-allowed; background: transparent; }
 @media (prefers-reduced-motion: reduce) { .ds-menu { animation: none; } .ds-select .chev { transition: none; } }
+
+/* Two banners in the same place was one banner: an error landed exactly on the
+   incoming-call notice. The second one down steps below the first. */
+.ds-banner ~ .ds-banner { top: calc(var(--sheet-top) + 58px); }
+.ds-app.is-focus .ds-banner, .ds-app.is-focus .ds-toast { left: 50%; }
+@keyframes ds-drop-in { from { opacity: 0; transform: translate(-50%, -8px); } }
+@keyframes ds-rise-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+@media (prefers-reduced-motion: reduce) { .ds-banner, .ds-toast { animation: none; } }
