@@ -5,6 +5,7 @@
 //   https://docs.fish.audio/api-reference/endpoint/websocket/tts-live
 import WebSocket from 'ws';
 import { encode, decode } from '@msgpack/msgpack';
+import { ProviderError } from './errors.mjs';
 
 export const LIVE_URL = 'wss://api.fish.audio/v1/tts/live';
 
@@ -15,8 +16,8 @@ export const LIVE_URL = 'wss://api.fish.audio/v1/tts/live';
  */
 export function streamSpeech({ apiKey, model = 's2.1-pro-free', text, referenceId, temperature, speed, sampleRate = 16000, latency = 'balanced', signal, onChunk, url = LIVE_URL, WebSocketImpl = WebSocket, timeoutMs = 20000 }) {
   return new Promise((resolve, reject) => {
-    if (!apiKey) return reject(new Error('Fish API key is not configured.'));
-    if (!text?.trim()) return reject(new Error('Nothing to say.'));
+    if (!apiKey) return reject(new ProviderError('Fish API key is not configured.'));
+    if (!text?.trim()) return reject(new ProviderError('Nothing to say.'));
     const ws = new WebSocketImpl(url, { headers: { Authorization: `Bearer ${apiKey}`, model } });
     let done = false, bytes = 0;
     const finish = (error) => {
@@ -25,8 +26,8 @@ export function streamSpeech({ apiKey, model = 's2.1-pro-free', text, referenceI
       try { ws.close(); } catch { /* closing */ }
       error ? reject(error) : resolve({ bytes });
     };
-    const abort = () => finish(new Error('Speech was cancelled.'));
-    const timer = setTimeout(() => finish(new Error('Fish did not finish speaking in time.')), timeoutMs);
+    const abort = () => finish(new ProviderError('Speech was cancelled.'));
+    const timer = setTimeout(() => finish(new ProviderError('Fish did not finish speaking in time.')), timeoutMs);
     timer.unref?.();
     if (signal?.aborted) return abort();
     signal?.addEventListener?.('abort', abort, { once: true });
@@ -40,19 +41,19 @@ export function streamSpeech({ apiKey, model = 's2.1-pro-free', text, referenceI
       ws.send(encode({ event: 'stop' }));
     });
     ws.on('message', raw => {
-      let message; try { message = decode(raw); } catch { return finish(new Error('Fish sent an unreadable frame.')); }
+      let message; try { message = decode(raw); } catch { return finish(new ProviderError('Fish sent an unreadable frame.')); }
       if (message?.event === 'audio' && message.audio) {
         const chunk = Buffer.isBuffer(message.audio) ? message.audio : Buffer.from(message.audio.buffer ?? message.audio);
         bytes += chunk.length;
         try { onChunk?.(chunk); } catch (error) { return finish(error); }
       } else if (message?.event === 'finish') {
-        if (message.reason === 'error') return finish(new Error('Fish could not speak this reply.'));
+        if (message.reason === 'error') return finish(new ProviderError('Fish could not speak this reply.'));
         finish();
       } else if (message?.event === 'error') {
-        finish(new Error(message.message || 'Fish returned an error.'));
+        finish(new ProviderError(message.message || 'Fish returned an error.'));
       }
     });
-    ws.on('error', error => finish(new Error(`Fish live connection failed: ${error.message}`)));
-    ws.on('close', () => { if (!done) finish(bytes ? undefined : new Error('Fish closed the connection before speaking.')); });
+    ws.on('error', error => finish(new ProviderError(`Fish live connection failed: ${error.message}`)));
+    ws.on('close', () => { if (!done) finish(bytes ? undefined : new ProviderError('Fish closed the connection before speaking.')); });
   });
 }

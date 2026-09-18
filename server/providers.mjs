@@ -1,14 +1,11 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { TONES, SENTENCE_TAGS, canonicalRegister } from './emotion.mjs';
 import { streamSpeech } from './fish-live.mjs';
+import { ProviderError } from './errors.mjs';
 import { openTranscription as openLiveTranscription } from './live-captions.mjs';
 import { convertAudio, audioMime } from './audio.mjs';
 
-export class ProviderError extends Error {
-  constructor(message, status = 502, code = 'provider_error') {
-    super(message); this.name = 'ProviderError'; this.status = status; this.code = code;
-  }
-}
+export { ProviderError } from './errors.mjs';
 
 function boundedText(value, max = 6000, optional = false) {
   if (optional && (value === undefined || value === '')) return '';

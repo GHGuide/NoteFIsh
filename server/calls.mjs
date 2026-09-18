@@ -708,7 +708,13 @@ export function createCallService({
     try {
       await providers.synthesizeStream({ text: spoken, referenceId: voice.referenceId, signal, ...prosody, onChunk: deliver });
     } catch (error) {
-      if (!started) { warn(runtime, `Live speech unavailable, using the standard path: ${safeError(error)}`); return 'fallback'; }
+      if (!started) {
+        // The desk hears a provider's own words; the server keeps the whole thing,
+        // because a fallback that happens every time is worth being able to explain.
+        console.warn('live speech fell back:', error?.message || error);
+        warn(runtime, `Live speech unavailable, using the standard path: ${safeError(error)}`);
+        return 'fallback';
+      }
       throw error;
     }
     if (!current()) return structuredClone(runtime.call);
