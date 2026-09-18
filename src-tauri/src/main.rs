@@ -9,7 +9,7 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::{Child, Command};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{
     menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
@@ -22,7 +22,65 @@ use tauri_plugin_shell::ShellExt;
 #[cfg(target_os = "macos")]
 use tauri_nspanel::{cocoa::appkit::NSWindowCollectionBehavior, ManagerExt as _, WebviewWindowExt as _};
 
-const DESK: &str = "http://127.0.0.1:3001";
+const DEFAULT_DESK: &str = "http://127.0.0.1:3001";
+
+/// Which desk this Mac answers on: NOTEFISH_DESK_URL, else the address the person
+/// typed into the menu, else a desk running on this Mac. A hosted desk is a URL
+/// like https://desk.example.com; this shell then never starts a server of its own.
+fn desk_cell() -> &'static Mutex<String> {
+    static CELL: OnceLock<Mutex<String>> = OnceLock::new();
+    CELL.get_or_init(|| Mutex::new(stored_desk()))
+}
+fn desk() -> String {
+    desk_cell().lock().unwrap().clone()
+}
+fn desk_file() -> PathBuf {
+    dirs_home().join("Library/Application Support/NoteFish/desk.txt")
+}
+fn tidy_desk(raw: &str) -> String {
+    let text = raw.trim().trim_end_matches('/');
+    match text {
+        "" => DEFAULT_DESK.to_string(),
+        _ if text.starts_with("http://") || text.starts_with("https://") => text.to_string(),
+        _ => format!("https://{text}"), // a bare hostname is a hosted desk
+    }
+}
+fn stored_desk() -> String {
+    if let Ok(url) = std::env::var("NOTEFISH_DESK_URL") {
+        if !url.trim().is_empty() {
+            return tidy_desk(&url);
+        }
+    }
+    std::fs::read_to_string(desk_file()).map(|text| tidy_desk(&text)).unwrap_or_else(|_| DEFAULT_DESK.to_string())
+}
+fn save_desk(url: &str) -> String {
+    let tidy = tidy_desk(url);
+    if let Some(parent) = desk_file().parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(desk_file(), &tidy);
+    *desk_cell().lock().unwrap() = tidy.clone();
+    tidy
+}
+fn desk_is_local() -> bool {
+    let url = desk();
+    url.starts_with("http://127.0.0.1") || url.starts_with("http://localhost") || url.starts_with("http://[::1]")
+}
+/// host:port of a desk on this Mac, for the plain HTTP the menu speaks to it.
+fn local_address() -> Option<String> {
+    let url = desk();
+    let rest = url.strip_prefix("http://")?;
+    Some(if rest.contains(':') { rest.to_string() } else { format!("{rest}:80") })
+}
+fn desk_label() -> String {
+    desk().split("://").nth(1).unwrap_or("this Mac").to_string()
+}
+
+/// What the desk page last told us, for a hosted desk the menu cannot poll itself.
+fn reported() -> &'static Mutex<Option<String>> {
+    static CELL: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+    CELL.get_or_init(|| Mutex::new(None))
+}
 const HELP: &str = "https://github.com/GHGuide/NoteFish#readme";
 /// Caption languages offered in the menu; the desk's Setup page has the full catalog.
 const MENU_LANGUAGES: [&str; 15] = ["en", "es", "fr", "de", "it", "pt", "nl", "pl", "tr", "ar", "hi", "zh", "ja", "ko", "ru"];
@@ -44,11 +102,15 @@ fn dirs_home() -> PathBuf {
 }
 
 fn desk_is_up() -> bool {
-    TcpStream::connect_timeout(&"127.0.0.1:3001".parse().unwrap(), Duration::from_millis(300)).is_ok()
+    let Some(address) = local_address().and_then(|text| text.parse().ok()) else { return false };
+    TcpStream::connect_timeout(&address, Duration::from_millis(300)).is_ok()
 }
 
 /// Starts `node server/index.mjs` from the checkout when nothing answers on the port.
 fn ensure_desk(app: &tauri::AppHandle) {
+    if !desk_is_local() {
+        return; // a hosted desk runs elsewhere; this Mac only signs in to it
+    }
     if desk_is_up() {
         return;
     }
@@ -79,11 +141,16 @@ fn ensure_desk(app: &tauri::AppHandle) {
 /// One local HTTP call to the desk server. Local requests need no password; the
 /// Origin header is what the server checks on writes.
 fn http(method: &str, path: &str, body: Option<&str>) -> Option<serde_json::Value> {
-    let mut stream = TcpStream::connect_timeout(&"127.0.0.1:3001".parse().ok()?, Duration::from_millis(500)).ok()?;
+    if !desk_is_local() {
+        return None; // a hosted desk answers the signed-in page, not this shell
+    }
+    let host = local_address()?;
+    let mut stream = TcpStream::connect_timeout(&host.parse().ok()?, Duration::from_millis(500)).ok()?;
     stream.set_read_timeout(Some(Duration::from_secs(3))).ok()?;
     let body = body.unwrap_or("");
     let request = format!(
-        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:3001\r\nOrigin: {DESK}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        "{method} {path} HTTP/1.1\r\nHost: {host}\r\nOrigin: {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        desk(),
         body.len()
     );
     stream.write_all(request.as_bytes()).ok()?;
@@ -135,7 +202,7 @@ fn toggle_listener(app: &tauri::AppHandle) {
     let root = notefish_root();
     let log = File::create(root.join("companion/listen.log")).ok();
     let mut command = Command::new("node");
-    command.arg("companion/index.mjs").arg("--watch").current_dir(&root);
+    command.arg("companion/index.mjs").arg("--watch").arg("--server").arg(desk()).current_dir(&root);
     if let Some(log) = log {
         if let Ok(err) = log.try_clone() {
             command.stdout(log).stderr(err);
@@ -151,6 +218,7 @@ fn toggle_listener(app: &tauri::AppHandle) {
 #[derive(Default, PartialEq, Clone)]
 struct Snapshot {
     status: String,
+    remote: bool,
     recent: Vec<(String, String)>,
     languages: Vec<(String, String)>,
     language: String,
@@ -159,6 +227,13 @@ struct Snapshot {
 
 fn snapshot(app: &tauri::AppHandle) -> Snapshot {
     let mut snap = Snapshot { listening: listening(app), status: "Desk offline".into(), ..Default::default() };
+    if !desk_is_local() {
+        // A hosted desk: the signed-in page reports what it sees, and keeps the
+        // recent calls and the caption language where the sign-in is.
+        snap.remote = true;
+        snap.status = reported().lock().unwrap().clone().unwrap_or_else(|| format!("Signing in to {}…", desk_label()));
+        return snap;
+    }
     let Some(settings) = http("GET", "/api/settings", None) else { return snap };
     snap.language = settings["settings"]["agentLanguage"].as_str().unwrap_or("en").to_string();
     let catalog = http("GET", "/api/languages", None).unwrap_or_default();
@@ -222,25 +297,51 @@ fn build_menu(app: &tauri::AppHandle, snap: &Snapshot) -> tauri::Result<Menu<Wry
         .collect::<tauri::Result<_>>()?;
     let language_refs: Vec<&dyn IsMenuItem<Wry>> = languages.iter().map(|item| item as &dyn IsMenuItem<Wry>).collect();
     let language_menu = Submenu::with_id_and_items(app, "languages", "Captions in", true, &language_refs)?;
+    let address = MenuItem::with_id(app, "address", format!("Desk: {}…", desk_label()).as_str(), true, None::<&str>)?;
     let help = MenuItem::with_id(app, "help", "Help", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit NoteFish", true, Some("CmdOrCtrl+Q"))?;
-    Menu::with_items(
-        app,
-        &[
-            &status,
-            &recent_menu,
-            &PredefinedMenuItem::separator(app)?,
-            &open,
-            &pill,
-            &listen,
-            &PredefinedMenuItem::separator(app)?,
-            &talk,
-            &language_menu,
-            &PredefinedMenuItem::separator(app)?,
-            &help,
-            &quit,
-        ],
-    )
+    let (first, second, third) = (PredefinedMenuItem::separator(app)?, PredefinedMenuItem::separator(app)?, PredefinedMenuItem::separator(app)?);
+    let mut items: Vec<&dyn IsMenuItem<Wry>> = vec![&status];
+    if !snap.remote {
+        items.push(&recent_menu); // a hosted desk keeps its history behind the sign-in
+    }
+    items.extend([&first as &dyn IsMenuItem<Wry>, &open, &pill, &listen, &second, &talk]);
+    if !snap.remote {
+        items.push(&language_menu);
+    }
+    items.extend([&third as &dyn IsMenuItem<Wry>, &address, &help, &quit]);
+    Menu::with_items(app, &items)
+}
+
+/// Point this Mac at another desk. The address is typed in a plain macOS dialog,
+/// which needs no window of our own and works before anyone has signed in.
+fn ask_for_desk(app: &tauri::AppHandle) {
+    let script = format!(
+        "display dialog \"Which NoteFish desk should this Mac use?\n\nYour company's address, or leave the default to run a desk on this Mac.\" default answer \"{}\" with title \"NoteFish\" buttons {{\"Cancel\", \"Use this desk\"}} default button 2",
+        desk().replace('"', "")
+    );
+    let Ok(output) = Command::new("osascript").arg("-e").arg(script).output() else { return };
+    if !output.status.success() {
+        return; // Cancel
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let Some(typed) = text.split("text returned:").nth(1) else { return };
+    let chosen = save_desk(typed.trim());
+    let was_listening = listening(app);
+    if was_listening {
+        toggle_listener(app); // the companion was pointed at the old desk
+    }
+    *reported().lock().unwrap() = None;
+    ensure_desk(app);
+    for (label, path) in [("main", "desk"), ("pill", "pill")] {
+        if let (Some(window), Ok(url)) = (app.get_webview_window(label), format!("{chosen}/{path}").parse()) {
+            let _ = window.navigate(url);
+        }
+    }
+    if was_listening {
+        toggle_listener(app);
+    }
+    refresh_menu(app, snapshot(app));
 }
 
 fn refresh_menu(app: &tauri::AppHandle, snap: Snapshot) {
@@ -293,7 +394,7 @@ fn create_pill(app: &tauri::AppHandle) {
         return;
     }
     app.manage(PillMode { notch: measure_notch() });
-    let url = format!("{DESK}/pill").parse().expect("pill url");
+    let url = format!("{}/pill", desk()).parse().expect("pill url");
     if let Ok(window) = WebviewWindowBuilder::new(app, "pill", WebviewUrl::External(url))
         .title("NoteFish")
         .inner_size(360.0, 100.0)
@@ -407,6 +508,17 @@ fn listen_to_pill(app: &tauri::App) {
     });
     let handle = app.handle().clone();
     app.listen("open-desk", move |_| show_main(&handle));
+    // A hosted desk cannot be polled from here, so the page says what it sees.
+    let handle = app.handle().clone();
+    app.listen("desk-state", move |event| {
+        let status = serde_json::from_str::<serde_json::Value>(event.payload()).ok().and_then(|value| value["status"].as_str().map(str::to_string));
+        if status.is_some() && *reported().lock().unwrap() != status {
+            *reported().lock().unwrap() = status;
+            if !desk_is_local() {
+                refresh_menu(&handle, snapshot(&handle));
+            }
+        }
+    });
     let handle = app.handle().clone();
     app.listen("pill-hello", move |_| {
         let notch = handle.try_state::<PillMode>().map(|mode| mode.notch).unwrap_or(None);
@@ -438,6 +550,12 @@ fn main() {
         .manage(Listener(Mutex::new(None)))
         .setup(|app| {
             ensure_desk(app.handle());
+            // The window in tauri.conf.json points at a desk on this Mac; a hosted one is loaded here.
+            if desk() != DEFAULT_DESK {
+                if let (Some(window), Ok(url)) = (app.get_webview_window("main"), format!("{}/desk", desk()).parse()) {
+                    let _ = window.navigate(url);
+                }
+            }
             let ptt = Shortcut::new(Some(Modifiers::ALT), Code::Space);
             if let Err(error) = app.global_shortcut().register(ptt) {
                 eprintln!("Push-to-talk key not registered: {error}");
@@ -459,6 +577,7 @@ fn main() {
                             toggle_listener(app);
                             refresh_menu(app, snapshot(app));
                         }
+                        "address" => ask_for_desk(app),
                         "help" => {
                             let _ = app.shell().open(HELP, None);
                         }
@@ -506,4 +625,24 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("NoteFish could not start");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_address_becomes_a_desk_url_and_says_whether_it_runs_here() {
+        assert_eq!(tidy_desk("  "), DEFAULT_DESK, "nothing typed keeps the desk on this Mac");
+        assert_eq!(tidy_desk("desk.acme.example"), "https://desk.acme.example", "a bare hostname is a hosted desk");
+        assert_eq!(tidy_desk("https://desk.acme.example/"), "https://desk.acme.example");
+        assert_eq!(tidy_desk("http://127.0.0.1:3001"), "http://127.0.0.1:3001");
+        *desk_cell().lock().unwrap() = tidy_desk("desk.acme.example");
+        assert!(!desk_is_local());
+        assert_eq!(desk_label(), "desk.acme.example");
+        assert_eq!(local_address(), None, "a hosted desk is never spoken to over plain HTTP");
+        *desk_cell().lock().unwrap() = tidy_desk("http://localhost:3001");
+        assert!(desk_is_local());
+        assert_eq!(local_address().as_deref(), Some("localhost:3001"));
+    }
 }

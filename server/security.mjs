@@ -71,8 +71,10 @@ export function createSecurity(config, accounts = null) {
     if (attempt?.until > now && attempt.count >= 20) return res.status(429).json({ error: 'Too many sign-in attempts. Try again in one minute.', code: 'AUTH_RATE_LIMIT' });
     if (!canAccessDesk(req, config, accounts)) {
       if (attempt?.until > now) attempt.count++; else attempts.set(ip, { count: 1, until: now + 60_000 });
+      // Accounts are a way in of their own: a deployment with no desk password is
+      // signed in to, not misconfigured.
+      if (accounts) return res.status(401).json({ error: 'Sign in to use the desk.', code: 'AUTH_REQUIRED' });
       if (!config.deskPassword || !config.publicBaseUrl) return res.status(503).json({ error: 'Public desk access requires PUBLIC_BASE_URL and NOTEFISH_DESK_PASSWORD on the server.', code: 'PUBLIC_ACCESS_UNCONFIGURED' });
-      if (accounts && req.path.startsWith('/api/')) return res.status(401).json({ error: 'Sign in to use the desk.', code: 'AUTH_REQUIRED' });
       res.set('WWW-Authenticate', 'Basic realm="NoteFish desk", charset="UTF-8"');
       return res.status(401).json({ error: 'Sign in with username desk and the configured desk password.', code: 'AUTH_REQUIRED' });
     }

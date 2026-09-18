@@ -106,6 +106,12 @@ export default function PillEntry() {
   const hidden = !!dismissed && current?.id === dismissed && now - peekAt > PEEK_LIFE;
   // Holding with nothing to reply to: say so briefly instead of recording into the void.
   useEffect(() => { if (holding && !live) setNudgeAt(Date.now()); }, [holding, !!live]);
+  // The menu-bar menu cannot poll a hosted desk, so say here what this desk sees.
+  const status = connection !== 'connected' ? 'Desk offline'
+    : ringing ? `Ringing · ${ringing.from || 'a caller'}`
+    : live ? `On a call · ${live.from || 'a caller'}`
+    : needsSeat ? 'Choose your name on the desk' : 'No call';
+  useEffect(() => { send('desk-state', { status }); }, [status]);
 
   const state = hidden ? null
     : ringing ? 'ringing'

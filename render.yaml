@@ -17,8 +17,20 @@ services:
         value: 0.0.0.0
       - key: DATA_DIR
         value: /var/data
+      # Accounts run this desk: the first person to sign up is its admin, and
+      # everyone after that arrives by invitation. Set NOTEFISH_PUBLIC_DEMO=true
+      # only for a throwaway demo with no accounts and no real calls.
       - key: NOTEFISH_PUBLIC_DEMO
-        value: "true"
+        value: "false"
+      # Who may create the first account, and so become this desk's admin. Set it
+      # before the service is reachable; everyone else arrives by invitation.
+      - key: NOTEFISH_ADMIN_EMAIL
+        sync: false
+      # The address people reach this desk on, e.g. https://desk.yourcompany.com.
+      # Invitation links and the sign-in cookie are built from it.
+      - key: PUBLIC_BASE_URL
+        sync: false
+      # Optional: a shared password as a second way in, alongside accounts.
       - key: NOTEFISH_DESK_PASSWORD
         sync: false
       - key: FISH_API_KEY

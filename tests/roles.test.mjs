@@ -85,3 +85,30 @@ test('roles: the first account runs the desk, invited people get a seat and thei
   assert.equal(freed.userId, null); assert.equal(freed.voiceId, null);
   assert.equal((await call(mara.cookie, 'GET', '/settings')).status, 401, 'her cookie no longer opens the desk');
 });
+
+// The hosted shape: no shared desk password, accounts only.
+test('a desk with accounts and no shared password asks people to sign in, and lets a signed-in one through', { timeout: 10000 }, async t => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'notefish-hosted-'));
+  await mkdir(path.join(directory, 'dist'), { recursive: true });
+  await writeFile(path.join(directory, 'dist', 'index.html'), '<!doctype html><title>NoteFish</title>');
+  const config = loadConfig({ NODE_ENV: 'production', HOST: '0.0.0.0', PUBLIC_BASE_URL: 'https://desk.example', NOTEFISH_ADMIN_EMAIL: 'Nina@Acme.Example', DATA_DIR: directory }, directory);
+  assert.equal(config.deskPassword, '', 'no shared password on a hosted desk');
+  assert.throws(() => loadConfig({ NODE_ENV: 'production', HOST: '0.0.0.0', PUBLIC_BASE_URL: 'https://desk.example', DATA_DIR: directory }, directory), /NOTEFISH_ADMIN_EMAIL/, 'a public desk is never left open to the first visitor');
+  const runtime = await createRuntime({ config, providers: { getVoice: async () => ({ state: 'trained' }) } });
+  await new Promise(resolve => runtime.server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${runtime.server.address().port}`;
+  t.after(async () => { await runtime.close(); await rm(directory, { recursive: true, force: true }); });
+
+  const shut = await fetch(`${base}/api/settings`);
+  assert.equal(shut.status, 401, 'signed out is signed out, not a misconfigured server');
+  assert.equal((await shut.json()).code, 'AUTH_REQUIRED');
+  assert.equal((await fetch(`${base}/desk`)).status, 200, 'the shell still loads so the sign-in page can render');
+  const grab = await fetch(`${base}/api/auth/signup`, { method: 'POST', headers: { Origin: 'https://desk.example', 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Passer By', email: 'passer@by.example', password: 'ten characters!' }) });
+  assert.equal(grab.status, 403, 'only the named person can claim a fresh desk');
+  const signUp = await fetch(`${base}/api/auth/signup`, { method: 'POST', headers: { Origin: 'https://desk.example', 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Nina Okafor', email: 'nina@acme.example', password: 'ten characters!' }) });
+  assert.equal(signUp.status, 201);
+  const cookie = signUp.headers.getSetCookie().map(item => item.split(';')[0]).join('; ');
+  assert.equal((await fetch(`${base}/api/settings`, { headers: { cookie } })).status, 200);
+  const invited = await fetch(`${base}/api/agents`, { method: 'POST', headers: { Origin: 'https://desk.example', 'Content-Type': 'application/json', cookie }, body: JSON.stringify({ email: 'mara@acme.example' }) });
+  assert.match((await invited.json()).inviteUrl, /^https:\/\/desk\.example\/join#/, 'invitations point at the desk’s own address');
+});

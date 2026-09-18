@@ -192,6 +192,7 @@ export function createAuthRouter({ config, accounts, sessions = null }) {
       if (body.invite && !invite) throw new AuthError('This invitation is no longer valid. Ask for a new one.', 410);
       if (invite) { body.email = invite.email; body.name = body.name || invite.agent.name; }
       else if (accounts.hasAdmin()) throw new AuthError('This desk is invitation-only. Ask an admin to invite you.', 403);
+      else if (config.adminEmail && String(body.email || '').trim().toLowerCase() !== config.adminEmail) throw new AuthError('This desk is waiting for the person who set it up. Ask them to invite you.', 403);
       const user = await accounts.signUp({ ...body, role: invite ? 'agent' : 'admin' });
       const agentId = invite ? await accounts.invites.accept(body.invite, user) : '';
       withSeat(res, user.id, agentId).status(201).json({ user, agentId: agentId || null });

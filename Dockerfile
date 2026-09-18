@@ -14,8 +14,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3001 DATA_DIR=/var/data
-# Explicit temporary shared-demo opt-in. A Render env value of false restores login.
-ENV NOTEFISH_PUBLIC_DEMO=true
+# Accounts run the desk by default. NOTEFISH_PUBLIC_DEMO=true opens a throwaway
+# demo with no sign-in; never set it on a desk that takes real calls.
+ENV NOTEFISH_PUBLIC_DEMO=false
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --chown=node:node server ./server

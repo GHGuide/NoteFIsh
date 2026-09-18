@@ -109,7 +109,20 @@ See the [two-person demo script and verification checklist](docs/demo-video.md).
 
 Use [the complete Render deployment guide](docs/render-deployment.md), [Dockerfile](Dockerfile), and [Render Blueprint](render.yaml).
 
-One Docker web service includes Node and FFmpeg, serves the built website/API/WebSockets on Render's `PORT`, listens on `0.0.0.0`, and stores state on a persistent disk at **`/var/data`**. The Docker demo sets `NOTEFISH_PUBLIC_DEMO=true` to open the workspace without a sign-in popup. Set it to `false` in Render Environment to restore the `desk` login using the existing password. The caller page still uses a short-lived invitation. Provider keys belong in Render Environment, never frontend code or build arguments.
+One Docker web service includes Node and FFmpeg, serves the built website/API/WebSockets on Render's `PORT`, listens on `0.0.0.0`, and stores state on a persistent disk at **`/var/data`**. Provider keys belong in Render Environment, never frontend code or build arguments.
+
+A hosted desk is run by accounts. Set these before the service is reachable:
+
+| Variable | Value |
+| --- | --- |
+| `NOTEFISH_ADMIN_EMAIL` | the address that may create the first account, and so becomes the desk's admin |
+| `PUBLIC_BASE_URL` | `https://desk.yourcompany.com`, the address invitation links and the sign-in cookie are built from |
+| `NOTEFISH_PUBLIC_DEMO` | `false` |
+| `OPENAI_API_KEY`, `FISH_API_KEY` | the provider keys |
+
+Point the domain at the service (a CNAME to the Render host), open it, and sign up with that admin address. Everyone else arrives by invitation from **Settings › Agents**. `NOTEFISH_DESK_PASSWORD` stays optional: a shared password as a second way in, alongside accounts. `NOTEFISH_PUBLIC_DEMO=true` opens a throwaway demo with no sign-in at all, and belongs on no desk that takes real calls.
+
+Each agent then runs the Mac app against that address: **menu bar › Desk: …** takes the company's address (`NOTEFISH_DESK_URL` sets it for a managed install). The app starts a desk of its own only when the address is on this Mac, and the companion follows the same address.
 
 ## Verification
 

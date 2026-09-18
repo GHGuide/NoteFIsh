@@ -26,7 +26,11 @@ export function loadConfig(env = process.env, root = process.cwd()) {
   const publicDemo = publicDemoValue === 'true';
   if (publicDemo && !publicBaseUrl) throw new Error('PUBLIC_BASE_URL is required for NOTEFISH_PUBLIC_DEMO');
   if (deskPassword && deskPassword.length < 16) throw new Error('NOTEFISH_DESK_PASSWORD must contain at least 16 characters');
-  if (!['127.0.0.1', '::1'].includes(host) && !deskPassword && !publicDemo) throw new Error('NOTEFISH_DESK_PASSWORD is required for a non-loopback HOST');
+  // Who may claim a fresh desk. Without it the first visitor to a public address
+  // would become its admin, so a public desk needs one of the three ways in.
+  const adminEmail = read('NOTEFISH_ADMIN_EMAIL', 254).trim().toLowerCase();
+  if (adminEmail && !/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,24}$/.test(adminEmail)) throw new Error('Invalid NOTEFISH_ADMIN_EMAIL');
+  if (!['127.0.0.1', '::1'].includes(host) && !deskPassword && !publicDemo && !adminEmail) throw new Error('A public HOST needs NOTEFISH_ADMIN_EMAIL (who may create the first account) or NOTEFISH_DESK_PASSWORD');
   const twilioAccountSid = read('TWILIO_ACCOUNT_SID');
   if (twilioAccountSid && !SID.test(twilioAccountSid)) throw new Error('Invalid TWILIO_ACCOUNT_SID');
   const twilioNumber = read('TWILIO_PHONE_NUMBER') || read('TWILIO_CALLER_ID');
@@ -71,7 +75,7 @@ export function loadConfig(env = process.env, root = process.cwd()) {
     production, dataPath: path.join(dataDir, 'notefish.json'), distPath: path.join(root, 'dist'),
     openaiApiKey: read('OPENAI_API_KEY'), fishApiKey: read('FISH_API_KEY'),
     twilioAccountSid, twilioAuthToken: read('TWILIO_AUTH_TOKEN'), twilioNumber,
-    sessionSecret, maxAgents, maxConcurrentCalls,
+    sessionSecret, adminEmail, maxAgents, maxConcurrentCalls,
     webhookUrl, webhookSecret, exportToken,
     zendeskSubdomain, zendeskEmail, zendeskApiToken,
     demoVoiceReferenceId: read('NOTEFISH_DEMO_VOICE_REFERENCE_ID', 128),
