@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Why macOS asks. Without these the system will not grant the microphone at
+       all, and the web view hides navigator.mediaDevices rather than prompting,
+       so holding to talk fails with no way to say yes. -->
+  <key>NSMicrophoneUsageDescription</key>
+  <string>NoteFish records your push-to-talk replies so it can speak them to the caller in your own cloned voice.</string>
+  <key>NSAudioCaptureUsageDescription</key>
+  <string>NoteFish listens to the call you are on so it can caption what the caller says.</string>
+</dict>
+</plist>

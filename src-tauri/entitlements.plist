@@ -2,13 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <!-- Entitlements only. The reasons the user is shown live in Info.plist; a
+       usage description here is silently ignored, which is what broke recording. -->
   <key>com.apple.security.device.audio-input</key>
   <true/>
   <key>com.apple.security.device.microphone</key>
   <true/>
-  <key>NSMicrophoneUsageDescription</key>
-  <string>NoteFish records your push-to-talk replies to speak them in your cloned voice.</string>
-  <key>NSAudioCaptureUsageDescription</key>
-  <string>NoteFish listens to the call you are on to show live captions.</string>
 </dict>
 </plist>

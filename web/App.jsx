@@ -84,6 +84,24 @@ function parseRoute(route) {
   return { path: NAV.some(item => item.path === base) || base === '/settings' ? base : '/desk', params: {}, query, full: route };
 }
 
+/** One broken component used to take the whole desk with it: a bad render threw,
+ *  React unmounted everything, and the window went white with a live call on it.
+ *  Now the page says so and the rest of the desk keeps working. */
+class PageBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { failed: null }; }
+  static getDerivedStateFromError(error) { return { failed: error }; }
+  componentDidCatch(error) { try { api.report?.(`desk page failed: ${error?.message || error}`); } catch { /* reporting is best effort */ } }
+  componentDidUpdate(previous) { if (previous.route !== this.props.route && this.state.failed) this.setState({ failed: null }); }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return <div className="ds-broken" role="alert">
+      <h2>This page stopped working.</h2>
+      <p>The rest of the desk is fine, and a call in progress is unaffected. Move to another page, or reload to come back to this one.</p>
+      <button type="button" onClick={() => this.setState({ failed: null })}>Try this page again</button>
+    </div>;
+  }
+}
+
 function WorkspaceApp({ user, onSignedOut }) {
   const role = user?.role || 'admin'; // no account means this desk is yours
   const [route, setRoute] = useState(location.pathname + location.search);
@@ -218,7 +236,7 @@ function WorkspaceApp({ user, onSignedOut }) {
     {needsSetup && setupPaused && !incoming && <div className="ds-banner" role="status"><span>Setup is paused.</span><button type="button" onClick={resumeSetup}>Continue setup</button></div>}
     {incoming && parsed.path !== '/desk' && <div className="ds-banner" role="status"><PhoneCall size={15} /><span>Incoming call from <b>{incoming.from || 'a caller'}</b></span><button type="button" onClick={() => navigate('/desk')}>Go to desk</button></div>}
     {error && <div className="ds-banner error" role="alert"><span>{error}</span><button type="button" className="x" aria-label="Dismiss" onClick={() => setError('')}><X size={14} /></button></div>}
-    <section className="ds-sheet"><RouteTransition route={parsed.path + (parsed.params.id || '')}><Page {...common} /></RouteTransition></section>
+    <section className="ds-sheet"><RouteTransition route={parsed.path + (parsed.params.id || '')}><PageBoundary route={parsed.path + (parsed.params.id || '')}><Page {...common} /></PageBoundary></RouteTransition></section>
     {free && <FreeMonth onClose={() => setFree(false)} seat={seat} setNotice={setNotice} />}
     {notice && <div className="ds-toast" role="status"><CheckCircle2 size={15} />{notice}<button type="button" aria-label="Dismiss" onClick={() => setNotice('')}><X size={13} /></button></div>}
   </div>;

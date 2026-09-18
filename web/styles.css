@@ -1106,3 +1106,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 
 .transcript-line.is-partial > p { color: var(--muted); }
 .transcript-line.is-partial .delivery { color: var(--green); }
+
+/* A page that failed to render, instead of a white window. */
+.ds-broken { max-width: 34em; margin: 12vh auto; padding: 0 24px; text-align: center; font-family: var(--sans); }
+.ds-broken h2 { margin: 0 0 10px; font: 400 30px/1.15 var(--serif); letter-spacing: -.4px; color: var(--ink); }
+.ds-broken p { margin: 0 0 18px; font-size: 15px; line-height: 1.5; color: var(--muted); }
+.ds-broken button { height: 40px; padding: 0 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); font: 600 14px var(--sans); color: var(--ink); cursor: pointer; }
+.ds-broken button:hover { background: var(--bar); }

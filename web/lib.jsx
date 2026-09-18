@@ -8,6 +8,7 @@ import { recordingType } from './audio.js';
 import { languages, languageName } from '../server/languages.mjs';
 import AudioWaveform from './components/AudioWaveform.jsx';
 import { Dialog as Modal } from './components/ui.jsx';
+import { Avatar } from './shell.jsx';
 export { languages, languageName };
 
 export const DEFAULT_SETTINGS = { voiceId: '', agentLanguage: 'en', customerLanguage: 'fr', queueName: 'Main line' };
@@ -99,7 +100,6 @@ export function LanguageSelect({ label, value, onChange, disabled = false, id, a
 
 export function StatusPill({ status }) { return <span className={`status-pill ${status}`}><span />{status === 'ready' ? 'Ready to use' : status === 'training' ? 'Training' : status === 'failed' ? 'Needs attention' : status === 'archived' ? 'Archived' : status}</span>; }
 export function Spinner({ size = 16 }) { return <Loader2 className="spin" size={size} />; }
-export function VoiceAvatarLegacy({ name = '', large = false }) { const seed = [...name].reduce((sum, char) => sum + char.charCodeAt(0), 0); return <div aria-hidden="true" className={`voice-avatar avatar-${seed % 5} ${large ? 'large' : ''}`}><div /><AudioLines size={large ? 36 : 25} strokeWidth={1.25} /></div>; }
 
 /** A file the browser saves, for voice exports. */
 export function downloadJson(name, data) {
@@ -121,7 +121,7 @@ export function VoiceModal({ voice, agentLanguage = 'en', customerLanguage = 'fr
   const [localError, setLocalError] = useState('');
   useEffect(() => () => { if (audio) URL.revokeObjectURL(audio); }, [audio]);
   const action = async (kind, fn) => { setBusy(kind); setLocalError(''); try { await fn(); } catch (failure) { setLocalError(failure.message); } finally { setBusy(''); } };
-  return <Modal title="Your voice" onClose={onClose}><div className="voice-modal-intro"><VoiceAvatar name={voice.name} large /><div><h3>{voice.name}</h3><StatusPill status={isArchived(voice) ? 'archived' : voice.status} /><p>{voice.kind === 'licensed' ? 'Licensed voice' : 'Enrolled voice'} · {languageName(voice.language || 'en')}</p></div></div>
+  return <Modal title="Your voice" onClose={onClose}><div className="voice-modal-intro"><Avatar who={voice.name} size={54} /><div><h3>{voice.name}</h3><StatusPill status={isArchived(voice) ? 'archived' : voice.status} /><p>{voice.kind === 'licensed' ? 'Licensed voice' : 'Enrolled voice'} · {languageName(voice.language || 'en')}</p></div></div>
     {localError && <div className="inline-error" role="alert">{localError}</div>}
     {voice.status === 'failed' && <div className="inline-error">{voice.error || 'Fish could not complete training. Refresh the status or try a new recording.'}</div>}
     {voice.status === 'training' && <div className="info-box"><Spinner />Fish is preparing your voice. Refresh its status in a moment.</div>}
