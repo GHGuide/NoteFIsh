@@ -185,9 +185,9 @@ export default function InsightsPage({ data, route, navigate, setNotice, setErro
   return <>
     <Toolbar />
     <Title title="Insights" sub="The last 30 days on this desk" />
-    {!nothing && <div className="ds-col wide" style={{ position: 'relative', height: 0 }}><ShareBadge onClick={share} /></div>}
+    {!nothing && <div className="ds-col" style={{ position: 'relative', height: 0 }}><ShareBadge onClick={share} /></div>}
     <Tabs items={[{ key: 'desk', label: 'Your desk' }, { key: 'voice', label: 'Your voice' }]} value={tab} onChange={setTab} />
-    <Body wide>
+    <Body>
       <Explainer
         id="insights" puff="pom" color="#3C8A4E"
         title={<>Everything this desk did, <em>counted</em>.</>}

@@ -38,6 +38,8 @@ const NAV = [
   { path: '/voice', label: 'Voice', icon: AudioLines },
 ];
 // Older links keep working: the library and the recorder are tabs of Voice, Setup is Settings.
+// Pages whose content is a grid, not prose: they get the wider column.
+const WIDE = new Set(['/insights', '/desk']);
 const ALIASES = { '/': '/desk', '/voices': '/voice?tab=library', '/enroll': '/voice?tab=takes', '/admin': '/settings' };
 
 export default function App() {
@@ -230,7 +232,7 @@ function WorkspaceApp({ user }) {
     {needsSetup && setupPaused && !incoming && <div className="ds-banner" role="status"><span>Setup is paused.</span><button type="button" onClick={resumeSetup}>Continue setup</button></div>}
     {incoming && parsed.path !== '/desk' && <div className="ds-banner" role="status"><PhoneCall size={15} /><span>Incoming call from <b>{incoming.from || 'a caller'}</b></span><button type="button" onClick={() => navigate('/desk')}>Go to desk</button></div>}
     {error && <div className="ds-banner error" role="alert"><span>{error}</span><button type="button" className="x" aria-label="Dismiss" onClick={() => setError('')}><X size={14} /></button></div>}
-    <section className="ds-sheet"><RouteTransition route={shown.path + (shown.params.id || '')}><PageBoundary route={shown.path + (shown.params.id || '')}><Page {...common} route={shown} /></PageBoundary></RouteTransition></section>
+    <section className={`ds-sheet ${WIDE.has(shown.path) ? 'is-wide' : ''}`}><RouteTransition route={shown.path + (shown.params.id || '')}><PageBoundary route={shown.path + (shown.params.id || '')}><Page {...common} route={shown} /></PageBoundary></RouteTransition></section>
     {settingsOpen && <SettingsModal {...common} onClose={() => navigate(behind.current)} />}
     {free && <FreeMonth onClose={() => setFree(false)} name={user?.name || voice?.name || ''} setNotice={setNotice} />}
     {notice && <div className="ds-toast" role="status"><CheckCircle2 size={15} />{notice}<button type="button" aria-label="Dismiss" onClick={() => setNotice('')}><X size={13} /></button></div>}

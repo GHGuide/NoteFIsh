@@ -60,13 +60,28 @@ export function Avatar({ who, size = 30, face }) { const a = avatarOf(who); retu
 
 // ---- the sheet's rhythm ----
 export function Toolbar({ back, onBack, children }) {
-  return <div className="ds-toolbar">{back ? <button type="button" className="ds-tool back" aria-label="Back" onClick={onBack}><ChevronLeft size={16} /></button> : <span />}<div className="right">{children}</div></div>;
+  return <div className="ds-toolbar"><div className="ds-col">{back ? <button type="button" className="ds-tool back" aria-label="Back" onClick={onBack}><ChevronLeft size={16} /></button> : <span />}<div className="right">{children}</div></div></div>;
 }
 export function Title({ title, sub, children }) {
   return <div className="ds-col ds-title"><h1>{title}</h1>{sub && <p>{sub}</p>}{children}</div>;
 }
 export function Tabs({ items, value, onChange }) {
-  return <div className="ds-tabs" role="tablist"><div className="ds-col">{items.map(item => <button type="button" role="tab" key={item.key} aria-selected={value === item.key} className={value === item.key ? 'on' : ''} onClick={() => onChange(item.key)}>{item.icon}{item.label}{item.count !== undefined && <span className="ds-chip">{item.count}</span>}</button>)}</div></div>;
+  // Roving focus and arrow keys, because the roles below promise them. Only the
+  // selected tab is in the tab order; the arrows move between them, Home and End jump.
+  const keys = event => {
+    const at = items.findIndex(item => item.key === value);
+    const to = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: items.length - 1 }[event.key];
+    if (to === undefined) return;
+    event.preventDefault();
+    const next = items[(to + items.length) % items.length];
+    onChange(next.key);
+    event.currentTarget.parentElement?.querySelector(`[data-tab="${next.key}"]`)?.focus();
+  };
+  return <div className="ds-tabs" role="tablist"><div className="ds-col">{items.map(item => <button
+    type="button" role="tab" key={item.key} data-tab={item.key}
+    aria-selected={value === item.key} tabIndex={value === item.key ? 0 : -1}
+    className={value === item.key ? 'on' : ''} onKeyDown={keys} onClick={() => onChange(item.key)}
+  >{item.icon}{item.label}{item.count !== undefined && <span className="ds-chip">{item.count}</span>}</button>)}</div></div>;
 }
 export function ReadBar({ children, right, className = '' }) {
   return <div className={`ds-col ds-readbar ${className}`}><div className="left">{children}</div>{right && <div className="right">{right}</div>}</div>;

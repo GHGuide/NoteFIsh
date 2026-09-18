@@ -8,7 +8,7 @@
 @font-face { font-family: 'DM Serif Display'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/DMSerifDisplay-normal-400.woff2') format('woff2'); }
 
 :root {
-  --paper: #FAF9F7; --panel: #F3F2EF; --card: #FEFDFC; --line: #D8D6D1; --ink: #242424; --muted: #66645F;
+  --paper: #F0EFEB; --panel: #F3F2EF; --card: #FEFDFC; --line: #D8D6D1; --ink: #242424; --muted: #66645F;
   --green: #386149; --red: #A53332; --amber: #815A25; --navtext: #5C5A55; --avatar-bg: #E6E4DE;
   --sheet: #FCFBFA; --sheet-line: #E8E6E1; --nav-active: #ECEBE8; --bar: #F1F0ED; --placeholder: #8F8B83;
   --sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -57,13 +57,22 @@ body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(-
 .ds-scrim { display: none; position: fixed; inset: 0; background: rgba(36, 36, 36, .22); z-index: 29; border: 0; }
 
 /* ---- the sheet ---- */
-.ds-sheet { position: fixed; left: var(--side); top: var(--sheet-top); right: 0; bottom: 0; background: var(--sheet); border: 1px solid var(--sheet-line); border-right: 0; border-bottom: 0; border-radius: 12px 0 0 0; overflow: hidden; display: flex; flex-direction: column; }
-.ds-app.is-focus .ds-side { transform: translateX(-100%); }
+/* One card on a page, inset on every side and rounded on every corner. It used to run
+   flush into the right and bottom of the window and be rounded on one corner only, which
+   on a page a shade away from its own colour meant it read as no card at all. */
+.ds-sheet { position: fixed; left: var(--side); top: var(--sheet-top); right: 10px; bottom: 10px; background: var(--sheet); border: 1px solid var(--sheet-line); border-radius: 16px; box-shadow: 0 1px 2px rgba(36, 36, 36, .03); overflow: hidden; display: flex; flex-direction: column; }
+.ds-side { transition: transform .2s var(--ease), visibility .2s; }
+.ds-app.is-focus .ds-side { transform: translateX(-100%); visibility: hidden; }
 .ds-app.is-focus .ds-sheet, .ds-app.is-focus .ds-topbar { left: 0; }
-.ds-app.is-focus .ds-sheet { border-radius: 0; border-left: 0; }
+.ds-app.is-focus .ds-sheet { left: 10px; }
 .ds-col { width: min(var(--col), calc(100% - 72px)); margin: 0 auto; flex-shrink: 0; }
 .ds-col.wide { width: min(var(--col), calc(100% - 80px)); }
-.ds-toolbar { height: 60px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 38px; }
+/* A page that shows a grid rather than prose asks the sheet for a wider column, and
+   every row on it — toolbar, title, tabs, body — moves together. A column set per
+   element is how a back arrow ends up 40px left of the title it belongs to. */
+.ds-sheet.is-wide .ds-col, .ds-sheet.is-wide .ds-col.wide { width: min(1160px, calc(100% - 84px)); }
+.ds-toolbar { height: 60px; flex-shrink: 0; display: flex; align-items: center; }
+.ds-toolbar .ds-col { display: flex; align-items: center; justify-content: space-between; }
 .ds-toolbar .right { display: flex; align-items: center; gap: 4px; }
 .ds-tool { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; min-width: 30px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--navtext); font: 500 13px var(--sans); cursor: pointer; }
 .ds-tool.filled { background: var(--bar); color: var(--ink); padding: 0 11px; }
@@ -76,6 +85,7 @@ body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(-
 .ds-title p b { font-weight: 600; color: var(--ink); }
 .ds-tabs { border-bottom: 1px solid var(--sheet-line); margin-top: 18px; flex-shrink: 0; }
 .ds-tabs .ds-col { display: flex; gap: 20px; }
+.ds-tabs button:focus-visible { border-radius: 6px; }
 .ds-tabs button { display: inline-flex; align-items: center; gap: 5px; padding: 0 0 11px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: transparent; font: 500 15.5px var(--sans); color: var(--navtext); cursor: pointer; white-space: nowrap; }
 .ds-tabs button.on { font-weight: 600; color: var(--ink); border-bottom-color: var(--ink); }
 .ds-tabs button:hover { color: var(--ink); }
@@ -328,11 +338,12 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 /* ---- narrow windows: the sidebar slides over the sheet ---- */
 @media (max-width: 900px) {
   :root { --side: 0px; }
-  .ds-side { width: 200px; transform: translateX(-100%); transition: transform .2s var(--ease); box-shadow: 0 0 0 1px var(--sheet-line); }
+  .ds-side { width: 200px; transform: translateX(-100%); visibility: hidden; box-shadow: 0 0 0 1px var(--sheet-line); }
+  .ds-side.is-open { visibility: visible; }
   .ds-side.is-open { transform: none; }
   .ds-side.is-open ~ .ds-scrim { display: block; }
   .ds-toggle { display: grid; }
-  .ds-sheet { border-radius: 0; border-left: 0; }
+  .ds-sheet { left: 8px; right: 8px; bottom: 8px; }
   .ds-col, .ds-col.wide { width: calc(100% - 32px); }
   .ds-toolbar { padding: 0 16px; }
   .ds-title h1 { font-size: 27px; }
