@@ -13,6 +13,7 @@ import { CallerAudio } from './audio.js';
 import { DEFAULT_SETTINGS, callState } from './lib.jsx';
 import { Avatar, LogoMark } from './shell.jsx';
 import { UiProvider, RouteTransition } from './components/ui.jsx';
+import TopBar from './components/topbar.jsx';
 import Caller from './Caller.jsx';
 import PillEntry from './pill.jsx';
 import DeskPage from './pages/desk.jsx';
@@ -21,7 +22,7 @@ import InsightsPage from './pages/insights.jsx';
 import GlossaryPage from './pages/glossary.jsx';
 import PhrasesPage from './pages/phrases.jsx';
 import VoicePage from './pages/voice.jsx';
-import SettingsPage from './pages/settings.jsx';
+import SettingsModal from './pages/settings.jsx';
 import FreeMonth from './pages/free.jsx';
 import AuthPage from './pages/auth.jsx';
 import Onboarding, { PAUSE_KEY } from './pages/onboarding.jsx';
@@ -187,7 +188,14 @@ function WorkspaceApp({ user }) {
   const needsSetup = !loading && !owned('onboardedAt') && !sharedDemo;
   const resumeSetup = () => { try { sessionStorage.removeItem(PAUSE_KEY); } catch { /* fine */ } setSetupPaused(false); navigate('/desk'); };
   if (needsSetup && !setupPaused) return <Onboarding {...common} onDone={() => { try { setSetupPaused(sessionStorage.getItem(PAUSE_KEY) === '1'); } catch { /* fine */ } }} />;
-  const Page = { '/desk': DeskPage, '/calls': CallsPage, '/insights': InsightsPage, '/glossary': GlossaryPage, '/phrases': PhrasesPage, '/voice': VoicePage, '/settings': SettingsPage }[parsed.path] || DeskPage;
+  const PAGES = { '/desk': DeskPage, '/calls': CallsPage, '/insights': InsightsPage, '/glossary': GlossaryPage, '/phrases': PhrasesPage, '/voice': VoicePage };
+  // Settings opens over whatever you were reading rather than taking its place, so
+  // closing it puts you back where you were instead of on some default page.
+  const settingsOpen = parsed.path === '/settings';
+  const behind = useRef('/desk');
+  if (!settingsOpen) behind.current = parsed.path;
+  const shown = settingsOpen ? { ...parsed, path: behind.current, query: {} } : parsed;
+  const Page = PAGES[shown.path] || DeskPage;
   return <div className={`ds-app ${focus ? 'is-focus' : ''}`}>
     <button type="button" className="ds-tool ds-toggle" aria-label="Open navigation" aria-expanded={mobileNav} onClick={() => setMobileNav(true)}><Menu size={18} /></button>
     <aside className={`ds-side ${mobileNav ? 'is-open' : ''}`} id="workspace-sidebar">
@@ -197,19 +205,19 @@ function WorkspaceApp({ user }) {
       <div className="ds-identity" aria-label="The voice you answer in">
         <Avatar who={voice || { name: user?.name || 'NoteFish', avatar: data.settings.avatar }} size={26} />
         <div>
-          <strong>{voice ? voice.name : sharedDemo ? 'Shared demo' : 'No voice yet'}</strong>
           {voices.length > 1
-            ? <select aria-label="The voice you answer in" value={voice?.id || ''} onChange={event => useVoice(event.target.value)}>
+            ? <select className="asname" aria-label="The voice you answer in" value={voice?.id || ''} onChange={event => useVoice(event.target.value)}>
                 {!voice && <option value="">Choose a voice…</option>}
                 {voices.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
               </select>
-            : <span className={`state ${connection === 'connected' ? '' : 'muted'}`}><i />{voice ? (connection === 'connected' ? 'Ready' : 'Connecting…') : 'Record one on Voice'}</span>}
+            : <strong>{voice ? voice.name : sharedDemo ? 'Shared demo' : 'No voice yet'}</strong>}
+          <span className={`state ${connection === 'connected' ? '' : 'muted'}`}><i />{voice ? (connection === 'connected' ? 'Ready' : 'Connecting…') : 'Record one on Voice'}</span>
         </div>
       </div>
       <nav className="ds-nav" aria-label="Main navigation">{NAV.map(item => <a href={item.path} key={item.path} className={parsed.path === item.path ? 'active' : ''} aria-current={parsed.path === item.path ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate(item.path); }}><item.icon size={16} strokeWidth={1.7} />{item.label}{item.path === '/desk' && incoming && <span className="ring" aria-label="Incoming call" />}</a>)}</nav>
       <nav className="ds-nav bottom" aria-label="More">
         <button type="button" onClick={() => setFree(true)}><Gift size={16} strokeWidth={1.7} />Get a free month</button>
-        {role === 'admin' && <a href="/settings" className={parsed.path === '/settings' ? 'active' : ''} onClick={event => { event.preventDefault(); navigate('/settings'); }}><Settings size={16} strokeWidth={1.7} />Settings</a>}
+        {role === 'admin' && <a href="/settings" className={settingsOpen ? 'active' : ''} onClick={event => { event.preventDefault(); navigate('/settings'); }}><Settings size={16} strokeWidth={1.7} />Settings</a>}
         <a href={HELP_URL} target="_blank" rel="noreferrer"><CircleHelp size={16} strokeWidth={1.7} />Help</a>
         <div className="ds-side-foot" title={user?.email || ''}><i className={connection === 'connected' ? 'connected' : ''} />{connection === 'connected' ? 'Desk connected' : connection === 'connecting' ? 'Connecting…' : 'Reconnecting…'}</div>
       </nav>
@@ -217,12 +225,13 @@ function WorkspaceApp({ user }) {
     {mobileNav && <button className="ds-scrim" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
     <button type="button" className="ds-collapse" aria-label={focus ? 'Show the sidebar' : 'Hide the sidebar'} aria-pressed={focus} onClick={() => setFocus(!focus)}><PanelLeft size={17} strokeWidth={1.7} /></button>
     <div className="ds-topbar" data-tauri-drag-region="true">
-      <button type="button" aria-label="Settings" onClick={() => navigate('/settings')}><Avatar who={voice || { name: user?.name || 'NoteFish', avatar: data.settings.avatar }} size={20} /></button>
+      <TopBar user={user} data={data} voice={voice} connection={connection} navigate={navigate} openFree={() => setFree(true)} />
     </div>
     {needsSetup && setupPaused && !incoming && <div className="ds-banner" role="status"><span>Setup is paused.</span><button type="button" onClick={resumeSetup}>Continue setup</button></div>}
     {incoming && parsed.path !== '/desk' && <div className="ds-banner" role="status"><PhoneCall size={15} /><span>Incoming call from <b>{incoming.from || 'a caller'}</b></span><button type="button" onClick={() => navigate('/desk')}>Go to desk</button></div>}
     {error && <div className="ds-banner error" role="alert"><span>{error}</span><button type="button" className="x" aria-label="Dismiss" onClick={() => setError('')}><X size={14} /></button></div>}
-    <section className="ds-sheet"><RouteTransition route={parsed.path + (parsed.params.id || '')}><PageBoundary route={parsed.path + (parsed.params.id || '')}><Page {...common} /></PageBoundary></RouteTransition></section>
+    <section className="ds-sheet"><RouteTransition route={shown.path + (shown.params.id || '')}><PageBoundary route={shown.path + (shown.params.id || '')}><Page {...common} route={shown} /></PageBoundary></RouteTransition></section>
+    {settingsOpen && <SettingsModal {...common} onClose={() => navigate(behind.current)} />}
     {free && <FreeMonth onClose={() => setFree(false)} name={user?.name || voice?.name || ''} setNotice={setNotice} />}
     {notice && <div className="ds-toast" role="status"><CheckCircle2 size={15} />{notice}<button type="button" aria-label="Dismiss" onClick={() => setNotice('')}><X size={13} /></button></div>}
   </div>;

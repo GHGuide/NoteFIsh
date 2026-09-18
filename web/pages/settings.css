@@ -1,10 +1,47 @@
-/* Settings: the inline line-name field, the revealed house-style editor, and the phone-number blocks. */
-.settings-inline { height: 28px; width: 180px; padding: 0 10px; border: 1px solid var(--sheet-line); border-radius: 999px; background: var(--sheet); font: 600 12px var(--sans); color: var(--ink); outline: none; }
-.settings-inline:focus { border-color: #8F8B83; }
-.settings-more { display: flex; flex-direction: column; gap: 8px; padding: 10px 0 14px; border-bottom: 1px solid var(--sheet-line); }
-.settings-block { display: flex; flex-direction: column; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--sheet-line); }
-.settings-block + .settings-block { margin-top: 4px; }
-.settings-block .ds-setting { border-bottom: 0; padding-bottom: 4px; }
-.settings-block .ds-note b { font-weight: 600; color: var(--ink); }
-.settings-block .ds-text { align-self: flex-start; text-decoration: none; }
-.settings-block .ds-text:hover { text-decoration: underline; }
+/* Settings sits over the desk: a rail of sections on the left, one quiet container of
+   rows on the right. Nothing here shouts; it is a place you visit and leave. */
+
+.set-overlay { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 28px; background: rgba(36, 36, 36, .3); animation: set-fade .16s var(--ease); }
+.set-card { display: grid; grid-template-columns: 268px minmax(0, 1fr); width: min(1020px, 100%); height: min(760px, 100%); border-radius: 20px; background: var(--card); box-shadow: 0 30px 80px rgba(36, 36, 36, .3); overflow: hidden; outline: none; animation: set-rise .18s var(--ease); }
+@keyframes set-fade { from { opacity: 0; } }
+@keyframes set-rise { from { opacity: 0; transform: translateY(10px) scale(.99); } }
+@media (prefers-reduced-motion: reduce) { .set-overlay, .set-card { animation: none; } }
+
+.set-rail { display: flex; flex-direction: column; gap: 18px; padding: 26px 14px 14px; background: var(--panel); border-right: 1px solid var(--sheet-line); overflow: auto; }
+.set-group { display: flex; flex-direction: column; gap: 1px; }
+.set-group .ds-label { padding: 0 11px; margin-bottom: 7px; }
+.set-group button { display: flex; align-items: center; gap: 11px; height: 36px; padding: 0 11px; border: 0; border-radius: 10px; background: transparent; color: var(--navtext); font: 500 14px var(--sans); text-align: left; cursor: pointer; transition: background .12s var(--ease), color .12s; }
+.set-group button:hover { background: var(--nav-active); color: var(--ink); }
+.set-group button.on { background: var(--nav-active); color: var(--ink); font-weight: 600; }
+.set-group button svg { flex-shrink: 0; }
+.set-ver { display: flex; align-items: center; gap: 7px; margin-top: auto; padding: 12px 11px 0; font-size: 11.5px; color: var(--muted); }
+.set-ver svg { color: #9A958B; }
+
+.set-main { display: flex; flex-direction: column; min-width: 0; }
+.set-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 24px 30px 0; }
+.set-top h1 { margin: 0; font: 400 30px/1.15 var(--serif); letter-spacing: -.6px; }
+.set-top-r { display: flex; align-items: center; gap: 2px; }
+.set-body { flex: 1; min-height: 0; overflow: auto; padding: 22px 30px 30px; }
+
+/* the one container everything sits in */
+.set-panel { padding: 4px 18px; border-radius: 16px; background: var(--panel); }
+.set-panel .ds-setting { border-bottom: 1px solid var(--sheet-line); padding: 15px 0; }
+.set-panel .ds-setting:last-child { border-bottom: 0; }
+.set-panel .ds-setting strong { font-size: 14.5px; }
+.set-panel .ds-setting > div > span { font-size: 12.5px; }
+.set-more { margin: 2px 0 14px; padding: 0 18px; }
+.set-inline { width: 190px; height: 30px; padding: 0 10px; border: 1px solid var(--sheet-line); border-radius: 8px; background: var(--card); font: 500 12.5px var(--sans); color: var(--ink); outline: none; }
+.set-inline:focus { border-color: #8F8B83; box-shadow: 0 0 0 3px rgba(36, 36, 36, .07); }
+.set-copy { margin-top: 10px; padding: 11px 13px; border-radius: 10px; background: var(--panel); font: 400 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); word-break: break-all; }
+.set-foot { display: inline-flex; margin-top: 12px; }
+
+@media (max-width: 860px) {
+  .set-overlay { padding: 0; }
+  .set-card { grid-template-columns: minmax(0, 1fr); height: 100%; border-radius: 0; }
+  .set-rail { flex-direction: row; gap: 14px; overflow-x: auto; padding: 14px; border-right: 0; border-bottom: 1px solid var(--sheet-line); }
+  .set-group { flex-direction: row; align-items: center; }
+  .set-group .ds-label { display: none; }
+  .set-ver { display: none; }
+  .set-top { padding: 16px 18px 0; }
+  .set-body { padding: 16px 18px 24px; }
+}

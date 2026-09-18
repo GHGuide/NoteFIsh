@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const SID = /^AC[0-9a-f]{32}$/i;
@@ -122,6 +123,11 @@ export function loadConfig(env = process.env, root = process.cwd()) {
   });
 }
 
+export const APP_VERSION = (() => {
+  try { return JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version || ''; }
+  catch { return ''; }
+})();
+
 export function getStatus(config, { audioAvailable = false, driverInstalled = null } = {}) {
   const keys = {
     OPENAI_API_KEY: config.openaiApiKey, FISH_API_KEY: config.fishApiKey,
@@ -136,7 +142,10 @@ export function getStatus(config, { audioAvailable = false, driverInstalled = nu
       fish: { configured: Boolean(config.fishApiKey), verified: false },
       openai: { configured: Boolean(config.openaiApiKey), verified: false },
       twilio: { configured: Boolean(config.twilioAccountSid && config.twilioAuthToken && config.twilioNumber), verified: false, optional: true },
+      elevenlabs: { configured: Boolean(config.elevenLabsApiKey), verified: false, optional: true },
     },
+    version: APP_VERSION,
+    storage: config.databaseUrl ? 'database' : 'file',
     phoneNumber: config.twilioNumber || null, publicUrl: config.publicBaseUrl || null,
     webhookUrl: config.publicBaseUrl ? `${config.publicBaseUrl}/twilio/incoming` : null,
     statusCallbackUrl: config.publicBaseUrl ? `${config.publicBaseUrl}/twilio/status` : null,

@@ -8,6 +8,7 @@ import { useCapture, VoiceModal, ImportModal, REGISTERS, READING_SCRIPTS, downlo
 import { ActionMenu } from '../components/ui.jsx';
 import AudioWaveform from '../components/AudioWaveform.jsx';
 import RecordedAudio from '../components/RecordedAudio.jsx';
+import Explainer from '../components/explainer.jsx';
 import './voice.css';
 
 const TABS = [{ key: 'voice', label: 'Your voice' }, { key: 'takes', label: 'Takes' }, { key: 'avatar', label: 'Avatar' }, { key: 'register', label: 'Register' }, { key: 'library', label: 'Library' }];
@@ -58,6 +59,16 @@ function YourVoice({ data, owned, saveOwned, me, voice, ready, registers, setTab
   const options = [...(own ? [] : [{ value: '', label: ready.length ? 'Choose a voice' : 'No voice yet', disabled: true }]), ...choices.map(item => ({ value: item.id, label: item.name }))];
   const taken = REGISTERS.filter(item => registers[item.key]);
   return <Body>
+    <Explainer
+      id="voice" puff="fish" color="#2E9E86"
+      title={<>The voice they hear is <em>yours</em>.</>}
+      sub="Read one short passage and NoteFish answers in your own voice, in a language you may not even speak. Record more feelings and it matches the mood of the call."
+      examples={[
+        { say: 'a calm take', then: 'how you sound most of the time' },
+        { say: 'an apologetic take', then: 'used when the caller is upset' },
+      ]}
+      action={{ label: 'Record a take', onClick: () => setTab('takes') }}
+    />
     <div className="ds-card"><Avatar who={me} size={54} /><div><strong>{voice ? `${voice.name} · ${voice.kind === 'licensed' ? 'licensed voice' : 'your voice'}` : 'No voice yet'}</strong><span>{voice ? [voice.createdAt && `Recorded ${dateOf(voice.createdAt)}`, languageName(voice.language || 'en'), kindOf(voice)].filter(Boolean).join(' · ') : 'Read one short passage and callers hear you in their language.'}</span></div>
       <div className="actions">{voice && <Btn pill kind="ghost" icon={<Play size={12} />} onClick={() => setSelectedId(voice.id)}>Hear it</Btn>}{voice && (voice.mine ?? true) && <Btn pill kind="ghost" icon={<Share2 size={12} />} onClick={() => share(voice)}>Share</Btn>}<Btn pill icon={<Mic size={13} />} onClick={() => setTab('takes')}>{voice ? 'Re-record' : 'Record'}</Btn></div></div>
     <h3>Voice for calls</h3>

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { languageName } from '../lib.jsx';
 import { Toolbar, Title, Tabs, ReadBar, Body, Row, SelectPill, Empty, Ask } from '../shell.jsx';
+import Explainer from '../components/explainer.jsx';
 import './glossary.css';
 
 const KINDS = [{ value: 'keep', label: 'Keep as written' }, { value: 'as', label: 'Translate as' }, { value: 'spell', label: 'Spell out' }];
@@ -27,6 +28,15 @@ export default function GlossaryPage({ data, saveSettings, role = 'admin' }) {
     <Tabs items={TABS} value={tab} onChange={setTab} />
     {canEdit && <ReadBar><Plus size={14} /><input value={draft} maxLength={120} placeholder="Add a word or phrase" aria-label="Add a word or phrase" disabled={list.length >= 200} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') add(); }} /></ReadBar>}
     <Body>
+      <Explainer
+        id="glossary" puff="bloom" color="#7A4E2D"
+        title={<>The words it is <em>not</em> allowed to get wrong.</>}
+        sub="Names, part numbers, the things a translator quietly mangles. Say how each one is handled and it stops guessing."
+        examples={[
+          { say: 'Acme', then: 'keep it exactly as it is' },
+          { say: 'SKU-4471', then: 'read it out character by character' },
+        ]}
+      />
       {shown.length ? shown.map(item => <Row key={item.id} main={item.term} sub={sub(item)} right={canEdit && <>
         {item.kind === 'as' && <input key={item.as} className="glossary-as" aria-label={`${item.term} in ${caller}`} defaultValue={item.as} maxLength={200} placeholder={`In ${caller}…`} onBlur={event => { const as = event.target.value.trim(); if (as !== (item.as || '')) patch(item.id, { as }); }} onKeyDown={event => { if (event.key === 'Enter') event.target.blur(); }} />}
         <SelectPill aria-label={`How to say ${item.term}`} value={item.kind} onChange={kind => patch(item.id, { kind })} options={KINDS} />

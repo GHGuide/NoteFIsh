@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { Check, Copy, Search, X } from 'lucide-react';
 import { Toolbar, Title, Tabs, ReadBar, Body, Label, Row, Status, Avatar, Empty, Ask, TextBtn } from '../shell.jsx';
 import { formatDuration, needsDispatch } from '../lib.jsx';
+import Explainer from '../components/explainer.jsx';
 import './calls.css';
 
 const secs = (a, b) => a && b ? Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000)) : 0;
@@ -42,6 +43,16 @@ export default function CallsPage(common) {
     <Tabs items={tabs} value={tab} onChange={setTab} />
     <ReadBar><Search size={14} /><input value={q} placeholder="Search callers, words, or ticket numbers" aria-label="Search calls" onChange={event => setQ(event.target.value)} /></ReadBar>
     <Body>
+      <Explainer
+        id="calls" puff="squish" color="#2F6FE0"
+        title={<>Every call, <em>kept</em>.</>}
+        sub="What was said, in both languages, line by line, and whatever note you left at the end. Nothing is thrown away when the caller hangs up."
+        examples={[
+          { say: 'the transcript', then: 'what they said and what you answered' },
+          { say: 'the note', then: 'what it was about, ready for a ticket' },
+        ]}
+        action={{ label: 'Open the latest', onClick: () => { const first = (common.data.calls || [])[0]; common.navigate(first ? `/calls/${first.id}` : '/desk'); } }}
+      />
       {!groups.length ? (data.calls.length ? <Empty title="Nothing here.">{needle ? `No call mentions “${q.trim()}”.` : tab === 'mine' ? 'None of these calls were answered by you.' : 'Nothing needs attention.'}</Empty> : <Empty title="No calls yet.">Calls appear here as they come in.</Empty>)
         : groups.map(([label, calls], index) => <React.Fragment key={label}>
           <Label style={{ margin: index ? '22px 0 4px' : '0 0 4px' }}>{label}</Label>
