@@ -37,6 +37,20 @@ fn desk() -> String {
 fn desk_file() -> PathBuf {
     dirs_home().join("Library/Application Support/NoteFish/desk.txt")
 }
+/// Whether to watch for calls. Kept between launches, because a listener that
+/// silently switches itself off is a call you do not get.
+fn listen_file() -> PathBuf {
+    dirs_home().join("Library/Application Support/NoteFish/listening")
+}
+fn wants_listening() -> bool {
+    std::fs::read_to_string(listen_file()).map(|text| text.trim() == "on").unwrap_or(false)
+}
+fn remember_listening(on: bool) {
+    if let Some(parent) = listen_file().parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(listen_file(), if on { "on" } else { "off" });
+}
 fn tidy_desk(raw: &str) -> String {
     let text = raw.trim().trim_end_matches('/');
     match text {
@@ -197,6 +211,7 @@ fn toggle_listener(app: &tauri::AppHandle) {
     let mut guard = state.0.lock().unwrap();
     if let Some(mut child) = guard.take() {
         let _ = child.kill();
+        remember_listening(false);
         return;
     }
     let root = notefish_root();
@@ -209,7 +224,7 @@ fn toggle_listener(app: &tauri::AppHandle) {
         }
     }
     match command.spawn() {
-        Ok(child) => *guard = Some(child),
+        Ok(child) => { *guard = Some(child); remember_listening(true); }
         Err(error) => eprintln!("Could not start the companion: {error}"),
     }
 }
@@ -596,6 +611,11 @@ fn main() {
                 })
                 .on_tray_icon_event(|tray, event| tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event))
                 .build(app)?;
+            // Left listening last time: start watching again rather than making
+            // the person remember to, which is how a call gets missed.
+            if wants_listening() && !listening(app.handle()) {
+                toggle_listener(app.handle());
+            }
             create_pill(app.handle());
             listen_to_pill(app);
             watch_cursor(app.handle());
@@ -644,5 +664,24 @@ mod tests {
         *desk_cell().lock().unwrap() = tidy_desk("http://localhost:3001");
         assert!(desk_is_local());
         assert_eq!(local_address().as_deref(), Some("localhost:3001"));
+    }
+}
+
+#[cfg(test)]
+mod listening_tests {
+    use super::*;
+
+    #[test]
+    fn the_listening_choice_survives_a_relaunch() {
+        // Whatever is on disk now, put it back afterwards.
+        let before = std::fs::read_to_string(listen_file()).ok();
+        remember_listening(true);
+        assert!(wants_listening(), "left listening, so it starts listening");
+        remember_listening(false);
+        assert!(!wants_listening(), "switched off, so it stays off");
+        match before {
+            Some(text) => { let _ = std::fs::write(listen_file(), text); }
+            None => { let _ = std::fs::remove_file(listen_file()); }
+        }
     }
 }
