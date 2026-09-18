@@ -71,10 +71,13 @@ Recorded here so the difference between the plan and the build stays visible.
   reply. Leave the key unset and Fish failing is simply a failure.
 - **Live captions come from OpenAI Realtime**, not ElevenLabs Scribe. Agent clip
   transcription and the translate-and-tone step already match the table.
-- **No Supabase.** Accounts, roster, glossary and call history live in one JSON
-  file on the Render disk. That is deliberate for now, and the move to Postgres is
-  the change the second paying customer forces, along with backups, retention and
-  an audit log.
+- **Postgres is wired, as one document rather than tables.** Set `DATABASE_URL` to a
+  Supabase connection string and the desk keeps its state there instead of a file on
+  the Render disk, moving the existing file across on the first start. What this buys
+  is managed backups and data that outlives the machine. What it does not buy is a
+  relational schema: accounts, roster, voices and calls are still one JSONB document,
+  because splitting them into tables means rewriting all 53 places that read and write
+  the store. Worth doing when queries or per-row concurrency start to matter.
 - **No Sentry, no Resend, no payments.** Invitations are sent by the operator's own
   mail client from a `mailto:` link rather than by a product mailer.
 - **The marketing site is on Cloudflare Pages**, not Render, so it costs nothing and

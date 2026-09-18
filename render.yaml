@@ -45,6 +45,10 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      # A managed Postgres database. Without it the desk keeps its data in a file
+      # on the disk below, which is not backed up.
+      - key: DATABASE_URL
+        sync: false
       # Optional second voice provider: speech falls back here when Fish cannot speak.
       - key: ELEVENLABS_API_KEY
         sync: false

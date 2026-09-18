@@ -1,5 +1,4 @@
-import { mkdir, open, rename, readFile, stat } from 'node:fs/promises';
-import path from 'node:path';
+import { chooseStorage } from './storage.mjs';
 import { isLayoutShape } from './layout.mjs';
 import { REGISTERS, canonicalRegister } from './emotion.mjs';
 
@@ -84,24 +83,20 @@ export function validateState(state) {
   return state;
 }
 
-export async function createStore(filePath) {
+export async function createStore(filePath, { connectionString = '', driver } = {}) {
+  const { storage, moved } = await chooseStorage({ filePath, connectionString, maxBytes: MAX_STATE, driver });
   let state = initialState();
   try {
-    const info = await stat(filePath);
-    if (info.size > MAX_STATE) throw new Error('Stored NoteFish data exceeds the size limit');
-    state = validateState(migrateState(JSON.parse(await readFile(filePath, 'utf8'))));
+    const encoded = await storage.load();
+    if (encoded !== null) state = validateState(migrateState(JSON.parse(encoded)));
   } catch (error) {
-    if (error.code !== 'ENOENT') throw new Error('Cannot load NoteFish data safely; inspect the local data file without sharing its private contents');
+    if (error.code !== 'ENOENT') throw new Error('Cannot load NoteFish data safely; inspect the stored data without sharing its private contents');
   }
   let pending = Promise.resolve();
   const persist = async (next) => {
     const encoded = JSON.stringify(validateState(next));
     if (Buffer.byteLength(encoded) > MAX_STATE) throw new Error('NoteFish storage is full. Archive or export older call data before continuing');
-    await mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
-    const temporary = `${filePath}.tmp`;
-    const handle = await open(temporary, 'w', 0o600);
-    try { await handle.writeFile(encoded, 'utf8'); await handle.sync(); } finally { await handle.close(); }
-    await rename(temporary, filePath);
+    await storage.save(encoded);
     state = next;
   };
   return {
@@ -117,5 +112,8 @@ export async function createStore(filePath) {
       return work;
     },
     flush: () => pending,
+    where: () => storage.describe(),
+    movedFromFile: moved,
+    close: async () => { await pending; await storage.close(); },
   };
 }

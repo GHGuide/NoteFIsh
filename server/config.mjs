@@ -71,6 +71,10 @@ export function loadConfig(env = process.env, root = process.cwd()) {
   const zendeskEmail = read('ZENDESK_EMAIL', 200);
   const zendeskApiToken = read('ZENDESK_API_TOKEN', 256);
   if (zendeskSubdomain && (!zendeskEmail || !zendeskApiToken)) throw new ConfigError('ZENDESK_EMAIL and ZENDESK_API_TOKEN are required with ZENDESK_SUBDOMAIN');
+  // A managed database instead of a file on this machine's disk. Set it and the
+  // document moves across on the first start, so a running deployment keeps its data.
+  const databaseUrl = read('DATABASE_URL', 600);
+  if (databaseUrl && !/^postgres(ql)?:\/\/[^\s]+$/.test(databaseUrl)) throw new ConfigError('DATABASE_URL must be a postgres:// connection string');
   const dataDir = read('DATA_DIR') || path.join(root, 'data');
   if (!path.isAbsolute(dataDir)) throw new ConfigError('DATA_DIR must be an absolute directory path');
   const model = (key, fallback) => {
@@ -84,7 +88,7 @@ export function loadConfig(env = process.env, root = process.cwd()) {
   if (!['low', 'balanced', 'normal'].includes(latency)) throw new ConfigError('FISH_LATENCY must be low, balanced or normal');
   return Object.freeze({
     root, port: Number(portText), host, publicBaseUrl, deskPassword, publicDemo,
-    production, dataPath: path.join(dataDir, 'notefish.json'), distPath: path.join(root, 'dist'),
+    production, databaseUrl, dataPath: path.join(dataDir, 'notefish.json'), distPath: path.join(root, 'dist'),
     openaiApiKey: read('OPENAI_API_KEY'), fishApiKey: read('FISH_API_KEY'),
     // Optional. With it, a recorded voice is enrolled at ElevenLabs too and speech
     // falls back there when Fish cannot speak. Without it, Fish failing is the answer.

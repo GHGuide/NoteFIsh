@@ -23,7 +23,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const execFileAsync = promisify(execFile);
 
 export async function createRuntime({ config = loadConfig(process.env, root), store: suppliedStore, providers: suppliedProviders, calls: suppliedCalls } = {}) {
-  const store = suppliedStore || await createStore(config.dataPath);
+  const store = suppliedStore || await createStore(config.dataPath, { connectionString: config.databaseUrl });
+  if (store.movedFromFile) console.log('Moved the existing desk data into the database.');
   const providers = suppliedProviders || createProviders(config);
   const callerAccess = createCallerAccess(config);
   const sessions = createSessions(config);
