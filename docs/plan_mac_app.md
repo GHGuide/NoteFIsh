@@ -98,7 +98,28 @@ Rough total: 2½–3 weeks of focused work. Steps 1–3 give a usable Mac app in
   bar from the companion design. Keep this look; it is the Windows version.
 
 Both are hidden until something happens (detected or ringing call, live call, ⌥ held,
-a reply playing, a five-second goodbye) and sized to what they draw. Hovering shows the
-options row: caller language, caption language, open the desk, hide for this call, end.
-The page drives the window over events (`pill-layout`, `pill-visible`, `open-desk`,
-`pill-hello`); Rust answers `pill-hello` with the mode.
+a reply playing, a five-second goodbye). The page drives the window over events
+(`pill-layout`, `pill-visible`, `open-desk`, `pill-hello`); Rust answers `pill-hello`
+with the mode.
+
+What is on it during a call, and why:
+
+- **One width, not the width of its contents.** The island was sized to whatever it held,
+  so a caption landing or the mouse passing over it resized the window and slid the row
+  sideways. It now has a single width whenever there is anything to show and hugs its row
+  when there is not; only its height changes.
+- **The last three turns**, oldest at the top, the speaker in its own column rather than a
+  label above each line. A single caption that expired meant that by the time you had read
+  a reply you had lost what it was answering. Only the newest turn carries the other
+  language underneath it.
+- **A meter that is really the caller's voice** (`level` events on the desk socket, from
+  `noteSound` in `server/calls.mjs`). It is the only thing on screen that separates a call
+  being heard from a bridge that has gone silent; the animation it replaced played at the
+  same pace either way. Nothing heard for six seconds of listening says so in words. The
+  desk sets the caller's audio aside while it translates or plays a reply, so that time
+  does not count towards it.
+- **Hold to talk**, beside the row, doing what ⌥Space does. It lives outside the part of
+  the row that swaps between states, because being unmounted mid-press would lose the
+  release and leave it recording.
+- **Hovering** shows the options: which language they speak, which you speak, open the
+  desk, hide for this call, end.

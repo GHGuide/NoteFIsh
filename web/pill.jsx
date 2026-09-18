@@ -9,14 +9,15 @@
 // The window is transparent and sized to whatever is drawn.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { Check, ChevronDown, EyeOff, Loader2, Maximize2, Monitor, Phone, PhoneOff, Volume2, X } from 'lucide-react';
+import { Check, ChevronDown, EyeOff, Loader2, Maximize2, Monitor, Phone, PhoneOff, Volume2, VolumeX, X } from 'lucide-react';
 import { Puff } from './shell.jsx';
 import { api } from './api.js';
 import { languages } from '../server/languages.mjs';
 import './pill.css';
 
-const SHOW_CAPTION = new Set(['listening', 'recording', 'thinking', 'speaking']);
-const CAPTION_LIFE = 14000; // a finished line stays readable this long after it lands
+const HISTORY = 3; // turns kept on the pill, so you can still see what was said a moment ago
+const LEVEL_LIFE = 1200; // no level for this long means no audio is arriving, so the meter rests
+const DEAF_AFTER = 6000; // connected this long with nothing heard at all is worth saying out loud
 const ENDED_LIFE = 5000, PEEK_LIFE = 4200, NUDGE_LIFE = 1800;
 const SPRING = { type: 'spring', stiffness: 520, damping: 40, mass: .7 };
 const WAVE = [8, 14, 20, 11, 17, 9];
@@ -27,7 +28,18 @@ const send = (name, payload = {}) => { try { tauri()?.event?.emit?.(name, payloa
 const code = value => (value && value !== 'auto' ? value.slice(0, 2).toUpperCase() : '··');
 const clock = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
-function Wave() { return <span className="wave" aria-hidden="true">{WAVE.map((h, i) => <i key={i} style={{ '--h': `${h}px`, '--d': `${i * .1}s` }} />)}</span>; }
+/** The caller's voice, when the desk is telling us how loud it is, and a plain idle
+ *  animation when it is not. A meter that moves only when audio is really arriving is
+ *  the one thing on the pill that proves the call is being heard: the old animation
+ *  played at the same pace whether the bridge was working or had gone completely deaf. */
+function Wave({ level = null }) {
+  const real = level !== null;
+  return <span className={`wave${real ? ' real' : ''}`} aria-hidden="true">
+    {WAVE.map((h, i) => <i key={i} style={real
+      ? { '--h': `${Math.max(3, Math.round(h * (.3 + level)))}px` }
+      : { '--h': `${h}px`, '--d': `${i * .1}s` }} />)}
+  </span>;
+}
 function LanguageSel({ label, value, allowAuto = false, disabled, onChange }) {
   return <><span className="lab">{label}</span><span className="sel"><select aria-label={label} value={value} disabled={disabled} onChange={event => onChange(event.target.value)}>{allowAuto && <option value="auto">Detect automatically</option>}{languages.map(item => <option key={item.code} value={item.code}>{item.name}</option>)}</select><ChevronDown size={12} /></span></>;
 }
@@ -38,6 +50,7 @@ export default function PillEntry() {
   const [connection, setConnection] = useState('connecting');
   const [holding, setHolding] = useState(false);
   const [partial, setPartial] = useState(null);
+  const [level, setLevel] = useState(null); // {at, value}: how loud the caller is, and when we last heard
   const [peekAt, setPeekAt] = useState(0);
   const [nudgeAt, setNudgeAt] = useState(0);
   const [now, setNow] = useState(Date.now());
@@ -74,6 +87,7 @@ export default function PillEntry() {
         if (message.type === 'snapshot') { setCalls(message.calls || []); setFloor(current => ({ agents: message.agents || current.agents, agentId: message.agentId === undefined ? current.agentId : message.agentId })); }
         if (message.type === 'call' && message.call) setCalls(current => [message.call, ...current.filter(call => call.id !== message.call.id)]);
         if (message.type === 'caption-partial') setPartial(message.text ? { callId: message.callId, text: message.text, shown: message.shown || '' } : null);
+        if (message.type === 'level') setLevel({ at: Date.now(), value: Math.max(0, Math.min(1, Number(message.level) || 0)) });
       };
       socket.onclose = () => { setConnection('reconnecting'); if (!closed) timer = setTimeout(connect, 2000); };
       socket.onerror = () => socket.close();
@@ -132,34 +146,50 @@ export default function PillEntry() {
   }, [!!state]);
   useEffect(() => { if (state === 'speaking') { if (!playingSince.current) playingSince.current = Date.now(); } else playingSince.current = 0; }, [state]);
 
-  const lastLine = live?.transcript?.[live.transcript.length - 1];
-  const lineAge = lastLine ? now - new Date(lastLine.t).getTime() : Infinity;
-  const caption = !SHOW_CAPTION.has(state) ? null
-    : partial && partial.callId === live?.id && partial.text
-      ? { who: 'Caller', text: partial.shown || partial.text, sub: partial.shown ? partial.text : '', lang: code(live?.detectedLanguage || live?.customerLanguage), mine: false }
-      : lastLine && lineAge < CAPTION_LIFE
-        ? { who: lastLine.speaker === 'agent' ? 'You' : 'Caller',
-            text: lastLine.speaker === 'agent' ? lastLine.textSource : lastLine.textShown,
-            sub: lastLine.textSource !== lastLine.textShown ? (lastLine.speaker === 'agent' ? lastLine.textShown : lastLine.textSource) : '',
-            lang: code(lastLine.speaker === 'agent' ? lastLine.targetLang : lastLine.sourceLang),
-            mine: lastLine.speaker === 'agent' }
-        : null;
-  // Between a partial clearing and its finished line arriving there is one render with no
-  // caption; holding the last one for half a second keeps the card from blinking.
-  const [held, setHeld] = useState(null);
-  useEffect(() => {
-    if (caption) { setHeld(caption); return; }
-    const timer = setTimeout(() => setHeld(null), 500);
-    return () => clearTimeout(timer);
-  }, [caption?.text, caption?.sub, caption?.who, !!caption]);
-  const shown = caption || held;
+  // The last few turns rather than one line that appears and then vanishes. A single
+  // caption meant that by the time you had read the reply you had already lost what it
+  // was answering, and that a pause of a few seconds left the pill saying nothing at all.
+  // Only the newest turn carries its other language underneath; the ones above it are
+  // there to be glanced at, so they get the side you actually need to read.
+  const entries = [];
+  for (const line of (live?.transcript || []).slice(-HISTORY)) {
+    const mine = line.speaker === 'agent';
+    entries.push({
+      key: line.id, mine, who: mine ? 'You' : 'Caller',
+      text: mine ? line.textSource : line.textShown,
+      sub: line.textSource !== line.textShown ? (mine ? line.textShown : line.textSource) : '',
+      lang: code(mine ? line.targetLang : line.sourceLang),
+    });
+  }
+  if (partial && partial.callId === live?.id && partial.text) {
+    entries.push({ key: 'partial', mine: false, who: 'Caller', partial: true,
+      text: partial.shown || partial.text, sub: partial.shown ? partial.text : '',
+      lang: code(live?.detectedLanguage || live?.customerLanguage) });
+  }
+  const turns = entries.slice(-HISTORY);
+  const showCard = !!live && turns.length > 0;
   const showActions = hover && !!(ringing || live);
+
+  // A meter that has not been fed for a moment rests at nothing, which is the truth:
+  // no audio is reaching the desk. Silence on the line still feeds it, quietly.
+  const heard = level && now - level.at < LEVEL_LIFE ? level.value : (live ? 0 : null);
+  const answeredFor = live?.answeredAt ? now - new Date(live.answeredAt).getTime() : 0;
+  // While a reply is being translated or played the desk sets the caller's audio aside,
+  // so no levels arrive and none are meant to. Only the time spent actually listening
+  // counts towards going deaf, or every long reply would raise a false alarm.
+  const busyAt = useRef(0);
+  useEffect(() => { if (live && live.phase !== 'listening') busyAt.current = Date.now(); }, [live?.phase, live?.id]);
+  // Nothing for a while, rather than nothing yet: a bridge that dies halfway through a
+  // call goes just as quiet as one that never worked, and silence on the line still
+  // sends levels, so this only fires when no audio is reaching the desk at all.
+  const heardAt = Math.max(level?.at || 0, busyAt.current, live?.answeredAt ? new Date(live.answeredAt).getTime() : 0);
+  const deaf = !!live && answeredFor > DEAF_AFTER && now - heardAt > DEAF_AFTER;
 
   // The window is exactly the box we draw. A ResizeObserver sees every change of that box
   // (a state's row swapping in, a caption landing, fonts arriving, the options on hover);
   // grow the window before the content moves and shrink it after, so nothing is clipped.
   const layout = useCallback((size, recenter, why) => { applied.current = size; send('pill-layout', { width: size.w, height: size.h, recenter, why }); }, []);
-  const why = useRef(''); why.current = state ? `${state}${shown ? '+caption' : ''}${showActions ? '+actions' : ''}` : '';
+  const why = useRef(''); why.current = state ? `${state}${showCard ? '+card' : ''}${showActions ? '+actions' : ''}` : '';
   useEffect(() => {
     const element = root.current;
     if (!element) return;
@@ -204,8 +234,10 @@ export default function PillEntry() {
       {needsSeat ? <button type="button" className="act" onClick={openDesk}>Open desk</button> : <button type="button" className="act" disabled={!!busy} onClick={() => answer(ringing)}>{busy === 'answer' ? 'Answering…' : 'Answer'}</button>}
       <button type="button" className="act ghost icon" aria-label="Decline" disabled={!!busy} onClick={() => act('end', () => api.end(ringing.id))}><X size={14} /></button>
     </>,
-    listening: <><Wave /><span>Listening</span>{pair}</>,
-    recording: <><span className="rec" /><span>Recording</span><Wave /></>,
+    listening: deaf
+      ? <><span className="warn"><VolumeX size={15} /></span><span className="warn">Not hearing the call</span></>
+      : <><span>Listening</span>{pair}</>,
+    recording: <><span className="rec" /><span>Recording</span></>,
     thinking: <><Loader2 className="spin" size={15} /><span>Translating</span>{pair}</>,
     speaking: <>
       <span className="dim2"><Volume2 size={15} /></span><span>Playing in your voice</span>
@@ -231,6 +263,7 @@ export default function PillEntry() {
   >{holding ? 'Release to send' : 'Hold to talk'}<kbd>⌥Space</kbd></button>;
   const row = <>
     <button type="button" className="mark" aria-label="Open the desk" onClick={openDesk}><Puff variant="fish" color="#F3F1EC" size={22} face={false} /></button>
+    {live && !deaf && <Wave level={heard} />}
     <AnimatePresence mode="wait" initial={false}><motion.span key={state} className="pillrow" {...swap}>{body}</motion.span></AnimatePresence>
     {talk}
   </>;
@@ -247,14 +280,25 @@ export default function PillEntry() {
       {live && <button type="button" className="act red" disabled={!!busy} onClick={() => act('end', () => api.end(live.id))}><PhoneOff size={13} />End</button>}
     </div>
   </div>;
-  const captionBlock = shown && <><span className="who">{shown.who}</span><p>{shown.text}</p>{shown.sub && <p className="sub"><b>{shown.lang}</b>{shown.sub}</p>}</>;
+  // Who this is and how long it has been running. It lives in the card because the row
+  // above has no room left for it, and it reads there as the heading of the conversation.
+  const card = showCard && <div className="ic" role="log" aria-live="polite">
+    <div className="ich"><span>{live.from || 'Caller'}</span><span>{clock(answeredFor / 1000)}</span></div>
+    {turns.map((turn, index) => <div key={turn.key} className={`turn${turn.mine ? ' mine' : ''}${turn.partial ? ' saying' : ''}${index === turns.length - 1 ? ' now' : ''}`}>
+      <span className="who">{turn.who}</span>
+      <div className="said">
+        <p>{turn.text}</p>
+        {index === turns.length - 1 && turn.sub && <p className="sub"><b>{turn.lang}</b>{turn.sub}</p>}
+      </div>
+    </div>)}
+  </div>;
 
   if (mode.kind === 'notch') {
     return <div className="notchroot" ref={root} style={{ '--notch': `${mode.notch}px`, '--bar': `${mode.bar}px` }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       <AnimatePresence initial={false}>
-        {state && <motion.div key="island" className={`island is-${state}`} layout={!reduced} {...drop}>
+        {state && <motion.div key="island" className={`island is-${state}${showCard || actions ? ' wide' : ''}`} layout={!reduced} {...drop}>
           <div className="pillrow">{row}</div>
-          {shown && <div className={`ic ${shown.mine ? 'mine' : ''}`} role="status">{captionBlock}</div>}
+          {card}
           {actions}
         </motion.div>}
       </AnimatePresence>
@@ -262,7 +306,7 @@ export default function PillEntry() {
   }
   return <div className="pillroot" ref={root} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
     <AnimatePresence initial={false}>
-      {shown && <motion.div key="caption" className={`pillcap ${shown.mine ? 'mine' : ''}`} role="status" {...enter}>{captionBlock}</motion.div>}
+      {card && <motion.div key="caption" className="pillcap" {...enter}>{card}</motion.div>}
     </AnimatePresence>
     <AnimatePresence initial={false}>
       {state && <motion.div key="pill" className={`pill is-${state}`} layout={!reduced} {...enter}>{row}</motion.div>}

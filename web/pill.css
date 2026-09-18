@@ -17,6 +17,7 @@
 .mark { display: grid; place-items: center; border: 0; background: transparent; padding: 0; cursor: pointer; flex-shrink: 0; border-radius: 50%; opacity: .95; transition: opacity .15s, transform .15s cubic-bezier(.2, .7, .2, 1); }
 .mark:hover { opacity: 1; transform: scale(1.08); }
 .dim { opacity: .5; } .dim2 { opacity: .6; display: inline-flex; }
+.warn { color: #E7A72F; display: inline-flex; align-items: center; }
 .pillrow b { font-weight: 600; }
 .pillrow kbd { font: inherit; font-size: 11px; border: 1px solid #777; padding: 3px 7px; border-radius: 4px; color: #E2E0DB; }
 /* Hold to talk. The ⌥Space shortcut still works; this is for when your hands are on the
@@ -39,6 +40,7 @@
 .bar i { display: block; height: 100%; background: #FFF; border-radius: 2px; transition: width .25s linear; }
 .wave { display: inline-flex; align-items: center; gap: 3px; height: 22px; }
 .wave i { width: 3px; border-radius: 2px; background: currentColor; height: var(--h, 10px); transform-origin: center; animation: pill-wave 1s ease-in-out infinite; animation-delay: var(--d, 0s); }
+.wave.real i { animation: none; transition: height .12s linear; }
 @keyframes pill-wave { 0%, 100% { transform: scaleY(.45); } 50% { transform: scaleY(1); } }
 .spin { animation: pill-spin 1s linear infinite; }
 @keyframes pill-spin { to { transform: rotate(360deg); } }
@@ -54,16 +56,29 @@
 .acts .sel svg { position: absolute; right: 8px; pointer-events: none; opacity: .6; }
 .acts .sel option { color: #242424; }
 
+/* ---- the conversation: the last few turns, oldest at the top ---- */
+.ic { display: flex; flex-direction: column; gap: 7px; text-align: left; box-sizing: border-box; width: 100%;
+  --lab: rgba(255, 255, 255, .4); --said: rgba(255, 255, 255, .6); --now: #FFF; --sub: rgba(255, 255, 255, .5); --me: #E7A72F; }
+.ich { display: flex; justify-content: space-between; gap: 10px; font-size: 10px; font-weight: 600; letter-spacing: 1.1px; text-transform: uppercase; color: var(--lab); }
+.ich span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.turn { display: flex; gap: 9px; align-items: baseline; }
+/* The speaker in its own column: a label above each line would double the height of the
+   card, and colour alone is not something to make the difference rest on. */
+.turn .who { flex: 0 0 44px; font-size: 10px; font-weight: 600; letter-spacing: 1.1px; text-transform: uppercase; color: var(--lab); }
+.turn.mine .who { color: var(--me); }
+.turn .said { flex: 1; min-width: 0; }
+.turn .said p { margin: 0; font-size: 13px; line-height: 1.35; color: var(--said); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
+.turn.now .said p { font-size: 14px; color: var(--now); -webkit-line-clamp: 2; }
+.turn.saying .said p { opacity: .8; }
+.turn .said p.sub { margin-top: 3px; font-size: 12px; color: var(--sub); -webkit-line-clamp: 1; }
+.turn .said p.sub b { font-weight: 600; margin-right: 6px; }
+
 /* ---- "pill": the strip ---- */
-.pillcap { width: 420px; padding: 11px 14px; border-radius: 14px; background: #FEFDFC; border: 1px solid rgba(36, 36, 36, .12); box-shadow: 0 10px 30px rgba(36, 36, 36, .18); text-align: left; }
-.pillcap p { margin: 0; font-size: 14.5px; line-height: 1.4; color: #242424; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.pillcap p.sub { margin-top: 3px; font-size: 12px; color: #66645F; -webkit-line-clamp: 1; }
-.pillcap p.sub b { font-weight: 600; margin-right: 6px; }
-.pillcap .who { display: block; font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: #8F8B83; margin-bottom: 3px; }
-.pillcap.mine .who { color: #815A25; }
+.pillcap { width: 420px; box-sizing: border-box; padding: 11px 14px; border-radius: 14px; background: #FEFDFC; border: 1px solid rgba(36, 36, 36, .12); box-shadow: 0 10px 30px rgba(36, 36, 36, .18); text-align: left; }
+.pillcap .ic { --lab: #8F8B83; --said: #66645F; --now: #242424; --sub: #66645F; --me: #815A25; }
 @media (prefers-color-scheme: dark) {
   .pillcap { background: #262522; border-color: rgba(243, 241, 236, .14); box-shadow: 0 12px 34px rgba(0, 0, 0, .5); }
-  .pillcap p { color: #F1EFE9; } .pillcap p.sub { color: rgba(241, 239, 233, .62); } .pillcap .who { color: rgba(241, 239, 233, .45); }
+  .pillcap .ic { --lab: rgba(241, 239, 233, .45); --said: rgba(241, 239, 233, .62); --now: #F1EFE9; --sub: rgba(241, 239, 233, .55); --me: #E7A72F; }
 }
 .pill { display: inline-flex; align-items: center; gap: 10px; height: 46px; padding: 0 16px 0 12px; border-radius: 999px; background: #242424; color: #FFF; box-shadow: 0 10px 30px rgba(36, 36, 36, .28), inset 0 0 0 1px rgba(255, 255, 255, .10); font: 500 14px/1 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; white-space: nowrap; }
 @media (prefers-color-scheme: dark) { .pill { background: #2E2D2A; box-shadow: 0 12px 34px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 255, 255, .18); } }
@@ -74,17 +89,13 @@
 /* ---- "notch": the island ---- */
 /* The top --bar px sit over the menu bar band and are the notch's own black; the island
    is never narrower than the notch, and the ears curve into the menu bar like the real one. */
-.island { position: relative; width: 460px; min-width: var(--notch, 220px); padding: var(--bar, 38px) 14px 10px; border-radius: 0 0 22px 22px; background: #000; color: #FFF; font: 500 14px/1 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; box-shadow: 0 14px 34px rgba(0, 0, 0, .45); display: flex; flex-direction: column; align-items: center; gap: 8px; box-sizing: border-box; }
+.island { position: relative; min-width: var(--notch, 220px); padding: var(--bar, 38px) 14px 10px; border-radius: 0 0 22px 22px; background: #000; color: #FFF; font: 500 14px/1 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; box-shadow: 0 14px 34px rgba(0, 0, 0, .45); display: flex; flex-direction: column; align-items: center; gap: 8px; box-sizing: border-box; }
 .island::before, .island::after { content: ''; position: absolute; top: 0; width: 18px; height: 18px; background: #000; }
 .island::before { right: 100%; -webkit-mask: radial-gradient(circle at 0 100%, transparent 17.5px, #000 18px); mask: radial-gradient(circle at 0 100%, transparent 17.5px, #000 18px); }
 .island::after { left: 100%; -webkit-mask: radial-gradient(circle at 100% 100%, transparent 17.5px, #000 18px); mask: radial-gradient(circle at 100% 100%, transparent 17.5px, #000 18px); }
+.island.wide { width: 460px; }
 .island .pillrow { min-height: 34px; padding: 0 4px; flex-wrap: wrap; justify-content: center; white-space: normal; row-gap: 6px; }
-.island .ic { width: 100%; padding: 8px 10px 10px; border-radius: 12px; background: #161616; text-align: left; box-sizing: border-box; }
-.island .ic .who { display: block; font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: rgba(255, 255, 255, .4); margin-bottom: 3px; }
-.island .ic.mine .who { color: #E7A72F; }
-.island .ic p { margin: 0; font-size: 14px; line-height: 1.4; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.island .ic p.sub { margin-top: 3px; font-size: 12px; color: rgba(255, 255, 255, .55); -webkit-line-clamp: 1; }
-.island .ic p.sub b { font-weight: 600; margin-right: 6px; }
+.island .ic { padding: 9px 11px 11px; border-radius: 12px; background: #161616; }
 .island .acts { padding: 2px 2px 0; }
 .island.is-recording { background: #1F0F0E; }
 .island.is-recording::before, .island.is-recording::after { background: #1F0F0E; }
