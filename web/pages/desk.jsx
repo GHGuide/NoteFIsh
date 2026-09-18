@@ -10,7 +10,6 @@ import { AudioLines, Check, CheckCircle2, ChevronDown, ChevronRight, Copy, Globe
 import { api } from '../api.js';
 import { Toolbar, Title, Tabs, Body, Col, Label, Dot, Status, Chip, Row, Btn, TextBtn, Pill, SelectPill, Field, Switch, Wave, Typing, Empty, Spinner, Ask, Avatar, Puff, SWATCHES } from '../shell.jsx';
 import { languages, languageName, REGISTERS, useCapture, callState, isArchived, needsDispatch, stamp, formatDuration } from '../lib.jsx';
-import Explainer from '../components/explainer.jsx';
 import './desk.css';
 
 const transportLabel = call => call?.transport === 'twilio' ? 'phone' : call?.transport === 'companion' ? 'companion' : 'browser link';
@@ -257,17 +256,6 @@ export default function DeskPage({ data, navigate, route, setError, setNotice, s
       </div>
     </Col>
     <Body>
-      <Explainer
-        id="desk" puff="cloud" color="#7D4FE0"
-        title={<>Where the call <em>actually</em> happens.</>}
-        sub="They speak, you read it in your own language, you hold a key and answer. The caller hears your voice saying it in theirs, and never hears your real microphone."
-        examples={[
-          { say: 'they say', then: 'Bonjour, j’ai un problème avec ma commande' },
-          { say: 'you read', then: 'Hello, I have a problem with my order' },
-          { say: 'you answer', then: 'they hear you, in French' },
-        ]}
-        action={{ label: 'Create a call link', onClick: createInvitation }}
-      />
       {!recent.length ? <><Label>Recent</Label><p className="ds-note" style={{ marginTop: 8 }}>Your calls will appear here. The first one can be a link you send to your own phone.</p></>
         : groups.map(([label, calls], index) => <React.Fragment key={label}>
           <Label style={{ margin: index ? '22px 0 4px' : '0 0 4px' }}>{label}</Label>
