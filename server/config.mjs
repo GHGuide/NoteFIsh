@@ -78,7 +78,15 @@ export function loadConfig(env = process.env, root = process.cwd()) {
   // A managed database instead of a file on this machine's disk. Set it and the
   // document moves across on the first start, so a running deployment keeps its data.
   const databaseUrl = read('DATABASE_URL', 600);
-  if (databaseUrl && !/^postgres(ql)?:\/\/[^\s]+$/.test(databaseUrl)) throw new ConfigError('DATABASE_URL must be a postgres:// connection string');
+  if (databaseUrl && !/^postgres(ql)?:\/\/[^\s]+$/.test(databaseUrl)) {
+    // Say what was wrong with it without ever saying what it was: a connection
+    // string carries a password, so only its shape can be reported.
+    const scheme = databaseUrl.includes('://') ? `${databaseUrl.slice(0, databaseUrl.indexOf('://'))}://` : 'no scheme';
+    const faults = [`starts with ${scheme}`];
+    if (/\s/.test(databaseUrl)) faults.push('contains a space');
+    if (/^["']|["']$/.test(databaseUrl)) faults.push('is wrapped in quotes');
+    throw new ConfigError(`DATABASE_URL must be a postgres:// connection string: this one ${faults.join(', ')}, and is ${databaseUrl.length} characters`);
+  }
   const dataDir = read('DATA_DIR') || path.join(root, 'data');
   if (!path.isAbsolute(dataDir)) throw new ConfigError('DATA_DIR must be an absolute directory path');
   const model = (key, fallback) => {
