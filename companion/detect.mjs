@@ -33,16 +33,24 @@ const LIVE_TITLE = /\bmeet\b|\bcall\b|\bhuddle\b|\bvideo\b|\bvoice\b|\bringing\b
 
 /** {app, kind:'app'|'web', via} for the most likely call, or null. */
 export function detectCall({ processes = [], tabs = [] } = {}) {
+  // Every tab, not the first that matches. Somebody with a Messenger tab open all
+  // day and a meeting starting in another one was being told about the Messenger
+  // tab, and a call in progress lost to a tab merely sitting there.
+  let idle = null;
   for (const tab of tabs) {
     const text = `${tab.url || ''} ${tab.title || ''}`;
     const site = CALL_SITES.find(item => item.match.test(text));
-    if (site) return { app: site.app, kind: 'web', via: tab.browser || 'browser', live: LIVE_TITLE.test(tab.title || '') || /meet\.google\.com\/[a-z]{3}-|zoom\.us\/(wc|j)\//i.test(tab.url || '') };
+    if (!site) continue;
+    const live = LIVE_TITLE.test(tab.title || '') || /meet\.google\.com\/[a-z]{3}-|zoom\.us\/(wc|j)\//i.test(tab.url || '');
+    const found = { app: site.app, kind: 'web', via: tab.browser || 'browser', live };
+    if (live) return found;
+    idle ||= found;
   }
   for (const name of processes) {
     const app = CALL_APPS.find(item => item.match.test(name));
     if (app) return { app: app.app, kind: 'app', via: name, live: true };
   }
-  return null;
+  return idle;
 }
 
 /** Split `ps -Ao comm` output into short process names. */

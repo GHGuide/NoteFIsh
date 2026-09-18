@@ -25,7 +25,13 @@ import { detectCall, processNames } from './detect.mjs';
 const run = promisify(execFile);
 const here = path.dirname(fileURLToPath(import.meta.url));
 const FRAME = 640; // 20 ms of 16 kHz mono PCM16, the same frames the phone page sends
-const BROWSERS = ['Google Chrome', 'Comet', 'Brave Browser', 'Microsoft Edge', 'Arc', 'Chromium'];
+// Safari calls a tab's title its name; everything Chrome-shaped calls it title.
+const BROWSERS = [
+  { app: 'Google Chrome', titleWord: 'title' }, { app: 'Comet', titleWord: 'title' },
+  { app: 'Brave Browser', titleWord: 'title' }, { app: 'Microsoft Edge', titleWord: 'title' },
+  { app: 'Arc', titleWord: 'title' }, { app: 'Chromium', titleWord: 'title' },
+  { app: 'Safari', titleWord: 'name' },
+];
 
 // ---- arguments and environment ----
 const args = parseArgs(process.argv.slice(2));
@@ -99,15 +105,14 @@ async function ensureMicProbe() {
 async function observe() {
   const processes = processNames((await run('ps', ['-Ao', 'comm'], { encoding: 'utf8' }).catch(() => ({ stdout: '' }))).stdout);
   const tabs = [];
-  for (const browser of BROWSERS) {
+  for (const { app: browser, titleWord } of BROWSERS) {
     if (!processes.some(name => name === browser || name === browser.split(' ')[0])) continue;
-    const script = `tell application "${browser}" to if it is running then get {URL, title} of tabs of windows`;
-    const out = (await run('osascript', ['-e', script], { encoding: 'utf8', timeout: 2000 }).catch(() => ({ stdout: '' }))).stdout.trim();
-    if (!out) continue;
-    // AppleScript prints URLs then titles, comma separated, one flat list per window group.
-    const parts = out.split(', ');
-    const half = Math.floor(parts.length / 2);
-    for (let i = 0; i < half; i++) tabs.push({ browser, url: parts[i], title: parts[half + i] || '' });
+    // Asked for separately, so one title containing a comma cannot shift every URL
+    // along by one and turn the whole list into nonsense.
+    const ask = async what => (await run('osascript', ['-e', `tell application "${browser}" to if it is running then get ${what} of tabs of windows`], { encoding: 'utf8', timeout: 3000 }).catch(() => ({ stdout: '' }))).stdout.trim();
+    const urls = (await ask('URL')).split(', ');
+    const titles = (await ask(titleWord)).split(', ');
+    urls.forEach((url, index) => { if (url) tabs.push({ browser, url, title: titles[index] || '' }); });
   }
   let micInUse = false;
   if (existsSync(micProbe)) micInUse = (await run(micProbe, [], { encoding: 'utf8', timeout: 2000 }).catch(() => ({ stdout: '0' }))).stdout.trim() === '1';
