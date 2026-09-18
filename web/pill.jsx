@@ -9,7 +9,7 @@
 // The window is transparent and sized to whatever is drawn.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { Check, ChevronDown, EyeOff, Loader2, Maximize2, Monitor, Phone, PhoneOff, Volume2, VolumeX, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, EyeOff, Loader2, Maximize2, Monitor, Phone, PhoneOff, Volume2, VolumeX, X } from 'lucide-react';
 import { Puff } from './shell.jsx';
 import { api } from './api.js';
 import { languages } from '../server/languages.mjs';
@@ -40,8 +40,23 @@ function Wave({ level = null }) {
       : { '--h': `${h}px`, '--d': `${i * .1}s` }} />)}
   </span>;
 }
-function LanguageSel({ label, value, allowAuto = false, disabled, onChange }) {
-  return <><span className="lab">{label}</span><span className="sel"><select aria-label={label} value={value} disabled={disabled} onChange={event => onChange(event.target.value)}>{allowAuto && <option value="auto">Detect automatically</option>}{languages.map(item => <option key={item.code} value={item.code}>{item.name}</option>)}</select><ChevronDown size={12} /></span></>;
+function LanguageSel({ label, value, allowAuto = false, disabled, onOpen }) {
+  const name = value === 'auto' || !value ? 'Detect' : (languages.find(item => item.code === value)?.name || value.toUpperCase());
+  return <><span className="lab">{label}</span><button type="button" className="sel" aria-label={`${label}: ${name}`} disabled={disabled} onClick={onOpen}>{name}<ChevronDown size={12} /></button></>;
+}
+
+/** The list, in the island itself, because nothing may be drawn outside the window. */
+function LanguageList({ label, value, allowAuto, onPick, onBack }) {
+  const options = [...(allowAuto ? [{ code: 'auto', name: 'Detect automatically' }] : []), ...languages];
+  return <div className="picker">
+    <div className="pickhead"><button type="button" className="back" aria-label="Back" onClick={onBack}><ChevronLeft size={14} /></button><span>{label}</span></div>
+    <div className="picklist" role="listbox" aria-label={label}>
+      {options.map(item => <button
+        key={item.code} type="button" role="option" aria-selected={item.code === (value || 'auto')}
+        className={item.code === (value || 'auto') ? 'on' : ''} onClick={() => onPick(item.code)}
+      >{item.name}{item.code === (value || 'auto') && <Check size={13} />}</button>)}
+    </div>
+  </div>;
 }
 
 export default function PillEntry() {
@@ -55,7 +70,9 @@ export default function PillEntry() {
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState('');
   const [hover, setHover] = useState(false);
-  const [dismissed, setDismissed] = useState(''); // the call whose pill was hidden by hand
+  const [dismissed, setDismissed] = useState('');
+  const [picking, setPicking] = useState(null); // which language is being chosen, in place
+  const [failed, setFailed] = useState(''); // the pill has nowhere else to put a failure // the call whose pill was hidden by hand
   // ?look=notch previews the island in a plain browser; in the app Rust decides.
   const [mode, setMode] = useState(() => ({ kind: new URLSearchParams(location.search).get('look') === 'notch' ? 'notch' : 'pill', notch: 220, bar: 38 }));
   const reduced = useReducedMotion();
@@ -118,6 +135,7 @@ export default function PillEntry() {
   const hidden = !!dismissed && current?.id === dismissed && now - peekAt > PEEK_LIFE;
   // Holding with nothing to reply to: say so briefly instead of recording into the void.
   useEffect(() => { if (holding && !live) setNudgeAt(Date.now()); }, [holding, !!live]);
+  useEffect(() => { if (!failed) return; const timer = setTimeout(() => setFailed(''), 6000); return () => clearTimeout(timer); }, [failed]);
   // The menu-bar menu cannot poll a hosted desk, so say here what this desk sees.
   const status = connection !== 'connected' ? 'Desk offline'
     : ringing ? `Ringing · ${ringing.from || 'a caller'}`
@@ -166,7 +184,7 @@ export default function PillEntry() {
   }
   const turns = entries.slice(-HISTORY);
   const showCard = !!live && turns.length > 0;
-  const showActions = hover && !!(ringing || live);
+  const showActions = (hover || picking) && !!(ringing || live);
 
   // A meter that has not been fed for a moment rests at nothing, which is the truth:
   // no audio is reaching the desk. Silence on the line still feeds it, quietly.
@@ -214,7 +232,7 @@ export default function PillEntry() {
     return () => clearTimeout(timer);
   }, [!!state, reduced]);
 
-  const act = (name, work) => { setBusy(name); work().catch(() => {}).finally(() => setBusy('')); };
+  const act = (name, work) => { setBusy(name); work().catch(failure => setFailed(failure?.message || 'That did not work.')).finally(() => setBusy('')); };
   // The same event ⌥Space raises, so the desk records either way. Set locally too, so the
   // button answers the press at once instead of after the round trip through Rust.
   const talkNow = on => { setHolding(on); send('ptt', on); };
@@ -232,7 +250,9 @@ export default function PillEntry() {
       <button type="button" className="act" disabled={!!busy} onClick={() => answer(ringing)}>{busy === 'answer' ? 'Answering…' : 'Answer'}</button>
       <button type="button" className="act ghost icon" aria-label="Decline" disabled={!!busy} onClick={() => act('end', () => api.end(ringing.id))}><X size={14} /></button>
     </>,
-    listening: deaf
+    listening: connection !== 'connected'
+      ? <><span className="warn"><VolumeX size={15} /></span><span className="warn">Reconnecting to your desk</span></>
+      : deaf
       ? <><span className="warn"><VolumeX size={15} /></span><span className="warn">Not hearing the call</span></>
       : <><span>Listening</span>{pair}</>,
     recording: <><span className="rec" /><span>Recording</span></>,
@@ -266,17 +286,25 @@ export default function PillEntry() {
   </>;
   // Two deliberate rows rather than one that wraps wherever it happens to run out:
   // which language is whose, then what to do with the call.
-  const actions = showActions && current && <div className="acts">
+  const actions = showActions && current && (picking ? <div className="acts">
+    <LanguageList
+      label={picking === 'customerLanguage' ? 'They speak' : 'You speak'}
+      value={picking === 'customerLanguage' ? (current.customerLanguage || 'auto') : (current.agentLanguage || 'en')}
+      allowAuto={picking === 'customerLanguage'}
+      onBack={() => setPicking(null)}
+      onPick={value => { setPicking(null); setLanguage(picking, value); }}
+    />
+  </div> : <div className="acts">
     <div className="actrow">
-      <LanguageSel label="They speak" value={current.customerLanguage || 'auto'} allowAuto disabled={!!busy} onChange={value => setLanguage('customerLanguage', value)} />
-      <LanguageSel label="You speak" value={current.agentLanguage || 'en'} disabled={!!busy} onChange={value => setLanguage('agentLanguage', value)} />
+      <LanguageSel label="They speak" value={current.customerLanguage || 'auto'} allowAuto disabled={!!busy} onOpen={() => setPicking('customerLanguage')} />
+      <LanguageSel label="You speak" value={current.agentLanguage || 'en'} disabled={!!busy} onOpen={() => setPicking('agentLanguage')} />
     </div>
     <div className="actrow">
       <button type="button" className="act ghost" onClick={openDesk}><Maximize2 size={13} />Desk</button>
       <button type="button" className="act ghost" onClick={() => setDismissed(current.id)}><EyeOff size={13} />Hide</button>
       {live && <button type="button" className="act red" disabled={!!busy} onClick={() => act('end', () => api.end(live.id))}><PhoneOff size={13} />End</button>}
     </div>
-  </div>;
+  </div>);
   // Who this is and how long it has been running. It lives in the card because the row
   // above has no room left for it, and it reads there as the heading of the conversation.
   const card = showCard && <div className="ic" role="log" aria-live="polite">
@@ -295,6 +323,7 @@ export default function PillEntry() {
       <AnimatePresence initial={false}>
         {state && <motion.div key="island" className={`island is-${state}${showCard || actions ? ' wide' : ''}`} layout={!reduced} {...drop}>
           <div className="pillrow">{row}</div>
+          {failed && <div className="ic fail" role="alert"><span className="who">Did not work</span><p>{failed}</p></div>}
           {card}
           {actions}
         </motion.div>}

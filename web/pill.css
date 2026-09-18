@@ -47,12 +47,10 @@
 .pill-page .acts { display: flex; flex-direction: column; align-items: stretch; gap: 8px; white-space: nowrap; width: 100%; }
 .pill-page .acts .actrow { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; }
 .pill-page .acts .lab { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: rgba(255, 255, 255, .45); margin-right: 2px; }
-.pill-page .acts .sel { position: relative; display: inline-flex; align-items: center; height: 28px; border-radius: 999px; background: rgba(255, 255, 255, .12); color: #FFF; }
-.pill-page .acts .sel:hover { background: rgba(255, 255, 255, .2); }
-.pill-page .acts .sel select { appearance: none; height: 100%; padding: 0 24px 0 11px; border: 0; background: transparent; color: inherit; font: 600 12.5px 'DM Sans', sans-serif; cursor: pointer; max-width: 132px; text-overflow: ellipsis; }
-.pill-page .acts .sel select:focus { outline: none; }
-.pill-page .acts .sel svg { position: absolute; right: 8px; pointer-events: none; opacity: .6; }
-.pill-page .acts .sel option { color: #242424; }
+.pill-page .acts .sel { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px 0 12px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .12); color: #FFF; font: 600 12.5px 'DM Sans', sans-serif; cursor: pointer; white-space: nowrap; transition: background .14s cubic-bezier(.2,.7,.2,1); }
+.pill-page .acts .sel:hover:not(:disabled) { background: rgba(255, 255, 255, .22); }
+.pill-page .acts .sel:disabled { opacity: .5; cursor: not-allowed; }
+.pill-page .acts .sel svg { opacity: .7; }
 
 /* ---- the conversation: the last few turns, oldest at the top ---- */
 .pill-page .ic { display: flex; flex-direction: column; gap: 7px; text-align: left; box-sizing: border-box; width: 100%;
@@ -101,3 +99,18 @@
 @media (prefers-reduced-motion: reduce) {
   .pill-page .wave i, .pill-page .rec, .pill-page .spin { animation: none; }
 }
+
+/* Choosing a language happens inside the island: nothing may be drawn outside a window
+   that is sized to its own contents. */
+.pill-page .picker { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.pill-page .pickhead { display: flex; align-items: center; gap: 8px; font-size: 10.5px; font-weight: 600; letter-spacing: 1.3px; text-transform: uppercase; color: rgba(243, 241, 236, .5); }
+.pill-page .pickhead .back { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .12); color: #F3F1EC; cursor: pointer; }
+.pill-page .pickhead .back:hover { background: rgba(255, 255, 255, .24); }
+.pill-page .picklist { display: flex; flex-direction: column; gap: 1px; max-height: 208px; overflow: auto; overscroll-behavior: contain; padding-right: 2px; }
+.pill-page .picklist button { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; height: 32px; flex: 0 0 32px; padding: 0 11px; border: 0; border-radius: 9px; background: transparent; color: #F3F1EC; font: 500 13px 'DM Sans', sans-serif; text-align: left; cursor: pointer; }
+.pill-page .picklist button:hover { background: rgba(255, 255, 255, .12); }
+.pill-page .picklist button.on { background: rgba(255, 255, 255, .16); font-weight: 650; }
+.pill-page .picklist button svg { color: #7FBF95; flex-shrink: 0; }
+.pill-page .ic.fail { background: #3A1C1B; }
+.pill-page .ic.fail .who { color: #FF9A94; }
+.pill-page .ic.fail p { margin: 0; font-size: 13px; line-height: 1.4; color: #F3F1EC; }
