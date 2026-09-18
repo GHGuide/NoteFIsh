@@ -14,6 +14,7 @@ import { DEFAULT_SETTINGS, callState } from './lib.jsx';
 import { Avatar, LogoMark } from './shell.jsx';
 import { UiProvider, RouteTransition } from './components/ui.jsx';
 import TopBar from './components/topbar.jsx';
+import VoiceMenu from './components/voice-menu.jsx';
 import Caller from './Caller.jsx';
 import PillEntry from './pill.jsx';
 import DeskPage from './pages/desk.jsx';
@@ -202,20 +203,12 @@ function WorkspaceApp({ user }) {
     <button type="button" className="ds-tool ds-toggle" aria-label="Open navigation" aria-expanded={mobileNav} onClick={() => setMobileNav(true)}><Menu size={18} /></button>
     <aside className={`ds-side ${mobileNav ? 'is-open' : ''}`} id="workspace-sidebar">
       <a className="ds-lockup" href="/desk" onClick={event => { event.preventDefault(); navigate('/desk'); }} aria-label="NoteFish desk"><LogoMark size={22} /><span>NoteFish<span className="dot">.</span></span></a>
-      {/* Who the caller hears. With more than one voice recorded this is also how you
-          change between them; with one it just says which one is answering. */}
-      <div className="ds-identity" aria-label="The voice you answer in">
-        <Avatar who={voice || { name: user?.name || 'NoteFish', avatar: data.settings.avatar }} size={26} />
-        <div>
-          {voices.length > 1
-            ? <select className="asname" aria-label="The voice you answer in" value={voice?.id || ''} onChange={event => useVoice(event.target.value)}>
-                {!voice && <option value="">Choose a voice…</option>}
-                {voices.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select>
-            : <strong>{voice ? voice.name : sharedDemo ? 'Shared demo' : 'No voice yet'}</strong>}
-          <span className={`state ${connection === 'connected' ? '' : 'muted'}`}><i />{voice ? (connection === 'connected' ? 'Ready' : 'Connecting…') : 'Record one on Voice'}</span>
-        </div>
-      </div>
+      {/* Who the caller hears, and where you change it. On this desk that is who you are,
+          so it sits where a name would. */}
+      <VoiceMenu
+        voice={voice} voices={voices} connection={connection} sharedDemo={sharedDemo}
+        onPick={useVoice} onRecord={() => navigate('/voice?tab=takes')}
+      />
       <nav className="ds-nav" aria-label="Main navigation">{NAV.map(item => <a href={item.path} key={item.path} className={parsed.path === item.path ? 'active' : ''} aria-current={parsed.path === item.path ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate(item.path); }}><item.icon size={16} strokeWidth={1.7} />{item.label}{item.path === '/desk' && incoming && <span className="ring" aria-label="Incoming call" />}</a>)}</nav>
       <nav className="ds-nav bottom" aria-label="More">
         <button type="button" onClick={() => setFree(true)}><Gift size={16} strokeWidth={1.7} />Get a free month</button>

@@ -3,35 +3,10 @@
 // Both are popovers hung under their button. They close on Escape, on a click
 // anywhere else, and when the window loses focus, and they hand focus back to the
 // button that opened them so the keyboard does not get stranded in a closed menu.
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { Bell, ChevronRight, Gift, Settings as Cog, TriangleAlert, UserRound } from 'lucide-react';
+import Popover from './popover.jsx';
 import { Avatar } from '../shell.jsx';
-
-/** One popover: a button, and a card under it that behaves. */
-function Popover({ label, badge, children, icon, align = 'right', onOpenChange }) {
-  const [open, setOpen] = useState(false);
-  const wrap = useRef(null);
-  const button = useRef(null);
-  useEffect(() => { onOpenChange?.(open); }, [open, onOpenChange]);
-  useEffect(() => {
-    if (!open) return;
-    const away = event => { if (!wrap.current?.contains(event.target)) setOpen(false); };
-    const key = event => { if (event.key === 'Escape') { setOpen(false); button.current?.focus(); } };
-    // Pointerdown, not click: a menu that waits for mouseup stays open under the cursor.
-    window.addEventListener('pointerdown', away);
-    window.addEventListener('keydown', key);
-    window.addEventListener('blur', () => setOpen(false), { once: true });
-    return () => { window.removeEventListener('pointerdown', away); window.removeEventListener('keydown', key); };
-  }, [open]);
-  return <div className="ds-pop-wrap" ref={wrap}>
-    <button
-      type="button" ref={button} className={`ds-pop-btn ${open ? 'on' : ''}`}
-      aria-label={label} aria-haspopup="dialog" aria-expanded={open}
-      onClick={() => setOpen(current => !current)}
-    >{icon}{badge > 0 && <i className="ds-pop-badge" aria-hidden="true" />}</button>
-    {open && <div className={`ds-pop ${align}`} role="dialog" aria-label={label}>{children(() => setOpen(false))}</div>}
-  </div>;
-}
 
 /** What is stopping this desk from taking a call, said once rather than per page. */
 function Attention({ data, connection, navigate, close }) {
@@ -63,10 +38,10 @@ function Account({ user, data, voice, navigate, openFree, close }) {
   const minutes = Math.round(answered.reduce((sum, call) => sum + Math.max(0, (Date.parse(call.endedAt || call.answeredAt) - Date.parse(call.answeredAt)) / 6e4), 0));
   return <>
     <div className="ds-pop-id">
-      <Avatar who={voice || { name: user?.name || 'NoteFish', avatar: data.settings.avatar }} size={44} />
+      <span className="disc"><Avatar who={voice || { name: user?.name || 'NoteFish', avatar: data.settings.avatar }} size={36} /></span>
       <div>
-        <strong>{user?.name || 'This desk'}</strong>
-        <span>{user?.email || 'Signed in on this Mac'}</span>
+        <strong>{user?.name || voice?.name || 'This desk'}</strong>
+        <span>{user?.email || (voice ? 'The voice callers hear' : 'Signed in on this Mac')}</span>
       </div>
     </div>
     <div className="ds-pop-row">
@@ -95,11 +70,14 @@ export default function TopBar({ user, data, voice, connection, navigate, openFr
   const blockers = (data.setup?.blockers || []).length
     + (connection === 'connected' ? 0 : 1)
     + ((data.voices || []).some(item => item.id === data.settings.voiceId && !item.archived) ? 0 : 1);
+  const button = (label, icon, badge) => ({ ref, open, toggle, props }) => <button
+    type="button" ref={ref} className={`ds-pop-btn ${open ? 'on' : ''}`} aria-label={label} onClick={toggle} {...props}
+  >{icon}{badge > 0 && <i className="ds-pop-badge" aria-hidden="true" />}</button>;
   return <>
-    <Popover label="Needs attention" badge={blockers} icon={<Bell size={17} strokeWidth={1.7} />}>
+    <Popover label="Needs attention" trigger={button('Needs attention', <Bell size={17} strokeWidth={1.7} />, blockers)}>
       {close => <Attention data={data} connection={connection} navigate={navigate} close={close} />}
     </Popover>
-    <Popover label="Your account" icon={<UserRound size={17} strokeWidth={1.7} />}>
+    <Popover label="Your account" trigger={button('Your account', <UserRound size={17} strokeWidth={1.7} />, 0)}>
       {close => <Account user={user} data={data} voice={voice} navigate={navigate} openFree={openFree} close={close} />}
     </Popover>
   </>;

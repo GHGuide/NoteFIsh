@@ -21,8 +21,7 @@ body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(-
 
 /* ---- window chrome: traffic lights are the OS's; we leave room for them ---- */
 .ds-topbar { position: fixed; top: 0; left: var(--side); right: 0; height: var(--sheet-top); display: flex; align-items: center; justify-content: flex-end; gap: 14px; padding: 0 22px; color: var(--navtext); z-index: 20; -webkit-app-region: drag; }
-.ds-topbar button { -webkit-app-region: no-drag; display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--navtext); }
-.ds-topbar button:hover { background: var(--nav-active); color: var(--ink); }
+.ds-topbar > * { -webkit-app-region: no-drag; }
 .ds-toggle { position: fixed; top: 10px; left: 76px; z-index: 25; display: none; }
 
 /* ---- sidebar ---- */
@@ -364,30 +363,37 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 
 /* ---- the top right: what needs attention, and whose desk this is ---- */
 .ds-pop-wrap { position: relative; -webkit-app-region: no-drag; }
-.ds-pop-btn { position: relative; display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 9px; background: transparent; color: var(--navtext); cursor: pointer; transition: background .12s var(--ease), color .12s; }
+.ds-pop-btn { position: relative; display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 50%; background: transparent; color: var(--navtext); cursor: pointer; transition: background .14s var(--ease), color .14s, transform .14s var(--ease); }
+.ds-pop-btn:active { transform: scale(.94); }
 .ds-pop-btn:hover, .ds-pop-btn.on { background: var(--nav-active); color: var(--ink); }
 .ds-pop-badge { position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 2px var(--paper); }
-.ds-pop { position: absolute; top: calc(100% + 8px); width: 340px; padding: 6px; border: 1px solid var(--sheet-line); border-radius: 16px; background: var(--card); box-shadow: 0 18px 44px rgba(36, 36, 36, .18); z-index: 60; animation: ds-pop-in .14s var(--ease); }
+.ds-pop { position: absolute; top: calc(100% + 9px); width: 358px; padding: 7px; border: 1px solid var(--sheet-line); border-radius: 20px; background: var(--card); box-shadow: 0 2px 6px rgba(36, 36, 36, .05), 0 22px 54px rgba(36, 36, 36, .2); z-index: 60; animation: ds-pop-in .16s var(--ease); transform-origin: top right; }
+.ds-pop.left { transform-origin: top left; }
 .ds-pop.right { right: 0; } .ds-pop.left { left: 0; }
-@keyframes ds-pop-in { from { opacity: 0; transform: translateY(-4px); } }
+@keyframes ds-pop-in { from { opacity: 0; transform: translateY(-6px) scale(.97); } }
 @media (prefers-reduced-motion: reduce) { .ds-pop { animation: none; } }
 .ds-pop-head { padding: 10px 12px 8px; }
 .ds-pop-head strong { font-size: 12.5px; font-weight: 600; }
-.ds-pop-id { display: flex; align-items: center; gap: 12px; padding: 12px; }
+.ds-pop-id { display: flex; align-items: center; gap: 13px; padding: 14px 13px; }
+.ds-pop-id .disc { display: grid; place-items: center; width: 50px; height: 50px; flex-shrink: 0; border-radius: 50%; background: var(--bar); box-shadow: inset 0 0 0 1px var(--sheet-line); }
 .ds-pop-id > div { min-width: 0; }
 .ds-pop-id strong { display: block; font-size: 15px; font-weight: 650; letter-spacing: -.2px; }
 .ds-pop-id span { display: block; font-size: 12.5px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ds-pop-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px; border: 0; border-top: 1px solid var(--sheet-line); background: transparent; text-align: left; font: inherit; color: inherit; }
-.ds-pop-row.act { cursor: pointer; border-radius: 0 0 11px 11px; }
-.ds-pop-row.act:hover { background: var(--bar); }
+.ds-pop-row { display: flex; align-items: center; gap: 11px; width: 100%; padding: 12px 13px; border: 0; background: transparent; text-align: left; font: inherit; color: inherit; }
+.ds-pop-row + .ds-pop-row, .ds-pop-id + .ds-pop-row { box-shadow: inset 0 1px 0 var(--sheet-line); }
+.ds-pop-row.act { cursor: pointer; border-radius: 14px; transition: background .12s; }
+.ds-pop-row.act:hover { background: var(--bar); box-shadow: none; }
 .ds-pop-row.quiet { color: var(--muted); font-size: 13px; line-height: 1.45; border-top: 0; }
-.ds-pop-row .ic { display: grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0; border-radius: 8px; background: var(--bar); color: var(--navtext); }
+.ds-pop-row .ic { display: grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; background: var(--bar); color: var(--navtext); }
 .ds-pop-row .ic.amber { background: #FBF3E6; color: var(--amber); }
 .ds-pop-row .txt { flex: 1; min-width: 0; }
 .ds-pop-row .txt strong { display: block; font-size: 13.5px; font-weight: 600; }
 .ds-pop-row .txt span { display: block; font-size: 12px; color: var(--muted); margin-top: 1px; line-height: 1.4; }
 .ds-pop-row > svg { color: var(--placeholder); flex-shrink: 0; }
-.ds-pop-row .ds-btn { flex-shrink: 0; }
+.ds-pop .ds-btn.pill { border-radius: 999px; height: 32px; padding: 0 14px; flex-shrink: 0; transition: background .14s var(--ease), transform .14s var(--ease); }
+.ds-pop .ds-btn.pill:not(.ink) { background: var(--sheet); box-shadow: inset 0 0 0 1px var(--sheet-line); }
+.ds-pop .ds-btn.pill:not(.ink):hover { background: var(--bar); }
+.ds-pop .ds-btn.pill:active { transform: scale(.96); }
 
 /* ---- the card that says what a screen is for ---- */
 .ds-explain { position: relative; overflow: hidden; margin-top: 20px; padding: 30px 32px 28px; border-radius: 18px; background: var(--ink); color: #F3F1EC; }
@@ -411,3 +417,27 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
   .ds-explain .art { display: none; }
   .ds-explain .egrow { flex-wrap: wrap; }
 }
+
+/* ---- the voice you answer in: the sidebar's identity, and its menu ---- */
+.ds-voice-wrap { margin: 0 2px 18px; }
+.ds-voice { display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 11px; border: 1px solid var(--sheet-line); border-radius: 999px; background: var(--sheet); color: inherit; font: inherit; text-align: left; min-height: 52px; }
+.ds-voice.pick { cursor: pointer; transition: background .14s var(--ease), border-color .14s, box-shadow .14s; }
+.ds-voice.pick:hover { background: var(--card); border-color: var(--line); }
+.ds-voice.pick.on { background: var(--card); border-color: var(--line); box-shadow: 0 2px 8px rgba(36, 36, 36, .07); }
+.ds-voice svg:first-child { flex-shrink: 0; }
+.ds-voice .who { flex: 1; min-width: 0; }
+.ds-voice .who strong { display: block; font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-voice .who .state { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--green); margin-top: 1px; }
+.ds-voice .who .state.muted { color: var(--muted); }
+.ds-voice .who .state i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.ds-voice .chev { color: var(--navtext); flex-shrink: 0; transition: transform .18s var(--ease); }
+.ds-voice.on .chev { transform: rotate(180deg); }
+
+.ds-pop-pick { display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 11px; border: 0; border-radius: 14px; background: transparent; text-align: left; font: inherit; color: inherit; cursor: pointer; transition: background .12s; }
+.ds-pop-pick:hover { background: var(--bar); }
+.ds-pop-pick.on { background: var(--bar); }
+.ds-pop-pick svg:first-child { flex-shrink: 0; }
+.ds-pop-pick .txt { flex: 1; min-width: 0; }
+.ds-pop-pick .txt strong { display: block; font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-pop-pick .txt span { display: block; font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+.ds-pop-pick .tick { color: var(--green); flex-shrink: 0; }
