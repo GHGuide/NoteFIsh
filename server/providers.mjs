@@ -53,12 +53,23 @@ async function readBody(response, maxBytes, signal) {
 }
 
 /** Fixed provider origins prevent configuration or uploaded metadata redirecting credentials. */
+const ENDPOINTS = {
+  Fish: { base: 'https://api.fish.audio', field: 'fishApiKey', auth: key => ({ Authorization: `Bearer ${key}` }) },
+  OpenAI: { base: 'https://api.openai.com', field: 'openaiApiKey', auth: key => ({ Authorization: `Bearer ${key}` }) },
+  // ElevenLabs takes the key in its own header, not as a bearer token.
+  ElevenLabs: { base: 'https://api.elevenlabs.io', field: 'elevenLabsApiKey', auth: key => ({ 'xi-api-key': key }) },
+};
+const endpoint = (provider, config) => {
+  const chosen = ENDPOINTS[provider];
+  if (!chosen) throw new ProviderError('Unknown speech or language provider.', 503, 'invalid_configuration');
+  return { base: chosen.base, key: config[chosen.field], auth: chosen.auth };
+};
+
 export function createProviders(config, { fetchImpl = globalThis.fetch } = {}) {
   async function request(provider, path, { method = 'POST', body, headers = {}, signal, retries = 1, binary = false } = {}) {
-    const key = provider === 'Fish' ? config.fishApiKey : config.openaiApiKey;
+    const { base, key, auth } = endpoint(provider, config);
     if (typeof key !== 'string' || !key.trim()) throw new ProviderError(`${provider} is not configured on the server.`, 503, 'provider_not_configured');
     if (/[\r\n]/u.test(key)) throw new ProviderError(`${provider} configuration is invalid.`, 503, 'invalid_configuration');
-    const base = provider === 'Fish' ? 'https://api.fish.audio' : 'https://api.openai.com';
     for (let attempt = 0; attempt <= retries; attempt++) {
       signal?.throwIfAborted();
       const controller = new AbortController();
@@ -66,7 +77,7 @@ export function createProviders(config, { fetchImpl = globalThis.fetch } = {}) {
       const combined = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
       try {
         const response = await fetchImpl(`${base}${path}`, {
-          method, body, headers: { ...headers, Authorization: `Bearer ${key}` }, signal: combined, redirect: 'error',
+          method, body, headers: { ...headers, ...auth(key) }, signal: combined, redirect: 'error',
         });
         if (!response.ok) {
           await response.body?.cancel();
@@ -110,6 +121,29 @@ export function createProviders(config, { fetchImpl = globalThis.fetch } = {}) {
       languages: Array.isArray(data.languages) ? data.languages.filter(v => typeof v === 'string' && v.length < 32).slice(0, 100) : [],
       createdAt: typeof data.created_at === 'string' && Number.isFinite(Date.parse(data.created_at)) ? new Date(data.created_at).toISOString() : null,
     };
+  }
+
+  /** The same words in the same person's voice, from the other provider. */
+  async function speakElsewhere({ text, voiceId, format, speed, signal }) {
+    const id = reference(voiceId);
+    const output = format === 'wav' ? 'pcm_24000' : 'mp3_44100_128';
+    return request('ElevenLabs', `/v1/text-to-speech/${id}?output_format=${output}`, {
+      signal, binary: true, retries: 0,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, model_id: config.elevenLabsModel || 'eleven_flash_v2_5',
+        ...(Number.isFinite(speed) && speed !== 1 ? { voice_settings: { speed: Math.min(1.2, Math.max(0.7, speed)) } } : {}) }),
+    });
+  }
+
+  /** A second home for a recorded voice, so the speech fallback has that person to play. */
+  async function enrolElsewhere({ name, description, wav, signal }) {
+    const form = new FormData();
+    form.append('name', name);
+    if (description) form.append('description', description);
+    form.append('files', new Blob([wav], { type: 'audio/wav' }), 'enrolled-voice.wav');
+    const data = await request('ElevenLabs', '/v1/voices/add', { body: form, signal, retries: 0 });
+    if (!data || typeof data.voice_id !== 'string') throw new ProviderError('ElevenLabs returned an invalid voice.');
+    return reference(data.voice_id);
   }
 
   return {
@@ -189,7 +223,7 @@ export function createProviders(config, { fetchImpl = globalThis.fetch } = {}) {
       if (!choice?.message?.content) throw new ProviderError('No answer came back.');
       return boundedText(choice.message.content, 2000).trim();
     },
-    async synthesize({ text, referenceId, signal, format = 'mp3', temperature, speed }) {
+    async synthesize({ text, referenceId, fallbackReferenceId = '', signal, format = 'mp3', temperature, speed }) {
       text = boundedText(text, 6000); referenceId = reference(referenceId);
       if (!['mp3', 'wav'].includes(format)) throw new ProviderError('Unsupported speech format.', 400);
       const model = config.fishModel || 's2.1-pro-free';
@@ -197,12 +231,19 @@ export function createProviders(config, { fetchImpl = globalThis.fetch } = {}) {
         throw new ProviderError('Choose a supported Fish model in the server configuration.', 503, 'invalid_configuration');
       }
       // The selected clone is required. Never silently fall back to a generic voice.
-      return request('Fish', '/v1/tts', { signal, binary: true,
-        headers: { 'Content-Type': 'application/json', model },
-        body: JSON.stringify({ text, reference_id: referenceId, format, normalize: true, latency: 'balanced',
-          ...(Number.isFinite(temperature) ? { temperature: Math.min(1, Math.max(0.1, temperature)) } : {}),
-          ...(Number.isFinite(speed) && speed !== 1 ? { prosody: { speed: Math.min(1.3, Math.max(0.8, speed)) } } : {}) }),
-      });
+      try {
+        return await request('Fish', '/v1/tts', { signal, binary: true,
+          headers: { 'Content-Type': 'application/json', model },
+          body: JSON.stringify({ text, reference_id: referenceId, format, normalize: true, latency: 'balanced',
+            ...(Number.isFinite(temperature) ? { temperature: Math.min(1, Math.max(0.1, temperature)) } : {}),
+            ...(Number.isFinite(speed) && speed !== 1 ? { prosody: { speed: Math.min(1.3, Math.max(0.8, speed)) } } : {}) }),
+        });
+      } catch (error) {
+        // Only the same person's voice at the other provider is an acceptable substitute.
+        // No second reference, no key, or a cancelled request: the caller hears the failure.
+        if (error.code === 'cancelled' || !config.elevenLabsApiKey || !fallbackReferenceId) throw error;
+        return speakElsewhere({ text, voiceId: fallbackReferenceId, format, speed, signal });
+      }
     },
     /** Live captions: a Realtime transcription session for one call. Phrases arrive via `onFinal` as the caller pauses. */
     openTranscription({ language, onPartial, onFinal, onError }) {
@@ -224,7 +265,12 @@ export function createProviders(config, { fetchImpl = globalThis.fetch } = {}) {
       form.append('voices', new Blob([wav], { type: 'audio/wav' }), 'enrolled-voice.wav');
       if (transcript) form.append('texts', transcript);
       // Voice creation is a mutation: do not retry an uncertain response and create duplicate models.
-      return voiceResult(await request('Fish', '/model', { body: form, signal, retries: 0 }));
+      const voice = voiceResult(await request('Fish', '/model', { body: form, signal, retries: 0 }));
+      // The same clip goes to the fallback provider, once, while we still have the audio.
+      // If that fails the recording still stands; only the fallback is missing.
+      if (!config.elevenLabsApiKey) return voice;
+      try { return { ...voice, fallbackReferenceId: await enrolElsewhere({ name, description, wav, signal }) }; }
+      catch { return voice; }
     },
     // Removing a model at Fish is the only real deletion of a cloned voice; one that is already gone counts as deleted.
     async deleteVoice({ referenceId, signal }) {

@@ -81,6 +81,10 @@ export function loadConfig(env = process.env, root = process.cwd()) {
     root, port: Number(portText), host, publicBaseUrl, deskPassword, publicDemo,
     production, dataPath: path.join(dataDir, 'notefish.json'), distPath: path.join(root, 'dist'),
     openaiApiKey: read('OPENAI_API_KEY'), fishApiKey: read('FISH_API_KEY'),
+    // Optional. With it, a recorded voice is enrolled at ElevenLabs too and speech
+    // falls back there when Fish cannot speak. Without it, Fish failing is the answer.
+    elevenLabsApiKey: read('ELEVENLABS_API_KEY'),
+    elevenLabsModel: model('ELEVENLABS_MODEL', 'eleven_flash_v2_5'),
     twilioAccountSid, twilioAuthToken: read('TWILIO_AUTH_TOKEN'), twilioNumber,
     sessionSecret, adminEmail, siteHosts, macBuildUrl, macBuildVersion, maxAgents, maxConcurrentCalls,
     webhookUrl, webhookSecret, exportToken,

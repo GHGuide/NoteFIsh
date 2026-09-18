@@ -45,6 +45,9 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      # Optional second voice provider: speech falls back here when Fish cannot speak.
+      - key: ELEVENLABS_API_KEY
+        sync: false
       - key: FISH_MODEL
         value: s2.1-pro-free
       # Seats survive a restart only with a secret. numInstances stays 1: the

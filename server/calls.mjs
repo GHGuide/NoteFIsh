@@ -647,7 +647,7 @@ export function createCallService({
         if (streamed !== 'fallback') return streamed;
         if (!current()) return structuredClone(runtime.call);
       }
-      const mp3 = await providers.synthesize({ text: spoken, referenceId: voice.referenceId, signal, format: 'mp3', ...prosody });
+      const mp3 = await providers.synthesize({ text: spoken, referenceId: voice.referenceId, fallbackReferenceId: voice.elevenReferenceId || '', signal, format: 'mp3', ...prosody });
       if (!current()) return structuredClone(runtime.call);
       const mulaw = await convert(mp3, 'audio/mpeg', { output: 'mulaw', sampleRate: 8000, maxSeconds: 90, signal });
       if (!current()) return structuredClone(runtime.call);

@@ -65,6 +65,7 @@ export function validateState(state) {
     if (!plain(voice) || !text(voice.id, 128) || !text(voice.referenceId, 128) || !text(voice.name, 100) || !text(voice.description, 1000) || !text(voice.language, 40) || !['enrolled', 'licensed'].includes(voice.kind) || !['training', 'ready', 'failed'].includes(voice.status) || typeof voice.archived !== 'boolean' || !text(voice.createdAt, 50)) throw new Error('Stored voice data is invalid');
     if (!([undefined, null].includes(voice.register) || REGISTERS.includes(voice.register))) throw new Error('Stored voice data is invalid');
     if (!([undefined, null].includes(voice.ownerId) || text(voice.ownerId, 128))) throw new Error('Stored voice data is invalid');
+    if (!([undefined, null].includes(voice.elevenReferenceId) || text(voice.elevenReferenceId, 128))) throw new Error('Stored voice data is invalid');
     if (!([undefined, null].includes(voice.baseline) || (plain(voice.baseline) && typeof voice.baseline.loudness === 'number' && typeof voice.baseline.rate === 'number'))) throw new Error('Stored voice data is invalid');
   }
   for (const call of state.calls) {

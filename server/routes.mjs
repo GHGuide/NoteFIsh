@@ -245,7 +245,7 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
       baseline = { loudness: clip.loudness, rate: clip.rate, snr: clip.snr, seconds: clip.voicedSeconds };
     } catch (error) { if (error instanceof InputError) throw error; /* measurement is best-effort */ }
     const result = await providers.createVoice({ name, description, audio: req.file.buffer, mimeType: req.file.mimetype, transcript });
-    const voice = { id: randomUUID(), referenceId: ref(result.referenceId), name, description, language: selectedLanguage, kind: 'enrolled', status: voiceState(result.state), archived: false, createdAt: new Date().toISOString(), consent: true, consentAt: new Date().toISOString(), ownerId: userOf(req) || null, register, baseline };
+    const voice = { id: randomUUID(), referenceId: ref(result.referenceId), name, description, language: selectedLanguage, kind: 'enrolled', status: voiceState(result.state), archived: false, createdAt: new Date().toISOString(), consent: true, consentAt: new Date().toISOString(), ownerId: userOf(req) || null, ...(result.fallbackReferenceId ? { elevenReferenceId: result.fallbackReferenceId } : {}), register, baseline };
     const agentId = currentAgent(req);
     await store.update(state => {
       state.voices.push(voice);

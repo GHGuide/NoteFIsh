@@ -63,10 +63,12 @@ At a hundred thousand minutes the infrastructure is a rounding error.
 
 Recorded here so the difference between the plan and the build stays visible.
 
-- **One voice provider, not two.** A voice carries a single `referenceId`, created
-  at Fish. Nothing enrols the same voice at ElevenLabs, so the speech fallback in
-  the table above has no voice to fall back to. Storing a second reference at
-  record time is the change that makes the fallback real.
+- **The speech fallback is wired.** Set `ELEVENLABS_API_KEY` and every voice
+  recorded from then on is enrolled at both Fish and ElevenLabs, keeping both
+  reference IDs, and speech falls back when Fish cannot speak. Two caveats: voices
+  recorded before the key was set have no second reference and cannot fail over,
+  and the fallback is one-shot rather than streamed, so it is slower than a normal
+  reply. Leave the key unset and Fish failing is simply a failure.
 - **Live captions come from OpenAI Realtime**, not ElevenLabs Scribe. Agent clip
   transcription and the translate-and-tone step already match the table.
 - **No Supabase.** Accounts, roster, glossary and call history live in one JSON
@@ -75,5 +77,6 @@ Recorded here so the difference between the plan and the build stays visible.
   an audit log.
 - **No Sentry, no Resend, no payments.** Invitations are sent by the operator's own
   mail client from a `mailto:` link rather than by a product mailer.
-- **The marketing site is on Cloudflare Pages**, not Render. It is a single static
-  file and needs neither the app server nor its Content Security Policy.
+- **The marketing site is on Cloudflare Pages**, not Render, so it costs nothing and
+  adds nothing to the hosting line. The desk itself still runs on Render. The site is
+  a single static file and needs neither the app server nor its Content Security Policy.
