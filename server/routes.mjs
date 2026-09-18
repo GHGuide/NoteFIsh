@@ -405,13 +405,15 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
   });
   router.patch('/agents/:id', async (req, res) => {
     requireFloor();
-    allowed(req.body, ['name', 'voiceId', 'agentLanguage', 'customerLanguage', 'archived', 'registers', 'layout', 'phrases', 'persona', 'formality', 'avatar']);
+    allowed(req.body, ['name', 'voiceId', 'agentLanguage', 'customerLanguage', 'archived', 'registers', 'layout', 'phrases', 'persona', 'formality', 'avatar', 'onboardedAt']);
     const target = findAgent(req.params.id, { active: false });
     if (roleOf(req) !== 'admin') {
       if (!ownsSeat(req, target)) forbid('Only an admin can change another seat.');
       if ('archived' in req.body) forbid('Only an admin can remove a seat.');
     }
     const changes = {};
+    // Setting up is something a person does, not a workspace: each seat finishes its own.
+    if ('onboardedAt' in req.body) changes.onboardedAt = req.body.onboardedAt === null ? null : new Date().toISOString();
     if ('persona' in req.body) changes.persona = text(req.body.persona ?? '', 'style', 300, true).trim();
     if ('formality' in req.body) changes.formality = formalityInput(req.body.formality);
     if ('avatar' in req.body) changes.avatar = avatarInput(req.body.avatar);

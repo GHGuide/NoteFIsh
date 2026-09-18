@@ -19,7 +19,7 @@ const STEPS = [
   { key: 'done', label: 'Ready' },
 ];
 
-export default function Onboarding({ data, seat, owned, saveSettings, navigate, setError, onDone }) {
+export default function Onboarding({ data, seat, owned, saveSettings, saveOwned, navigate, setError, onDone }) {
   const mac = data.setup?.mac?.platform === 'darwin';
   const steps = STEPS.filter(step => !step.macOnly || mac);
   const [index, setIndex] = useState(0);
@@ -36,7 +36,7 @@ export default function Onboarding({ data, seat, owned, saveSettings, navigate, 
   const takes = Object.values(owned('registers') || {}).filter(Boolean).length;
   const driver = data.setup?.mac?.driverInstalled;
   const go = delta => setIndex(current => Math.max(0, Math.min(steps.length - 1, current + delta)));
-  const finish = async () => { setBusy(true); if (await saveSettings({ onboardedAt: true })) onDone(); setBusy(false); };
+  const finish = async () => { setBusy(true); if (await saveOwned({ onboardedAt: true })) onDone(); setBusy(false); };
   const pause = path => { try { sessionStorage.setItem(PAUSE_KEY, '1'); } catch { /* fine */ } navigate(path); onDone(); };
 
   // Hold to speak: the same recorder the desk uses. Release sends the clip to /api/try.
@@ -73,8 +73,8 @@ export default function Onboarding({ data, seat, owned, saveSettings, navigate, 
       <h1>Who speaks what.</h1>
       <p className="ob-lead">You keep speaking your own language. Callers are understood in theirs, detected on their first sentence unless you pin one.</p>
       <div className="ob-fields">
-        <div className="ob-field"><span>You speak</span><SelectPill value={data.settings.agentLanguage} options={languages.map(item => ({ value: item.code, label: item.name }))} onChange={value => saveSettings({ agentLanguage: value })} /></div>
-        <div className="ob-field"><span>Callers speak</span><SelectPill value={data.settings.customerLanguage || 'auto'} options={[{ value: 'auto', label: 'Detect automatically' }, ...languages.map(item => ({ value: item.code, label: item.name }))]} onChange={value => saveSettings({ customerLanguage: value })} /></div>
+        <div className="ob-field"><span>You speak</span><SelectPill value={owned('agentLanguage') || data.settings.agentLanguage} options={languages.map(item => ({ value: item.code, label: item.name }))} onChange={value => saveOwned({ agentLanguage: value })} /></div>
+        <div className="ob-field"><span>Callers speak</span><SelectPill value={owned('customerLanguage') || data.settings.customerLanguage || 'auto'} options={[{ value: 'auto', label: 'Detect automatically' }, ...languages.map(item => ({ value: item.code, label: item.name }))]} onChange={value => saveOwned({ customerLanguage: value })} /></div>
       </div>
       <p className="ob-note">Captions always show in your language. Replies go out in theirs.</p>
     </>,

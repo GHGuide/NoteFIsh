@@ -68,6 +68,13 @@ test('roles: the first account runs the desk, invited people get a seat and thei
   assert.equal((await call(admin.cookie, 'GET', '/voices/mara-voice/export')).status, 200, 'an admin can share any voice');
   assert.equal((await call(mara.cookie, 'GET', '/voices/export')).body.voices.map(item => item.name).join(), 'Mara', 'the library export holds only what you manage');
 
+  // Setting up is per person: an agent finishes their own without touching the workspace.
+  assert.equal((await call(mara.cookie, 'PATCH', `/agents/${seat.body.agent.id}`, { onboardedAt: true })).status, 200);
+  const settledIn = runtime.store.snapshot().agents.find(item => item.id === seat.body.agent.id);
+  assert.match(settledIn.onboardedAt, /^\d{4}-\d{2}-\d{2}T/, 'her seat remembers she is set up');
+  assert.equal(runtime.store.snapshot().settings.onboardedAt, undefined, 'and the workspace is untouched by it');
+  assert.equal((await call(mara.cookie, 'PATCH', `/agents/${adminSeat.body.agent.id}`, { onboardedAt: true })).status, 403, 'nobody finishes setup on another seat');
+
   // A supervisor keeps the glossary but not the workspace.
   assert.equal((await call(admin.cookie, 'PATCH', `/users/${admin.body.user.id}`, { role: 'agent' })).status, 409, 'not your own role');
   assert.equal((await call(admin.cookie, 'PATCH', `/users/${mara.body.user.id}`, { role: 'supervisor' })).body.user.role, 'supervisor');

@@ -186,7 +186,8 @@ function WorkspaceApp({ user, onSignedOut }) {
   const common = { user, role, data, navigate, route: parsed, loading, error, setError, setNotice, saveSettings, saveOwned, owned, refreshVoices, updateCall, sharedDemo, trainingNotes, multiAgent, hasFloor, roster, seat, seatActions, refreshFloor, partialCaption, connection, invitation, setInvitation, audioReady, enableAudio, clearAudio: () => player.current.clear(), setAudioMuted: muted => { player.current.muted = muted; if (muted) player.current.clear(); }, reload, focus, setFocus, openFree: () => setFree(true) };
   // First run: setup until it is finished, unless paused to go record a voice.
   const [setupPaused, setSetupPaused] = useState(() => { try { return sessionStorage.getItem(PAUSE_KEY) === '1'; } catch { return false; } });
-  const needsSetup = !loading && !data.settings.onboardedAt && !sharedDemo && role === 'admin';
+  // Whoever just signed in, admin or agent, until they have finished their own setup.
+  const needsSetup = !loading && !owned('onboardedAt') && !sharedDemo;
   const resumeSetup = () => { try { sessionStorage.removeItem(PAUSE_KEY); } catch { /* fine */ } setSetupPaused(false); navigate('/desk'); };
   if (needsSetup && !setupPaused) return <Onboarding {...common} onDone={() => { try { setSetupPaused(sessionStorage.getItem(PAUSE_KEY) === '1'); } catch { /* fine */ } }} />;
   const Page = { '/desk': DeskPage, '/calls': CallsPage, '/insights': InsightsPage, '/glossary': GlossaryPage, '/phrases': PhrasesPage, '/voice': VoicePage, '/floor': FloorPage, '/settings': SettingsPage }[parsed.path] || DeskPage;
