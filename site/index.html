@@ -1,5 +1,10 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><title>NoteFish — answer callers in their language, in your own voice</title><meta name="description" content="NoteFish sits next to whatever call you are on. The caller hears your own voice, in their language, sounding the way you actually sounded."><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='26' fill='%23242424'/%3E%3Cellipse cx='46' cy='51' rx='32' ry='28' fill='%23F3F1EC'/%3E%3Ccircle cx='36' cy='47' r='3.4' fill='%23242424'/%3E%3Ccircle cx='54' cy='47' r='3.4' fill='%23242424'/%3E%3C/svg%3E"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&display=swap">
+<style>
+@font-face { font-family: 'DM Sans'; font-style: italic; font-weight: 300 700; font-display: swap; src: url('/site/fonts/DMSans-italic-300_700.woff2') format('woff2'); }
+@font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 300 700; font-display: swap; src: url('/site/fonts/DMSans-normal-300_700.woff2') format('woff2'); }
+@font-face { font-family: 'DM Serif Display'; font-style: italic; font-weight: 400; font-display: swap; src: url('/site/fonts/DMSerifDisplay-italic-400.woff2') format('woff2'); }
+@font-face { font-family: 'DM Serif Display'; font-style: normal; font-weight: 400; font-display: swap; src: url('/site/fonts/DMSerifDisplay-normal-400.woff2') format('woff2'); }
+</style>
 <style>
   :root {
     --paper: #FAF9F7; --panel: #ECEAE2; --panel-2: #F3F2EF; --card: #FFFFFF; --line: rgba(36, 36, 36, .15); --hairline: rgba(36, 36, 36, .08);
@@ -285,8 +290,8 @@
 
 <div class="navwrap"><nav class="nav" aria-label="Main">
   <a class="brand" href="#top"><svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="26" fill="#242424"/><g transform="translate(8 9) scale(.84)"><circle cx="67" cy="51" r="14" fill="#F3F1EC"/><circle cx="59.7" cy="67.3" r="14" fill="#F3F1EC"/><circle cx="42" cy="74" r="14" fill="#F3F1EC"/><circle cx="24.3" cy="67.3" r="14" fill="#F3F1EC"/><circle cx="17" cy="51" r="14" fill="#F3F1EC"/><circle cx="24.3" cy="34.7" r="14" fill="#F3F1EC"/><circle cx="42" cy="28" r="14" fill="#F3F1EC"/><circle cx="59.7" cy="34.7" r="14" fill="#F3F1EC"/><circle cx="80" cy="36" r="12" fill="#F3F1EC"/><circle cx="80" cy="66" r="12" fill="#F3F1EC"/><circle cx="71" cy="51" r="11" fill="#F3F1EC"/><ellipse cx="42" cy="51" rx="30" ry="26" fill="#F3F1EC"/><g transform="rotate(-9 34 47)"><rect x="31.4" y="40" width="5.2" height="14" rx="2.6" fill="#242424"/></g><g transform="rotate(9 50 47)"><rect x="47.4" y="40" width="5.2" height="14" rx="2.6" fill="#242424"/></g></g></svg>NoteFish<span class="dotmark">.</span></a>
-  <div class="navlinks"><a href="#shift">Call centres</a><a href="#faq">Pricing</a><a href="#trust">Trust</a><a href="https://app.notefish.ai/desk">Sign in</a></div>
-  <a class="btn small" href="#download"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg><span class="t">Download for macOS</span></a>
+  <div class="navlinks"><a href="#shift">Call centres</a><a href="#faq">Pricing</a><a href="#trust">Trust</a></div>
+  <a class="btn small" href="/downloads"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg><span class="t">Download for macOS</span></a>
   <button class="burger" type="button" aria-label="Menu"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
 </nav></div>
 
@@ -295,7 +300,7 @@
     <p class="eyebrow">NoteFish live voice</p>
     <h1 class="display h1">Don’t translate, <em>just talk.</em></h1>
     <p class="lead">Answer callers in their language, in your own voice, sounding the way you actually sounded.</p>
-    <a class="btn" href="#download"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Download for macOS</a>
+    <a class="btn" href="/downloads"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Download for macOS</a>
     <p class="hero-note">It sits next to whatever call you’re on. Give it your phone number and it picks those up as well.</p>
   </div>
   <div class="hero-art" aria-hidden="true">
@@ -410,13 +415,13 @@
 <section class="band final" id="download"><div class="blobs"></div><div class="wrap">
   <h2 class="display h2">Same voice. <em>Every language.</em></h2>
   <p class="lead">Download the Mac app and read aloud for a minute so it can learn your voice. Your next call can be in any language. That’s the whole setup.</p>
-  <a class="btn" href="#download"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Download for macOS</a>
+  <a class="btn" href="/downloads"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Download for macOS</a>
   <p class="dl-note">Runs on the Mac next to your call: Zoom, Meet, Teams, WhatsApp, FaceTime, anything that uses a microphone. With a phone number connected it answers from any browser as well.</p>
 </div></section>
 
 <footer><div class="wrap">
   <div class="cols">
-    <div><h4>Get started</h4><ul><li><a href="https://app.notefish.ai/desk">Open your desk</a></li><li><a href="#download">Download for macOS</a></li><li><a href="#trust">Privacy &amp; security</a></li><li><a href="#faq">Pricing</a></li><li><a href="#shift">Why not an interpreter line</a></li></ul></div>
+    <div><h4>Get started</h4><ul><li><a href="https://app.notefish.ai/desk">Open your desk</a></li><li><a href="/downloads">Download for macOS</a></li><li><a href="#trust">Privacy &amp; security</a></li><li><a href="#faq">Pricing</a></li><li><a href="#shift">Why not an interpreter line</a></li></ul></div>
     <div><h4>Teams</h4><ul><li><a href="#shift">Call centres</a></li><li><a href="#shift">Customer support</a></li><li><a href="#shift">Field service</a></li><li><a href="#shift">Clinics</a></li><li><a href="#shift">Accessibility</a></li></ul></div>
     <div><h4>Resources</h4><ul><li><a href="#faq">Help center</a></li><li><a href="#trust">Trust notes</a></li><li><a href="#shift">Integrations</a></li><li><a href="#faq">Audio setup</a></li></ul></div>
     <div><h4>Company</h4><ul><li><a href="#top">About</a></li><li><a href="#top">Careers</a></li><li><a href="#trust">Trust center</a></li><li><a href="#top">Media kit</a></li></ul></div>
@@ -425,75 +430,6 @@
   <div class="legal"><span>© NoteFish 2026 · Terms · Privacy · Data controls</span><span>We only clone a voice with its owner’s consent.</span></div>
 </div></footer>
 
-<script>
-(function () {
-  document.documentElement.classList.add('js');
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
-
-  // reveal on scroll
-  const io = new IntersectionObserver(entries => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -12% 0px' });
-  $$('.reveal, .ul').forEach(el => io.observe(el));
-  if (reduced) $$('.reveal').forEach(el => el.classList.add('in'));
-
-  // hero: the companion pill runs through a call — detected, listening, holding, speaking
-  const PUFF = '<svg class="puff" viewBox="0 0 100 100" aria-hidden="true"><circle cx="67" cy="51" r="14"/><circle cx="59.7" cy="67.3" r="14"/><circle cx="42" cy="74" r="14"/><circle cx="24.3" cy="67.3" r="14"/><circle cx="17" cy="51" r="14"/><circle cx="24.3" cy="34.7" r="14"/><circle cx="42" cy="28" r="14"/><circle cx="59.7" cy="34.7" r="14"/><circle cx="80" cy="36" r="12"/><circle cx="80" cy="66" r="12"/><circle cx="71" cy="51" r="11"/><ellipse cx="42" cy="51" rx="30" ry="26"/></svg>'; const WAVE = '<span class="wave"><i style="--h:8px;--d:0s"></i><i style="--h:14px;--d:.1s"></i><i style="--h:20px;--d:.2s"></i><i style="--h:11px;--d:.3s"></i><i style="--h:17px;--d:.4s"></i><i style="--h:9px;--d:.5s"></i></span>';
-  const VOL = '<span class="dim2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg></span>';
-  const PHONE = '<span class="dim2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.6a2 2 0 0 1-.5 2.1L8 9.7a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.8.3 1.7.6 2.6.7a2 2 0 0 1 1.7 2z"/></svg></span>';
-  const MON = '<span class="dim2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>';
-  const STATES = [
-    { label: 'Incoming', html: PUFF + PHONE + '<span>Incoming</span><span class="dim">+33 6 12 34 56 78 · French</span><span class="start">Answer</span>', caption: false, hold: 2600 },
-    { label: 'Listening', html: PUFF + WAVE + '<span>Listening</span><span class="dim">EN ← FR</span><kbd>hold ⌥</kbd>', caption: true, hold: 3000 },
-    { label: 'Holding', html: PUFF + '<span class="rec"></span><span>Recording</span>' + WAVE + '<span class="dim">release to send</span>', caption: true, hold: 2600 },
-    { label: 'Speaking', html: PUFF + VOL + '<span>Playing in your voice</span><span class="bar"><i></i></span><span class="dim">0:03</span>', caption: true, hold: 3000 },
-  ];
-  const pill = $('#hero-pill'), cap = $('#hero-caption');
-  if (pill && !reduced) {
-    let i = 1;
-    const show = () => { const st = STATES[i]; pill.classList.add('swap'); setTimeout(() => { pill.innerHTML = st.html; cap.classList.toggle('off', !st.caption); pill.classList.remove('swap'); }, 320); setTimeout(() => { i = (i + 1) % STATES.length; show(); }, st.hold + 320); };
-    setTimeout(() => { i = 2; show(); }, 2800);
-  }
-
-  // count-up numbers
-  const cio = new IntersectionObserver(entries => entries.forEach(e => { if (!e.isIntersecting) return; const el = e.target, to = +el.dataset.to; cio.unobserve(el); if (reduced) { el.textContent = to; return; } const t0 = performance.now(); const step = t => { const p = Math.min(1, (t - t0) / 900); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); }), { threshold: .6 });
-  $$('.count').forEach(el => cio.observe(el));
-
-  // scroll-pinned flow: four steps
-  $$('[data-words]').forEach(el => { const words = el.textContent.trim().split(' '); el.textContent = ''; words.forEach((w, i) => { const s = document.createElement('span'); s.className = 'w'; s.textContent = w; s.style.transitionDelay = `${i * 55}ms`; el.appendChild(s); }); });
-  const tabs = $$('.flow-tabs button'), scenes = $$('.phone .scene'), copies = $$('.flow-copy > div');
-  let step = 0;
-  function setStep(n) { step = n; tabs.forEach((t, i) => t.setAttribute('aria-selected', i === n ? 'true' : 'false')); scenes.forEach((s, i) => s.classList.toggle('on', i === n)); copies.forEach((c, i) => c.classList.toggle('on', i === n)); }
-  tabs.forEach(t => t.addEventListener('click', () => { setStep(+t.dataset.step); const target = $$('.flow-steps div')[+t.dataset.step]; if (target && window.innerWidth > 900) window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY + 10, behavior: reduced ? 'auto' : 'smooth' }); }));
-  const sio = new IntersectionObserver(entries => entries.forEach(e => { if (e.isIntersecting) setStep($$('.flow-steps div').indexOf(e.target)); }), { rootMargin: '-45% 0px -45% 0px' });
-  $$('.flow-steps div').forEach(d => sio.observe(d));
-
-  // sticky card + rows
-  const faces = $$('.shift-card .face'), rows = $$('.rows .row');
-  const rio = new IntersectionObserver(entries => entries.forEach(e => { if (!e.isIntersecting) return; const n = +e.target.dataset.row; rows.forEach((r, i) => r.classList.toggle('on', i === n)); faces.forEach((f, i) => f.classList.toggle('on', i === n)); }), { rootMargin: '-40% 0px -40% 0px' });
-  rows.forEach(r => rio.observe(r));
-
-  // collage parallax
-  const cards = $$('.pcard'); const board = $('.board');
-  if (!reduced && cards.length) {
-    let raf = 0; const base = new Map(cards.map(c => [c, c.style.transform || getComputedStyle(c).transform]));
-    const update = () => { raf = 0; if (window.innerWidth <= 900) return; const r = board.getBoundingClientRect(); const mid = r.top + r.height / 2 - window.innerHeight / 2; cards.forEach(c => { const rot = c.classList.contains('press') ? -4 : c.classList.contains('sound') ? 2 : c.classList.contains('detect') ? -3 : 0; c.style.transform = `translateY(${(-mid * +c.dataset.speed).toFixed(1)}px) rotate(${rot}deg)`; }); };
-    window.addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(update); }, { passive: true }); update();
-  }
-
-  // faq two-panel
-  const answers = [
-    'No. They hear a clone of your voice, built from about a minute of you reading aloud, speaking their language. The feeling comes from how you actually said it: the desk measures your clip and plays one of the six takes you recorded.',
-    'Yes. Eighty-odd on the caller’s side. You keep speaking your own language. The desk works out theirs from the first phrase, or you can pin it. Captions always show in your language.',
-    'Connect your phone number and it takes real phone calls. Or send the caller a one-use link that opens in their phone’s browser. When a call ends it goes onward as a ticket in your helpdesk, a webhook to whatever you run, or a plain export.',
-    'Accents are fine. A noisy voice sample gets refused when you record it, which beats cloning it badly. On the call, push to talk means one side speaks at a time, so nothing talks over anything. If a reply can’t be confirmed as played, the desk tells you.',
-    'A Mac and a headset. The desk runs beside whatever call you’re already on. Connect a phone number and it answers real calls too, from any browser. On the server side it’s one container behind an HTTPS address.',
-    'Yes. Add agents to the roster and each gets a seat with their own voice takes, canned lines and layout. Incoming calls ring every seated agent and the first to answer takes it. Supervisors watch the floor without hearing audio.',
-    'No. They call your number from any phone, or open a one-use link in the browser they already have and tap Call. Everything else happens on your side. They just hear you.',
-    'Per seat. A single desk is free to try. For a floor of more than a few agents, talk to us.',
-  ];
-  $$('.faq-q button').forEach(b => b.addEventListener('click', () => { $$('.faq-q button').forEach(x => x.setAttribute('aria-selected', x === b ? 'true' : 'false')); $('#faq-asked').textContent = b.textContent; const a = $('#faq-answer'); a.textContent = answers[+b.dataset.q]; a.style.animation = 'none'; void a.offsetWidth; a.style.animation = ''; }));
-
-})();
-</script>
+<script src="/site/site.js"></script>
 
 </body></html>

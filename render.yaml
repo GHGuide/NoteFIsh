@@ -26,6 +26,11 @@ services:
       # before the service is reachable; everyone else arrives by invitation.
       - key: NOTEFISH_ADMIN_EMAIL
         sync: false
+      # The built Mac app the download page hands out, and the version it names.
+      - key: NOTEFISH_MAC_BUILD_URL
+        sync: false
+      - key: NOTEFISH_MAC_BUILD_VERSION
+        sync: false
       # Hosts that should see the marketing page instead of the desk sign-in.
       - key: NOTEFISH_SITE_HOSTS
         sync: false

@@ -71,10 +71,25 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
   app.use('/api/auth', express.json({ limit: '8kb', strict: true }), createAuthRouter({ config, accounts, sessions }));
   // The marketing site answers on the bare domain; the desk answers on its own
   // subdomain. One service, so there is no second thing to deploy and keep alive.
-  const sitePage = path.join(root, 'site', 'index.html');
+  const sitePage = name => path.join(root, 'site', `${name}.html`);
+  const onSite = req => config.siteHosts.includes(req.hostname);
+  // The site's own fonts and scripts. Serving them from here keeps the desk's
+  // Content Security Policy strict: nothing inline, nothing from another origin.
+  app.use('/site', express.static(path.join(root, 'site'), { dotfiles: 'deny', index: false, extensions: false, fallthrough: true, setHeaders: res => res.setHeader('Cache-Control', 'public, max-age=3600') }));
   app.get('/', (req, res, next) => {
-    if (!config.siteHosts.includes(req.hostname)) return next();
-    res.sendFile(sitePage, error => { if (error && !res.headersSent) next(); });
+    if (!onSite(req)) return next();
+    res.sendFile(sitePage('index'), error => { if (error && !res.headersSent) next(); });
+  });
+  // The download page and the build it fetches. Public: someone installing the
+  // app has no account yet, and the page is the same for everyone.
+  app.get('/downloads', (req, res, next) => {
+    if (!onSite(req)) return next();
+    res.sendFile(sitePage('downloads'), error => { if (error && !res.headersSent) next(); });
+  });
+  app.get('/api/mac-build', (req, res) => {
+    res.json(config.macBuildUrl
+      ? { url: config.macBuildUrl, version: config.macBuildVersion || null, file: config.macBuildUrl.split('/').pop() || null }
+      : { url: null });
   });
   app.get(['/', '/desk', '/enroll', '/admin', '/voices', '/voice', '/floor', '/calls', '/calls/:id', '/insights', '/glossary', '/phrases', '/settings', '/join'], (req, res) => res.sendFile(path.join(config.distPath, 'index.html'), error => { if (error && !res.headersSent) res.status(404).end(); }));
   app.use(createSecurity(config, accounts));

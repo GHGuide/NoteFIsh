@@ -139,6 +139,19 @@ test('the marketing site answers on the site hosts, and the desk answers everywh
   assert.equal(site.status, 200);
   assert.match(site.body, /Don’t translate/, 'the bare domain gets the marketing page');
   assert.match((await page('www.notefish.ai')).body, /Don’t translate/);
+  const downloads = await new Promise((resolve, reject) => {
+    const call = httpRequest({ host: '127.0.0.1', port: runtime.server.address().port, path: '/downloads', headers: { Host: 'notefish.ai' } }, response => {
+      let body = ''; response.setEncoding('utf8');
+      response.on('data', chunk => { body += chunk; });
+      response.on('end', () => resolve({ status: response.statusCode, body }));
+    });
+    call.on('error', reject); call.end();
+  });
+  assert.equal(downloads.status, 200);
+  assert.match(downloads.body, /Three steps/, 'the download page explains the install');
+  const build = await fetch(`${base}/api/mac-build`);
+  assert.deepEqual(await build.json(), { url: null }, 'with no build configured the page is told so rather than guessing');
+
   const desk = await page('app.notefish.ai');
   assert.equal(desk.status, 200);
   assert.match(desk.body, /NoteFish desk/, 'the desk subdomain still gets the app shell');

@@ -28,6 +28,11 @@ export function loadConfig(env = process.env, root = process.cwd()) {
   if (deskPassword && deskPassword.length < 16) throw new Error('NOTEFISH_DESK_PASSWORD must contain at least 16 characters');
   // Who may claim a fresh desk. Without it the first visitor to a public address
   // would become its admin, so a public desk needs one of the three ways in.
+  // Where the built Mac app lives, and what it is called on disk. The download
+  // page asks the server for this, so no URL is ever guessed in the page.
+  const macBuildUrl = read('NOTEFISH_MAC_BUILD_URL', 600);
+  if (macBuildUrl && !/^https:\/\/[^\s]+$/.test(macBuildUrl)) throw new Error('NOTEFISH_MAC_BUILD_URL must be an https URL');
+  const macBuildVersion = read('NOTEFISH_MAC_BUILD_VERSION', 40);
   // Hosts that get the marketing page at / instead of the desk. Comma separated.
   const siteHosts = read('NOTEFISH_SITE_HOSTS', 400).split(',').map(item => item.trim().toLowerCase()).filter(Boolean);
   const adminEmail = read('NOTEFISH_ADMIN_EMAIL', 254).trim().toLowerCase();
@@ -77,7 +82,7 @@ export function loadConfig(env = process.env, root = process.cwd()) {
     production, dataPath: path.join(dataDir, 'notefish.json'), distPath: path.join(root, 'dist'),
     openaiApiKey: read('OPENAI_API_KEY'), fishApiKey: read('FISH_API_KEY'),
     twilioAccountSid, twilioAuthToken: read('TWILIO_AUTH_TOKEN'), twilioNumber,
-    sessionSecret, adminEmail, siteHosts, maxAgents, maxConcurrentCalls,
+    sessionSecret, adminEmail, siteHosts, macBuildUrl, macBuildVersion, maxAgents, maxConcurrentCalls,
     webhookUrl, webhookSecret, exportToken,
     zendeskSubdomain, zendeskEmail, zendeskApiToken,
     demoVoiceReferenceId: read('NOTEFISH_DEMO_VOICE_REFERENCE_ID', 128),
