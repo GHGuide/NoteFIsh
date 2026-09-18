@@ -1,0 +1,499 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><title>NoteFish — answer callers in their language, in your own voice</title><meta name="description" content="NoteFish sits next to whatever call you are on. The caller hears your own voice, in their language, sounding the way you actually sounded."><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='26' fill='%23242424'/%3E%3Cellipse cx='46' cy='51' rx='32' ry='28' fill='%23F3F1EC'/%3E%3Ccircle cx='36' cy='47' r='3.4' fill='%23242424'/%3E%3Ccircle cx='54' cy='47' r='3.4' fill='%23242424'/%3E%3C/svg%3E"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --paper: #FAF9F7; --panel: #ECEAE2; --panel-2: #F3F2EF; --card: #FFFFFF; --line: rgba(36, 36, 36, .15); --hairline: rgba(36, 36, 36, .08);
+    --ink: #1E1E1C; --muted: rgba(30, 30, 28, .7); --soft: rgba(30, 30, 28, .45);
+    --cta: #DCE8FF; --cta-hover: #CFE0FF;
+    --deep: #1F3A5F; --deep-2: #17304F; --deep-text: #F4F7FD; --deep-muted: rgba(244, 247, 253, .72);
+    --dark: #1A1A19; --dark-text: #F3F1EC; --dark-muted: rgba(243, 241, 236, .6);
+    --blue: #2F6FE0; --orange: #E2732A; --teal: #2E9E86; --pink: #D63F8C; --amber: #815A25; --green: #386149; --red: #A53332;
+    --ribbon-a: #1E1E1C; --ribbon-a-text: #FAF9F7; --ribbon-b: #FFFFFF; --ribbon-b-text: #1E1E1C;
+    --serif: 'DM Serif Display', Georgia, 'Times New Roman', serif; --sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; --mono: 'DM Mono', ui-monospace, Menlo, monospace;
+    --ease: cubic-bezier(.2, .7, .2, 1); --spring: cubic-bezier(.34, 1.4, .64, 1);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --paper: #161513; --panel: #22211E; --panel-2: #1D1C1A; --card: #262522; --line: rgba(243, 241, 236, .16); --hairline: rgba(243, 241, 236, .09); --ink: #F1EFE9; --muted: rgba(241, 239, 233, .7); --soft: rgba(241, 239, 233, .45); --cta: #2A4B85; --cta-hover: #33579A; --deep: #16294A; --deep-2: #12213C; --dark: #070706; --ribbon-a: #F1EFE9; --ribbon-a-text: #161513; --ribbon-b: #24231F; --ribbon-b-text: #D9D6CE; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --paper: #161513; --panel: #22211E; --panel-2: #1D1C1A; --card: #262522; --line: rgba(243, 241, 236, .16); --hairline: rgba(243, 241, 236, .09); --ink: #F1EFE9; --muted: rgba(241, 239, 233, .7); --soft: rgba(241, 239, 233, .45); --cta: #2A4B85; --cta-hover: #33579A; --deep: #16294A; --deep-2: #12213C; --dark: #070706; --ribbon-a: #F1EFE9; --ribbon-a-text: #161513; --ribbon-b: #24231F; --ribbon-b-text: #D9D6CE; color-scheme: dark; }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 17px; line-height: 1.5; font-weight: 450; -webkit-font-smoothing: antialiased; overflow-x: clip; }
+  h1, h2, h3, h4, p, ul, figure, blockquote { margin: 0; }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+  .wrap { width: 100%; max-width: 1240px; margin: 0 auto; padding-inline: clamp(16px, 4vw, 40px); }
+  .narrow { max-width: 912px; }
+  .eyebrow { font-size: 13px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  .display { font-family: var(--serif); font-weight: 400; letter-spacing: -.03em; line-height: .95; text-wrap: balance; }
+  .display em { font-style: italic; }
+  .h1 { font-size: clamp(52px, 6.7vw, 96px); }
+  .h2 { font-size: clamp(42px, 6vw, 88px); }
+  .h3 { font-family: var(--serif); font-weight: 400; font-size: clamp(30px, 3.4vw, 48px); line-height: 1.1; letter-spacing: -.02em; }
+  .lead { font-size: clamp(18px, 1.5vw, 20px); line-height: 1.3; font-weight: 500; color: var(--ink); max-width: 30em; text-wrap: pretty; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 50px; padding: 0 22px; border-radius: 10px; border: 1.5px solid var(--ink); background: var(--cta); color: var(--ink); font-weight: 600; font-size: 16px; white-space: nowrap; transition: transform .2s var(--spring), background .2s; }
+  .btn:hover { background: var(--cta-hover); transform: translateY(-1px); } .btn:active { transform: scale(.98); }
+  .btn.dark { background: var(--ink); color: var(--paper); border-color: var(--ink); } .btn.dark:hover { background: #3A3A37; }
+  .btn.small { height: 44px; padding: 0 18px; font-size: 15px; }
+  .arrow-link { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 16px; }
+  .arrow-link svg { transition: transform .35s var(--ease); } .arrow-link:hover svg { transform: translateX(4px); }
+  .chip { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; border-radius: 999px; font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .chip.ink { background: var(--ink); color: var(--paper); }
+  .chip.navy { background: var(--deep); color: var(--deep-text); }
+  .mono { font-family: var(--mono); }
+  .band { margin-inline: 0; }
+  .reveal { opacity: 1; transform: none; }
+  .js .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s var(--ease), transform .7s var(--ease); }
+  .js .reveal.in { opacity: 1; transform: none; }
+
+  /* ---- announcement + nav ---- */
+  .announce { background: var(--deep); color: var(--deep-text); font-size: 15px; font-weight: 600; text-align: center; padding: 12px 16px; }
+  .announce a { margin-left: 10px; font-weight: 600; }
+  .navwrap { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40; padding: 16px 16px 0; pointer-events: none; }
+  .nav { pointer-events: auto; max-width: 912px; margin: 0 auto; height: 66px; display: flex; align-items: center; gap: 18px; padding: 0 10px 0 20px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, var(--paper) 92%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 22px; letter-spacing: -.8px; }
+  .brand .mark { width: 30px; height: 30px; display: block; }
+  .brand .dotmark { color: var(--soft); margin-left: -4px; }
+  .navlinks { margin-left: auto; display: flex; gap: 18px; font-size: 16px; font-weight: 500; color: var(--muted); }
+  .navlinks a:hover { color: var(--ink); }
+  .burger { display: none; width: 44px; height: 44px; border: 0; background: transparent; }
+  @media (max-width: 860px) { .navlinks { display: none; } .burger { display: grid; place-items: center; margin-left: auto; } .nav { padding-left: 16px; gap: 10px; } .nav .btn.small { margin-left: auto; padding: 0 14px; font-size: 14px; } }
+  @media (max-width: 480px) { .nav .btn.small .t { display: none; } .nav .btn.small { width: 44px; padding: 0; } .brand { font-size: 20px; } }
+
+  /* ---- hero ---- */
+  .hero { position: relative; text-align: center; padding: clamp(70px, 9vw, 120px) 0 clamp(270px, 21vw, 300px); overflow: hidden; }
+  .hero .eyebrow { margin-bottom: 30px; }
+  .hero .h1 { max-width: 14ch; margin: 0 auto 26px; }
+  .hero .lead { margin: 0 auto 30px; max-width: 24em; }
+  .hero-note { margin-top: 18px; font-size: 15px; color: var(--muted); }
+  .hero-art { position: absolute; inset: auto 0 0 0; height: 250px; pointer-events: none; }
+  .ribbon { position: absolute; left: -6%; width: 112%; padding: 11px 0; white-space: nowrap; overflow: hidden; font-size: 15px; font-weight: 500; letter-spacing: .005em; }
+  .ribbon.r1 { bottom: 56px; transform: rotate(-3.5deg); background: var(--ribbon-a); color: var(--ribbon-a-text); }
+  .ribbon span { display: inline-block; padding-right: 60px; animation: ticker 44s linear infinite; }
+  @keyframes ticker { to { transform: translateX(-50%); } }
+  .stage { position: absolute; left: 50%; bottom: 54px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 12px; z-index: 2; width: max-content; max-width: calc(100vw - 32px); }
+  .caption { max-width: 420px; padding: 12px 16px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(36, 36, 36, .10); text-align: left; transition: opacity .4s var(--ease), transform .4s var(--ease); }
+  .caption p { font-size: 15px; line-height: 1.45; color: var(--ink); } .caption .fr { font-size: 12.5px; color: var(--muted); margin-top: 4px; } .caption b { font-weight: 600; margin-right: 6px; }
+  .caption.off { opacity: 0; transform: translateY(6px); }
+  .cpill { display: inline-flex; align-items: center; gap: 10px; height: 46px; padding: 0 18px 0 12px; border-radius: 999px; background: #242424; color: #FFF; box-shadow: 0 10px 30px rgba(36, 36, 36, .28), inset 0 0 0 1px rgba(255, 255, 255, .10); font: 500 14px/1 var(--sans); white-space: nowrap; transition: opacity .35s var(--ease), transform .35s var(--ease); }
+  .cpill.swap { opacity: 0; transform: translateY(8px) scale(.98); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cpill, :root:not([data-theme="light"]) .micpill { background: #2E2D2A; box-shadow: 0 12px 34px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 255, 255, .18); } }
+  :root[data-theme="dark"] .cpill, :root[data-theme="dark"] .micpill { background: #2E2D2A; box-shadow: 0 12px 34px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 255, 255, .18); }
+  .cpill .puff { width: 24px; height: 24px; fill: #F3F1EC; flex-shrink: 0; }
+  .cpill .dim { opacity: .5; } .cpill .dim2 { opacity: .6; display: inline-flex; }
+  .cpill kbd { font: inherit; font-size: 11px; border: 1px solid #777; padding: 3px 7px; border-radius: 4px; color: #E2E0DB; }
+  .cpill .start { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 999px; background: #FFF; color: #242424; font-weight: 600; margin-left: 2px; }
+  .cpill .rec { width: 9px; height: 9px; border-radius: 50%; background: #C43B36; box-shadow: 0 0 0 4px rgba(196, 59, 54, .28); animation: blink 1.2s ease-in-out infinite; }
+  .cpill .bar { width: 84px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .18); overflow: hidden; } .cpill .bar i { display: block; height: 100%; width: 0; background: #FFF; animation: fillbar 2.6s linear forwards; }
+  @keyframes fillbar { to { width: 100%; } }
+  .cpill .wave { display: inline-flex; align-items: center; gap: 3px; height: 22px; }
+  .wave i { width: 3px; border-radius: 2px; background: currentColor; height: var(--h, 10px); transform-origin: center; animation: wave 1s ease-in-out infinite; animation-delay: var(--d, 0s); }
+  @keyframes wave { 0%, 100% { transform: scaleY(.45); } 50% { transform: scaleY(1); } }
+  .micpill { display: inline-flex; align-items: center; gap: 10px; height: 46px; padding: 0 16px 0 12px; border-radius: 999px; background: #242424; color: #FFF; box-shadow: 0 10px 30px rgba(36, 36, 36, .28), inset 0 0 0 1px rgba(255, 255, 255, .10); font: 500 14px/1 var(--sans); white-space: nowrap; }
+  .micpill .wave { display: inline-flex; align-items: center; gap: 3px; height: 22px; }
+  @media (max-width: 760px) { .hero { padding-bottom: 250px; } .hero-art { height: 240px; } .caption { max-width: 320px; } .cpill { height: 42px; font-size: 13px; padding: 0 14px 0 10px; gap: 8px; } .cpill kbd, .cpill .bar { display: none; } .ribbon.r1 { bottom: 48px; } .stage { bottom: 50px; } }
+
+  /* ---- dark band: runs on + languages ticker ---- */
+  .logos { background: var(--dark); color: var(--dark-text); border-radius: 80px 80px 0 0; padding: 72px 0 64px; overflow: hidden; box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
+  .logos .eyebrow { color: var(--dark-muted); text-align: center; margin-bottom: 34px; }
+  .ticker { display: flex; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
+  .ticker > div { display: flex; flex-shrink: 0; gap: clamp(40px, 6vw, 96px); padding-right: clamp(40px, 6vw, 96px); animation: ticker 40s linear infinite; align-items: center; }
+  .ticker.slow > div { animation-duration: 70s; animation-direction: reverse; }
+  .logo { display: inline-flex; align-items: center; gap: 10px; font-family: var(--serif); font-size: 30px; white-space: nowrap; }
+  .logo small { font: 500 11px var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--dark-muted); }
+  .langs { margin-top: 30px; font-family: var(--serif); font-size: clamp(30px, 3.2vw, 44px); color: var(--dark-text); }
+  .langs .ticker > div { gap: clamp(36px, 5vw, 72px); animation-duration: 60s; }
+  @media (max-width: 760px) { .logos { border-radius: 40px 40px 0 0; } }
+
+  /* ---- deep band: one voice ---- */
+  .deep { background: var(--deep); color: var(--deep-text); padding: clamp(80px, 10vw, 140px) 0 clamp(60px, 8vw, 110px); text-align: center; }
+  .deep .h2 { font-size: clamp(40px, 5.6vw, 80px); max-width: 18ch; margin: 0 auto 22px; }
+  .deep .lead { color: var(--deep-text); opacity: .85; margin: 0 auto 60px; }
+  .compare { display: grid; grid-template-columns: 200px 1fr; gap: 16px; align-items: stretch; text-align: left; }
+  .compare .old { border: 1px solid rgba(255, 255, 255, .22); border-radius: 28px; padding: 30px 24px; display: flex; flex-direction: column; gap: 6px; }
+  .compare .old .k, .compare .new .k { font-size: 18px; font-weight: 500; }
+  .compare .old strong, .compare .new strong { font-family: var(--serif); font-size: clamp(34px, 3.4vw, 44px); line-height: 1; letter-spacing: -.02em; font-weight: 400; display: block; }
+  .compare .old p { font-size: 14px; opacity: .7; margin-top: auto; }
+  .compare .new { position: relative; min-height: 460px; border-radius: 28px; overflow: hidden; padding: 30px 32px; background: #1C2B47; }
+  .blobs { position: absolute; inset: -20%; filter: blur(46px); opacity: .9; background: radial-gradient(circle at 20% 30%, #2F6FE0 0, transparent 38%), radial-gradient(circle at 75% 25%, #E2732A 0, transparent 34%), radial-gradient(circle at 60% 80%, #2E9E86 0, transparent 40%), radial-gradient(circle at 25% 85%, #D63F8C 0, transparent 30%); animation: drift 18s ease-in-out infinite alternate; }
+  @keyframes drift { from { transform: translate3d(-2%, -1%, 0) rotate(0deg); } to { transform: translate3d(3%, 2%, 0) rotate(6deg); } }
+  .compare .new > *:not(.blobs) { position: relative; }
+  .compare .new .ribbonx { position: absolute; left: -10%; width: 120%; bottom: 130px; transform: rotate(-6deg); background: var(--paper); color: var(--ink); padding: 10px 0; white-space: nowrap; overflow: hidden; font-size: 16px; font-weight: 500; }
+  .compare .new .ribbonx span { display: inline-block; animation: ticker 70s linear infinite; }
+  .compare .new .played { position: absolute; right: 26px; bottom: 26px; }
+  @media (max-width: 760px) { .compare { grid-template-columns: 1fr; } .compare .new { min-height: 380px; } }
+
+  /* ---- scroll-pinned flow ---- */
+  .flow { position: relative; min-height: 400vh; }
+  .flow-stage { position: sticky; top: 0; min-height: 100vh; display: grid; grid-template-columns: 1fr minmax(320px, 400px) 1fr; align-items: center; gap: clamp(24px, 4vw, 64px); padding-block: 90px; }
+  .flow-steps { position: absolute; inset: 0; pointer-events: none; }
+  .flow-steps div { height: 100vh; }
+  .flow-tabs { display: grid; gap: 4px; border-left: 2px solid var(--hairline); }
+  .flow-tabs button { position: relative; text-align: left; padding: 7px 0 7px 18px; border: 0; background: transparent; font-family: var(--serif); font-size: 21px; color: var(--soft); transition: color .3s; }
+  .flow-tabs button::before { content: ''; position: absolute; left: -2px; top: 0; bottom: 0; width: 3px; background: var(--orange); transform: scaleY(0); transition: transform .35s var(--ease); }
+  .flow-tabs button[aria-selected="true"] { color: var(--ink); } .flow-tabs button[aria-selected="true"]::before { transform: scaleY(1); }
+  .phone { position: relative; aspect-ratio: 400 / 466; border-radius: 28px; overflow: hidden; background: var(--deep-2); color: var(--deep-text); box-shadow: 0 30px 60px rgba(0, 0, 0, .25); }
+  .phone .blobs { opacity: .55; }
+  .phone .scene { position: absolute; inset: 0; padding: 26px 24px; display: flex; flex-direction: column; opacity: 0; transition: opacity .45s var(--ease); }
+  .phone .scene.on { opacity: 1; }
+  .phone .hdr { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; opacity: .75; margin-bottom: 18px; }
+  .phone .hdr .dot { width: 8px; height: 8px; border-radius: 50%; background: #5BC48A; box-shadow: 0 0 0 4px rgba(91, 196, 138, .25); }
+  .phone .hdr kbd { font: inherit; font-size: 11px; border: 1px solid rgba(255, 255, 255, .45); padding: 2px 7px; border-radius: 4px; }
+  .phone .them { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 1.45; opacity: .78; margin-bottom: 14px; }
+  .phone .them .wave { flex-shrink: 0; display: inline-flex; align-items: center; gap: 3px; height: 20px; margin-top: 1px; }
+  .phone .spoken { font-size: 16px; line-height: 1.5; font-weight: 500; }
+  .phone .w { display: inline-block; opacity: 0; transform: translateY(6px); transition: opacity .25s var(--ease), transform .28s var(--ease); margin-right: .28em; }
+  .phone .scene.on .w { opacity: 1; transform: none; }
+  .phone .bigwave { margin: auto 0 70px; display: flex; align-items: center; justify-content: center; gap: 4px; height: 56px; } .phone .bigwave i { width: 4px; border-radius: 2px; background: var(--paper); opacity: .85; height: var(--h); transform-origin: center; animation: wave 1.1s ease-in-out infinite; animation-delay: var(--d); }
+  .phone .chip.glass { background: rgba(255, 255, 255, .14); color: #FFF; }
+  .phone .pill-bottom .wave { display: inline-flex; align-items: center; gap: 3px; height: 18px; }
+  .phone .pill-bottom .rec { width: 8px; height: 8px; border-radius: 50%; background: #E0524C; box-shadow: 0 0 0 3px rgba(224, 82, 76, .3); animation: blink 1.2s ease-in-out infinite; }
+  .phone .pill-bottom .bar { width: 64px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .22); overflow: hidden; } .phone .pill-bottom .bar i { display: block; height: 100%; width: 0; background: var(--paper); animation: fillbar 2.9s linear infinite; }
+  .phone .pill-bottom .dim2 { opacity: .7; display: inline-flex; }
+  .phone .meter { display: grid; grid-template-columns: 74px 1fr auto; align-items: center; gap: 10px; font-size: 13px; background: rgba(255, 255, 255, .1); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+  .phone .meter i { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .18); overflow: hidden; display: block; } .phone .meter i b { display: block; height: 100%; width: 0; background: var(--paper); transition: width 1.2s var(--ease); } .phone .scene.on .meter i b { width: var(--w); }
+  .phone .stack { display: grid; gap: 8px; margin-top: 14px; }
+  .phone .stack .chip { justify-content: flex-start; width: max-content; }
+  .phone .pill-bottom { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; height: 40px; padding: 0 14px; border-radius: 999px; background: var(--ink); color: var(--paper); border: 2px solid rgba(255, 255, 255, .8); font-size: 13px; font-weight: 600; }
+  .phone .bubble { background: var(--paper); color: var(--ink); border-radius: 14px; padding: 14px 16px; font-size: 15px; line-height: 1.45; box-shadow: 0 8px 24px rgba(0, 0, 0, .2); }
+  .phone .bubble small { display: block; margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .flow-copy { display: grid; }
+  .flow-copy > div { grid-area: 1 / 1; opacity: 0; transform: translateY(14px); transition: opacity .5s var(--ease), transform .5s var(--ease); }
+  .flow-copy > div.on { opacity: 1; transform: none; }
+  .flow-copy .h3 { margin-bottom: 14px; }
+  .flow-copy p { font-size: 17px; line-height: 1.45; color: var(--ink); max-width: 30em; }
+  .waves { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  .waves svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .waves path { fill: none; stroke: var(--panel); stroke-width: 120; stroke-linecap: round; }
+  @media (max-width: 900px) { .flow { min-height: 0; } .flow-stage { position: static; grid-template-columns: 1fr; gap: 28px; min-height: 0; padding-block: 60px 20px; } .flow-steps { display: none; } .flow-tabs { grid-auto-flow: column; border-left: 0; border-bottom: 2px solid var(--hairline); overflow-x: auto; } .flow-tabs button { padding: 0 6px 12px; font-size: 18px; white-space: nowrap; } .flow-tabs { gap: 14px; scrollbar-width: none; } .flow-tabs button::before { left: 0; right: 0; top: auto; bottom: -2px; width: auto; height: 3px; transform: scaleX(0); } .flow-tabs button[aria-selected="true"]::before { transform: scaleX(1); } .phone { max-width: 400px; margin: 0 auto; width: 100%; } .waves { display: none; } }
+
+  /* ---- built for the shift (sticky card + rows) ---- */
+  .shift { padding: clamp(80px, 10vw, 140px) 0 60px; }
+  .shift .head { text-align: center; margin-bottom: clamp(60px, 8vw, 110px); }
+  .shift .head .h2 { max-width: 14ch; margin: 18px auto 0; }
+  .ul { position: relative; display: inline-block; }
+  .ul svg { position: absolute; left: -2%; right: -2%; bottom: -.08em; width: 104%; height: .32em; overflow: visible; }
+  .ul path { fill: none; stroke: var(--blue); stroke-width: 9; stroke-linecap: round; opacity: .55; stroke-dasharray: 1000; stroke-dashoffset: 1000; transition: stroke-dashoffset 1.1s var(--ease) .3s; }
+  .in .ul path, .ul.in path { stroke-dashoffset: 0; }
+  .shift-grid { display: grid; grid-template-columns: 400px 1fr; gap: clamp(32px, 8vw, 160px); align-items: start; }
+  .shift-card { position: sticky; top: 130px; aspect-ratio: 1; border-radius: 24px; background: var(--panel); display: grid; place-items: center; overflow: hidden; }
+  .shift-card .face { grid-area: 1 / 1; display: grid; place-items: center; gap: 14px; padding: 30px; text-align: center; opacity: 0; transform: scale(.96); transition: opacity .35s var(--ease), transform .45s var(--spring); }
+  .shift-card .face.on { opacity: 1; transform: none; }
+  .langpill { display: inline-flex; align-items: center; gap: 12px; height: 56px; padding: 0 12px 0 22px; border-radius: 999px; background: var(--card); box-shadow: 0 6px 20px rgba(0, 0, 0, .08); font-size: 16px; }
+  .langpill .flag { width: 32px; height: 32px; border-radius: 50%; background: conic-gradient(#2F6FE0 0 33%, #FFFFFF 0 66%, #E2732A 0); border: 1px solid var(--line); }
+  .langpill .dots i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 3px; animation: blink 1.2s ease-in-out infinite; } .langpill .dots i:nth-child(2) { animation-delay: .2s; } .langpill .dots i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 50% { opacity: .25; } }
+  .tilt-ribbon { position: absolute; left: -10%; width: 120%; bottom: 60px; transform: rotate(-5deg); white-space: nowrap; overflow: hidden; font-size: 16px; font-weight: 500; color: var(--ink); }
+  .tilt-ribbon span { display: inline-block; padding-right: 40px; animation: ticker 30s linear infinite; }
+  .takes { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 300px; }
+  .takes span { padding: 9px 14px; border-radius: 999px; background: var(--card); font-size: 14px; font-weight: 600; box-shadow: 0 3px 10px rgba(0, 0, 0, .06); }
+  .takes span.on { background: var(--ink); color: var(--paper); }
+  .stylecard { background: var(--card); border-radius: 16px; padding: 18px 20px; font-size: 15px; text-align: left; box-shadow: 0 6px 20px rgba(0, 0, 0, .08); max-width: 300px; display: grid; gap: 8px; }
+  .stylecard small { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .panels { display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px; width: 280px; margin-bottom: 4px; }
+  .panels i { display: grid; place-items: center; height: 44px; border-radius: 10px; background: var(--card); box-shadow: 0 3px 10px rgba(0, 0, 0, .06); font: 600 12px var(--sans); color: var(--muted); }
+  .panels i.b { grid-row: span 2; height: auto; color: var(--ink); }
+  .agents { display: grid; gap: 8px; width: 290px; text-align: left; }
+  .agents div { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; background: var(--card); box-shadow: 0 3px 10px rgba(0, 0, 0, .06); font-size: 14px; font-weight: 600; }
+  .agents .d { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; } .agents em { margin-left: auto; font: 500 12px var(--sans); color: var(--muted); }
+  .rows { display: grid; }
+  .row { min-height: 62vh; display: flex; flex-direction: column; justify-content: center; gap: 14px; opacity: .3; transition: opacity .45s var(--ease); }
+  .row.on { opacity: 1; }
+  .row .h3 { font-size: clamp(30px, 3.6vw, 48px); }
+  .row p { font-size: 17px; line-height: 1.45; max-width: 32em; }
+  @media (max-width: 900px) { .shift-grid { grid-template-columns: 1fr; } .shift-card { position: relative; top: 0; max-width: 400px; width: 100%; margin: 0 auto; aspect-ratio: 1.2; } .shift-card .face { display: none; } .shift-card .face.on { display: grid; } .row { min-height: 0; padding-block: 28px; opacity: 1; } }
+
+  /* ---- trust panel ---- */
+  .trust { padding-block: 40px 100px; }
+  .trust-card { background: var(--panel); border-radius: 24px; padding: clamp(32px, 4vw, 48px); display: grid; grid-template-columns: 1.1fr 1.2fr 1.3fr; gap: 32px; align-items: center; }
+  .trust-card .h3 { font-size: clamp(34px, 3.6vw, 48px); }
+  .trust-card p { font-size: 16px; line-height: 1.45; color: var(--ink); max-width: 30em; margin-bottom: 18px; }
+  .badges { display: flex; gap: 14px; justify-content: flex-end; flex-wrap: wrap; }
+  .badge { width: 104px; height: 104px; border-radius: 50%; border: 1px solid var(--ink); display: grid; place-items: center; text-align: center; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; line-height: 1.25; padding: 8px; color: var(--ink); background: transparent; transition: transform .3s var(--spring); }
+  .badge:hover { transform: rotate(-6deg) scale(1.04); }
+  .badge b { display: block; font-family: var(--serif); font-weight: 400; font-size: 22px; letter-spacing: 0; text-transform: none; }
+  @media (max-width: 900px) { .trust-card { grid-template-columns: 1fr; } .badges { justify-content: flex-start; } }
+
+  /* ---- collage band ---- */
+  .collage { background: var(--dark); color: var(--dark-text); border-radius: 76px 76px 4px 4px; padding: clamp(90px, 10vw, 150px) 0 clamp(80px, 9vw, 130px); overflow: hidden; }
+  .collage .eyebrow { color: var(--dark-muted); text-align: center; }
+  .collage .h2 { text-align: center; max-width: 12ch; margin: 22px auto 70px; color: var(--dark-text); }
+  .board { position: relative; height: 900px; }
+  .pcard { position: absolute; border-radius: 26px; padding: 30px; color: var(--ink); will-change: transform; }
+  .pcard q, .pcard blockquote { font-family: var(--serif); font-size: clamp(20px, 1.9vw, 26px); line-height: 1.12; letter-spacing: -.015em; quotes: '“' '”'; }
+  .pcard .who { margin-top: auto; font-size: 14px; } .pcard .who strong { display: block; font-weight: 700; } .pcard .who span { color: var(--muted); }
+  .pcard.record { left: 24%; top: 0; width: 54%; background: var(--cta); display: grid; grid-template-columns: 1fr 300px; gap: 20px; min-height: 450px; }
+  .pcard.record .photo { position: relative; border-radius: 18px; overflow: hidden; background: var(--deep-2); color: var(--deep-text); padding: 22px; display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; }
+  .pcard.record .photo .blobs { opacity: .8; }
+  .pcard.record .stats { position: relative; display: flex; gap: 30px; } .pcard.record .stats strong { display: block; font-family: var(--serif); font-size: 42px; line-height: 1; font-weight: 400; } .pcard.record .stats span { font-size: 13px; opacity: .8; display: block; margin-top: 4px; }
+  .pcard.record h3 { font: 700 26px/1 var(--sans); letter-spacing: -.02em; text-transform: uppercase; } .pcard.record .sub { color: var(--muted); font-size: 15px; margin: 8px 0 20px; }
+  .pcard.record .arrow-link { margin-top: auto; }
+  .pcard.press { left: 0; top: 300px; width: 26%; min-height: 330px; background: var(--paper); transform: rotate(-4deg); display: flex; flex-direction: column; gap: 22px; }
+  .pcard.press .who { display: flex; align-items: center; gap: 12px; } .pcard.press .who svg { flex-shrink: 0; }
+  .pcard.sound { left: 30%; top: 560px; width: 30%; min-height: 280px; background: var(--orange); color: #1E1E1C; display: flex; flex-direction: column; gap: 18px; transform: rotate(2deg); }
+  .pcard.detect { right: 0; top: 540px; width: 34%; min-height: 300px; background: #2EC9A0; display: flex; flex-direction: column; gap: 18px; transform: rotate(-3deg); }
+  .pcard.detect .langs-list { display: flex; flex-wrap: wrap; gap: 8px; } .pcard.detect .langs-list span { padding: 6px 10px; border-radius: 999px; background: rgba(0, 0, 0, .12); font-size: 13px; font-weight: 600; }
+  .pcard.canned { left: 4%; top: 760px; width: 24%; min-height: 230px; background: var(--pink); color: #FFF; display: flex; flex-direction: column; gap: 12px; transform: rotate(3deg); }
+  .pcard.canned .chip { background: rgba(255, 255, 255, .22); color: #FFF; }
+  .pcard.canned q { color: #FFF; }
+  @media (max-width: 900px) { .collage { border-radius: 40px 40px 4px 4px; } .board { height: auto; display: grid; gap: 18px; } .pcard { position: static; width: auto !important; transform: none !important; min-height: 0; } .pcard.record { grid-template-columns: 1fr; } .pcard.record .photo { min-height: 240px; } }
+
+  /* ---- faq ---- */
+  .faq { padding: clamp(80px, 10vw, 140px) 0; }
+  .faq .h2 { text-align: center; margin-bottom: 56px; }
+  .faq-card { display: grid; grid-template-columns: 1fr 1.05fr; background: var(--panel); border-radius: 24px; padding: 16px; gap: 32px; }
+  .faq-q { background: var(--deep); color: var(--deep-text); border-radius: 18px; padding: 26px 22px; display: grid; gap: 6px; align-content: start; }
+  .faq-q h3, .faq-a h3 { font-family: var(--serif); font-weight: 400; font-size: 24px; margin-bottom: 10px; }
+  .faq-q button { text-align: left; border: 0; background: transparent; color: inherit; padding: 14px 16px; border-radius: 10px; font-size: 16px; font-weight: 500; line-height: 1.35; transition: background .2s; }
+  .faq-q button:hover { background: rgba(255, 255, 255, .06); } .faq-q button[aria-selected="true"] { background: rgba(255, 255, 255, .12); }
+  .faq-a { padding: 26px 24px 26px 0; display: grid; align-content: start; gap: 12px; }
+  .faq-a .asked { text-align: right; font-size: 15px; color: var(--muted); }
+  .faq-a .answer { background: var(--card); border-radius: 14px; padding: 18px 20px; font-size: 16px; line-height: 1.5; box-shadow: 0 2px 8px rgba(0, 0, 0, .04); max-width: 34em; animation: pop .35s var(--ease); }
+  @keyframes pop { from { opacity: 0; transform: translateY(8px); } }
+  .faq-a .avatar { width: 30px; height: 30px; }
+  @media (max-width: 900px) { .faq-card { grid-template-columns: 1fr; } .faq-a { padding: 8px 8px 16px; } .faq-a .asked { text-align: left; } }
+
+  /* ---- final band ---- */
+  .final { position: relative; overflow: hidden; border-radius: 0 0 80px 80px; background: var(--deep-2); color: #FFF; text-align: center; padding: clamp(100px, 13vw, 190px) 0; }
+  .final .blobs { opacity: .75; filter: blur(70px); }
+  .final .wrap { position: relative; }
+  .final .h2 { max-width: 13ch; margin: 0 auto 26px; color: #FFF; }
+  .final .lead { color: #FFF; opacity: .9; margin: 0 auto 34px; }
+  .final .dl-note { margin: 18px auto 0; max-width: 34em; font-size: 14px; opacity: .7; }
+  @media (max-width: 760px) { .final { border-radius: 0 0 40px 40px; } }
+
+  /* ---- products + footer ---- */
+  footer { padding: 40px 0 30px; }
+  .cols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; font-size: 15px; }
+  .cols h4 { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 500; margin-bottom: 14px; }
+  .cols ul { list-style: none; padding: 0; display: grid; gap: 10px; } .cols a:hover { text-decoration: underline; text-underline-offset: 4px; }
+  .giant { display: flex; align-items: center; gap: 4vw; margin: 90px 0 50px; font-weight: 700; font-size: clamp(64px, 17.5vw, 262px); letter-spacing: -.06em; line-height: .85; }
+  .giant svg { width: clamp(64px, 13vw, 200px); height: auto; flex-shrink: 0; }
+  .legal { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; font-size: 14px; color: var(--muted); padding-top: 20px; border-top: 1px solid var(--hairline); }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr 1fr; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .js .reveal { opacity: 1; transform: none; } .row { opacity: 1; } .phone .w { opacity: 1; transform: none; } .ul path { stroke-dashoffset: 0; }
+  }
+</style>
+
+<div class="announce">NoteFish now works out which language the caller speaks, then answers in it. <a href="#flow">See a call ›</a></div>
+
+<div class="navwrap"><nav class="nav" aria-label="Main">
+  <a class="brand" href="#top"><svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="26" fill="#242424"/><g transform="translate(8 9) scale(.84)"><circle cx="67" cy="51" r="14" fill="#F3F1EC"/><circle cx="59.7" cy="67.3" r="14" fill="#F3F1EC"/><circle cx="42" cy="74" r="14" fill="#F3F1EC"/><circle cx="24.3" cy="67.3" r="14" fill="#F3F1EC"/><circle cx="17" cy="51" r="14" fill="#F3F1EC"/><circle cx="24.3" cy="34.7" r="14" fill="#F3F1EC"/><circle cx="42" cy="28" r="14" fill="#F3F1EC"/><circle cx="59.7" cy="34.7" r="14" fill="#F3F1EC"/><circle cx="80" cy="36" r="12" fill="#F3F1EC"/><circle cx="80" cy="66" r="12" fill="#F3F1EC"/><circle cx="71" cy="51" r="11" fill="#F3F1EC"/><ellipse cx="42" cy="51" rx="30" ry="26" fill="#F3F1EC"/><g transform="rotate(-9 34 47)"><rect x="31.4" y="40" width="5.2" height="14" rx="2.6" fill="#242424"/></g><g transform="rotate(9 50 47)"><rect x="47.4" y="40" width="5.2" height="14" rx="2.6" fill="#242424"/></g></g></svg>NoteFish<span class="dotmark">.</span></a>
+  <div class="navlinks"><a href="#shift">Call centres</a><a href="#faq">Pricing</a><a href="#trust">Trust</a><a href="https://app.notefish.ai/desk">Sign in</a></div>
+  <a class="btn small" href="#download"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg><span class="t">Download for macOS</span></a>
+  <button class="burger" type="button" aria-label="Menu"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+</nav></div>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <p class="eyebrow">NoteFish live voice</p>
+    <h1 class="display h1">Don’t translate, <em>just talk.</em></h1>
+    <p class="lead">Answer callers in their language, in your own voice, sounding the way you actually sounded.</p>
+    <a class="btn" href="#download"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Download for macOS</a>
+    <p class="hero-note">It sits next to whatever call you’re on. Give it your phone number and it picks those up as well.</p>
+  </div>
+  <div class="hero-art" aria-hidden="true">
+    <div class="ribbon r1"><span>Je suis désolée pour l’attente. Le chauffeur est à deux arrêts. &nbsp;·&nbsp; Siento la espera. El conductor está a dos paradas. &nbsp;·&nbsp; Entschuldigen Sie die Wartezeit. Der Fahrer ist zwei Haltestellen entfernt. &nbsp;·&nbsp; お待たせして申し訳ありません。ドライバーはあと2停留所です。 &nbsp;·&nbsp; Desculpe a espera. O motorista está a duas paradas. &nbsp;·&nbsp; Mi scuso per l’attesa. L’autista è a due fermate. &nbsp;·&nbsp; آسفة على الانتظار. السائق على بُعد محطتين. &nbsp;·&nbsp; इंतज़ार के लिए माफ़ करें। ड्राइवर दो स्टॉप दूर है। &nbsp;·&nbsp; 기다리게 해서 죄송합니다. 기사님이 두 정거장 거리에 있습니다. &nbsp;·&nbsp; Sorry voor het wachten. De chauffeur is twee haltes verderop. &nbsp;·&nbsp; Je suis désolée pour l’attente. Le chauffeur est à deux arrêts. &nbsp;·&nbsp; Siento la espera. El conductor está a dos paradas. &nbsp;·&nbsp; Entschuldigen Sie die Wartezeit. Der Fahrer ist zwei Haltestellen entfernt. &nbsp;·&nbsp; お待たせして申し訳ありません。ドライバーはあと2停留所です。 &nbsp;·&nbsp; Desculpe a espera. O motorista está a duas paradas. &nbsp;·&nbsp; Mi scuso per l’attesa. L’autista è a due fermate. &nbsp;·&nbsp; آسفة على الانتظار. السائق على بُعد محطتين. &nbsp;·&nbsp; इंतज़ार के लिए माफ़ करें। ड्राइवर दो स्टॉप दूर है। &nbsp;·&nbsp; 기다리게 해서 죄송합니다. 기사님이 두 정거장 거리에 있습니다. &nbsp;·&nbsp; Sorry voor het wachten. De chauffeur is twee haltes verderop. &nbsp;·&nbsp; </span></div>
+    <div class="stage">
+      <div class="caption" id="hero-caption"><p>I’ve been waiting for my delivery since this morning.</p><p class="fr"><b>FR</b>J’attends ma livraison depuis ce matin.</p></div>
+      <div class="cpill-wrap"><div class="cpill" id="hero-pill"><svg class="puff" viewBox="0 0 100 100" aria-hidden="true"><circle cx="67" cy="51" r="14"/><circle cx="59.7" cy="67.3" r="14"/><circle cx="42" cy="74" r="14"/><circle cx="24.3" cy="67.3" r="14"/><circle cx="17" cy="51" r="14"/><circle cx="24.3" cy="34.7" r="14"/><circle cx="42" cy="28" r="14"/><circle cx="59.7" cy="34.7" r="14"/><circle cx="80" cy="36" r="12"/><circle cx="80" cy="66" r="12"/><circle cx="71" cy="51" r="11"/><ellipse cx="42" cy="51" rx="30" ry="26"/></svg><span class="wave"><i style="--h:8px;--d:0s"></i><i style="--h:14px;--d:.1s"></i><i style="--h:20px;--d:.2s"></i><i style="--h:11px;--d:.3s"></i><i style="--h:17px;--d:.4s"></i><i style="--h:9px;--d:.5s"></i></span><span>Listening</span><span class="dim">EN ← FR</span><kbd>hold ⌥</kbd></div></div>
+    </div>
+  </div>
+</header>
+
+<section class="band logos"><div class="wrap">
+  <p class="eyebrow">Eighty-odd languages on their end. Yours on the desk.</p>
+  <div class="langs"><div class="ticker"><div><span>Français</span><span>Español</span><span>Deutsch</span><span>日本語</span><span>Português</span><span>العربية</span><span>हिन्दी</span><span>Italiano</span><span>한국어</span><span>Türkçe</span><span>Nederlands</span><span>Polski</span><span>Tiếng Việt</span><span>Українська</span><span>中文</span><span>Svenska</span></div><div aria-hidden="true"><span>Français</span><span>Español</span><span>Deutsch</span><span>日本語</span><span>Português</span><span>العربية</span><span>हिन्दी</span><span>Italiano</span><span>한국어</span><span>Türkçe</span><span>Nederlands</span><span>Polski</span><span>Tiếng Việt</span><span>Українська</span><span>中文</span><span>Svenska</span></div></div></div>
+</div></section>
+
+<section class="band deep"><div class="wrap">
+  <h2 class="display h2 reveal">Eighty languages, <em>one voice.</em></h2>
+  <p class="lead reveal">You talk. About half a second later the caller hears you in their language, and it is still your voice. Nobody in between is relaying anything.</p>
+  <div class="compare reveal">
+    <div class="old"><span class="k">Interpreter line</span><strong><span class="count" data-to="3">0</span> people</strong><p>You, the caller, and a third person relaying. Every sentence gets said twice.</p></div>
+    <div class="new"><div class="blobs"></div><span class="k">NoteFish</span><strong><span class="count" data-to="1">0</span> voice, and it’s yours</strong>
+      <div class="ribbonx"><span>Je suis désolée pour l’attente. Le chauffeur est à deux arrêts. &nbsp;·&nbsp; Siento la espera. El conductor está a dos paradas. &nbsp;·&nbsp; Entschuldigen Sie die Wartezeit. Der Fahrer ist zwei Haltestellen entfernt. &nbsp;·&nbsp; お待たせして申し訳ありません。ドライバーはあと2停留所です。 &nbsp;·&nbsp; Desculpe a espera. O motorista está a duas paradas. &nbsp;·&nbsp; Mi scuso per l’attesa. L’autista è a due fermate. &nbsp;·&nbsp; Je suis désolée pour l’attente. Le chauffeur est à deux arrêts. &nbsp;·&nbsp; Siento la espera. El conductor está a dos paradas. &nbsp;·&nbsp; Entschuldigen Sie die Wartezeit. Der Fahrer ist zwei Haltestellen entfernt. &nbsp;·&nbsp; お待たせして申し訳ありません。ドライバーはあと2停留所です。 &nbsp;·&nbsp; Desculpe a espera. O motorista está a duas paradas. &nbsp;·&nbsp; Mi scuso per l’attesa. L’autista è a due fermate. &nbsp;·&nbsp; </span></div>
+      <div class="cpill" style="position:absolute;left:50%;bottom:60px;transform:translateX(-50%)"><svg class="puff" viewBox="0 0 100 100" aria-hidden="true"><circle cx="67" cy="51" r="14"/><circle cx="59.7" cy="67.3" r="14"/><circle cx="42" cy="74" r="14"/><circle cx="24.3" cy="67.3" r="14"/><circle cx="17" cy="51" r="14"/><circle cx="24.3" cy="34.7" r="14"/><circle cx="42" cy="28" r="14"/><circle cx="59.7" cy="34.7" r="14"/><circle cx="80" cy="36" r="12"/><circle cx="80" cy="66" r="12"/><circle cx="71" cy="51" r="11"/><ellipse cx="42" cy="51" rx="30" ry="26"/></svg><span class="dim2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg></span><span>Playing in your voice</span><span class="dim">[reassuring]</span><span class="bar"><i></i></span><span class="dim">0:03</span></div>
+          </div>
+  </div>
+</div></section>
+
+<section class="flow" id="flow">
+  <div class="waves" aria-hidden="true"><svg viewBox="0 0 1440 1400" preserveAspectRatio="none"><path d="M-100 900 C 200 700, 500 1100, 800 900 S 1300 700, 1600 900"/><path d="M900 120 C 1100 20, 1300 260, 1550 160"/></svg></div>
+  <div class="flow-steps" aria-hidden="true"><div></div><div></div><div></div><div></div></div>
+  <div class="flow-stage wrap">
+    <div class="flow-tabs" role="tablist" aria-label="How a call goes">
+      <button type="button" role="tab" aria-selected="true" data-step="0">The caller speaks</button>
+      <button type="button" role="tab" aria-selected="false" data-step="1">You just talk</button>
+      <button type="button" role="tab" aria-selected="false" data-step="2">It hears how you said it</button>
+      <button type="button" role="tab" aria-selected="false" data-step="3">They hear you</button>
+    </div>
+    <div class="phone" aria-hidden="true"><div class="blobs"></div>
+      <div class="scene on" data-scene="0"><div class="hdr"><span class="dot"></span>On the line · French<span class="mono" style="margin-left:auto">01:12</span></div><div class="them"><span class="wave"><i style="--h:8px;--d:0s"></i><i style="--h:14px;--d:.1s"></i><i style="--h:18px;--d:.2s"></i><i style="--h:10px;--d:.3s"></i><i style="--h:16px;--d:.4s"></i></span><span>J’attends ma livraison depuis ce matin, et personne ne répond.</span></div><div class="bubble"><span data-words>I’ve been waiting for my delivery since this morning, and nobody picks up.</span><small>Caption · English</small></div><div class="stack"><span class="chip ink">French · heard on the first phrase</span><span class="chip glass">sounds upset</span></div><div class="pill-bottom"><span class="wave"><i style="--h:8px;--d:0s"></i><i style="--h:14px;--d:.1s"></i><i style="--h:18px;--d:.2s"></i><i style="--h:10px;--d:.3s"></i><i style="--h:16px;--d:.4s"></i></span>Listening · EN ← FR</div></div>
+      <div class="scene" data-scene="1"><div class="hdr"><kbd>⌥</kbd>held · your language<span class="mono" style="margin-left:auto">0:04</span></div><p class="spoken" data-words>So sorry about that. I’m getting somebody over to you right now. The driver’s about fifteen minutes out, is that okay?</p><div class="bigwave"><i style="--h:10px;--d:0.00s"></i><i style="--h:22px;--d:0.07s"></i><i style="--h:34px;--d:0.14s"></i><i style="--h:18px;--d:0.21s"></i><i style="--h:42px;--d:0.28s"></i><i style="--h:28px;--d:0.35s"></i><i style="--h:14px;--d:0.42s"></i><i style="--h:38px;--d:0.49s"></i><i style="--h:24px;--d:0.56s"></i><i style="--h:46px;--d:0.63s"></i><i style="--h:20px;--d:0.70s"></i><i style="--h:12px;--d:0.77s"></i><i style="--h:30px;--d:0.84s"></i><i style="--h:40px;--d:0.91s"></i><i style="--h:16px;--d:0.98s"></i><i style="--h:26px;--d:1.05s"></i><i style="--h:44px;--d:1.12s"></i><i style="--h:22px;--d:1.19s"></i><i style="--h:36px;--d:1.26s"></i><i style="--h:14px;--d:1.33s"></i><i style="--h:32px;--d:1.40s"></i><i style="--h:18px;--d:1.47s"></i><i style="--h:42px;--d:1.54s"></i><i style="--h:24px;--d:1.61s"></i><i style="--h:12px;--d:1.68s"></i><i style="--h:28px;--d:1.75s"></i></div><div class="pill-bottom"><span class="rec"></span>Recording<span class="wave"><i style="--h:8px;--d:0s"></i><i style="--h:14px;--d:.1s"></i><i style="--h:18px;--d:.2s"></i><i style="--h:10px;--d:.3s"></i><i style="--h:16px;--d:.4s"></i></span>release to send</div></div>
+      <div class="scene" data-scene="2"><div class="hdr">measured on your clip</div><div class="meter"><span>Loudness</span><i><b style="--w:74%"></b></i><span class="mono">+4.2 dB</span></div><div class="meter"><span>Pace</span><i><b style="--w:58%"></b></i><span class="mono">1.15×</span></div><div class="meter"><span>Caller</span><i><b style="--w:88%"></b></i><span class="mono">upset</span></div><div class="stack"><span class="chip ink">your apologetic take</span><span class="chip glass">[sincerely apologetic] · 0.92×</span></div><div class="pill-bottom">choosing a take…</div></div>
+      <div class="scene" data-scene="3"><div class="hdr"><span class="dot"></span>On the line · French<span class="mono" style="margin-left:auto">01:31</span></div><div style="margin-top:auto;margin-bottom:52px" class="bubble">Je suis vraiment désolée pour l’attente. Le chauffeur est à deux arrêts, environ quinze minutes. Il vous appellera d’en bas.<small>Played to the caller · your voice · 2.9 s</small></div><div class="pill-bottom"><span class="dim2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg></span>Playing in your voice<span class="bar"><i></i></span></div></div>
+    </div>
+    <div class="flow-copy">
+      <div class="on" data-copy="0"><h3 class="h3">The caller speaks</h3><p>They ring from a phone, or from Zoom, or from wherever. By the end of their first sentence the desk knows which language it is and captions it in yours. It also notes how they sound, because an upset caller and a cheerful one need different answers.</p></div>
+      <div data-copy="1"><h3 class="h3">You just talk</h3><p>Hold the key and say it the way you’d say it to the person at the next desk. Ramble a bit if you need to. When you let go, the reply is on its way.</p></div>
+      <div data-copy="2"><h3 class="h3">It hears how you said it</h3><p>The words alone don’t say how something was said. So the desk measures your clip against your own normal: were you louder than usual, faster, softer? It weighs that against the caller’s mood and picks the take of your voice that fits.</p></div>
+      <div data-copy="3"><h3 class="h3">They hear you</h3><p>The caller hears your voice, in their language, carrying the feeling you had. One side talks at a time, so nobody gets talked over. And if the desk can’t confirm a reply actually played, it says so instead of guessing.</p></div>
+    </div>
+  </section>
+
+<section class="shift" id="shift"><div class="wrap">
+  <div class="head reveal"><p class="eyebrow">For the floor</p><h2 class="display h2">Made for the <span class="ul"><em>whole shift.</em><svg viewBox="0 0 300 20" preserveAspectRatio="none"><path d="M4 12 C 60 4, 140 18, 296 8"/></svg></span></h2></div>
+  <div class="shift-grid">
+    <div class="shift-card" aria-hidden="true">
+      <div class="face on" data-face="0"><span class="langpill">Language: <strong>Français</strong><span class="dots"><i></i><i></i><i></i></span><span class="flag"></span></span><div class="tilt-ribbon"><span>Bonjour, j’attends ma livraison depuis ce matin… &nbsp; Hola, buenos días, llamo por mi pedido… &nbsp; Guten Tag, ich warte seit heute Morgen… &nbsp; Bonjour, j’attends ma livraison depuis ce matin… &nbsp; Hola, buenos días, llamo por mi pedido… &nbsp; Guten Tag, ich warte seit heute Morgen… </span></div></div>
+      <div class="face" data-face="1"><div class="takes"><span>Calm</span><span>Warm</span><span>Energetic</span><span>Reassuring</span><span class="on">Apologetic</span><span>Firm</span></div><span class="chip ink">Read. Record. Ready. · 60 s</span></div>
+      <div class="face" data-face="2"><div class="takes"><span>One moment, please.</span><span>Sending someone now.</span><span>Repeat the address?</span></div><span class="chip ink">one tap → French, your voice</span></div>
+      <div class="face" data-face="3"><div class="stylecard"><small>House style</small><span>“Brief and warm. Formal <i>vous</i>. Never promise a time you can’t keep.”</span><small style="color:var(--green)">facts and numbers never change</small></div></div>
+      <div class="face" data-face="4"><div class="panels"><i class="a">Your voice</i><i class="b">Live transcript</i><i class="a">Speak</i><i class="a">Canned lines</i><i class="b">Caller · notes</i></div><span class="chip ink">drag · hide · presets · saved to your seat</span></div>
+      <div class="face" data-face="5"><div class="agents"><div><span class="d" style="background:var(--green)"></span>Tom<em>available</em></div><div><span class="d" style="background:var(--red)"></span>Nina<em>on a call · 04:12</em></div><div><span class="d" style="background:var(--amber)"></span>Léa<em>paused · lunch</em></div><div><span class="d" style="background:var(--blue)"></span>2 waiting<em>ring all · first to answer wins</em></div></div></div>
+    </div>
+    <div class="rows">
+      <div class="row on" data-row="0"><h3 class="h3">It works out the language itself</h3><p>Leave the caller’s language on Auto. They start talking, the desk hears which language it is and replies in it. Your captions stay in whatever you set as yours.</p></div>
+      <div class="row" data-row="1"><h3 class="h3">Six takes of your voice</h3><p>You record one short passage for each feeling: calm, warm, energetic, reassuring, apologetic, firm. During a call the desk plays whichever take matches how you just spoke. If you’d rather choose yourself, tap one.</p></div>
+      <div class="row" data-row="2"><h3 class="h3">Canned lines, one tap</h3><p>The lines you say forty times a day. One tap says them to the caller, translated and in your voice, and your hands never leave the ticket.</p></div>
+      <div class="row" data-row="3"><h3 class="h3">Make it sound like your team</h3><p>One line of house style changes how every reply is worded: how long it runs, how formal it is. What it can’t change are the facts. Numbers, times and promises come out exactly as you said them.</p></div>
+      <div class="row" data-row="4"><h3 class="h3">Your desk, your layout</h3><p>Drag the panels around, hide the ones you never touch, save a few presets. The layout belongs to your seat, so it comes with you to whichever machine you sit at.</p></div>
+      <div class="row" data-row="5"><h3 class="h3">A whole floor</h3><p>Seats and a queue. A call rings every free seat and the first agent to pick up gets it. Each agent has their own voice takes, canned lines and layout. Supervisors can see who is on what without hearing a second of audio.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="trust" id="trust"><div class="wrap">
+  <div class="trust-card reveal">
+    <h3 class="display h3">Your voice <em>stays yours.</em></h3>
+    <div><p>A cloned voice is a serious thing, so we treat it like one. Nothing gets cloned without your explicit consent, and the caller’s voice is never cloned at all. Keys stay on the server. The transcript stays with the call, in your own system of record.</p><a class="arrow-link" href="#faq">Learn more <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></a></div>
+    <div class="badges"><div class="badge"><span><b>Consent</b>gated cloning</span></div><div class="badge"><span><b>Server</b>side keys</span></div><div class="badge"><span><b>Self</b>hosted</span></div></div>
+  </div>
+</div></section>
+
+<section class="band collage"><div class="wrap">
+  <p class="eyebrow">From one real call</p>
+  <h2 class="display h2">What a call <em>leaves behind.</em></h2>
+  <div class="board">
+    <div class="pcard record" data-speed="0.04"><div><h3>Delivery running late</h3><p class="sub">Sep 16, 2026 · 10:14 · French → English · Nina O.</p><q>Marie will wait at the downstairs door. The buzzer is broken; the driver should call on arrival. If it slips past 10:45, call her back.</q><a class="arrow-link" href="#faq">Read the call record <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></a></div><div class="photo"><div class="blobs"></div><div class="stats"><div><strong>4:12</strong><span>one call, two languages</span></div><div><strong>1</strong><span>ticket sent to your helpdesk</span></div></div></div></div>
+    <div class="pcard press" data-speed="-0.06"><blockquote>“Est-ce que le chauffeur va appeler avant d’arriver ?” came up on the desk as “Is the driver going to call before he arrives?” about half a second later.</blockquote><div class="who"><svg width="44" height="44" viewBox="0 0 100 100" aria-hidden="true"><g fill="#2F6FE0"><circle cx="67" cy="51" r="14"/><circle cx="59.7" cy="67.3" r="14"/><circle cx="42" cy="74" r="14"/><circle cx="24.3" cy="67.3" r="14"/><circle cx="17" cy="51" r="14"/><circle cx="24.3" cy="34.7" r="14"/><circle cx="42" cy="28" r="14"/><circle cx="59.7" cy="34.7" r="14"/><circle cx="80" cy="36" r="12"/><circle cx="80" cy="66" r="12"/><circle cx="71" cy="51" r="11"/><ellipse cx="42" cy="51" rx="30" ry="26"/></g><circle cx="34" cy="48" r="2.8" fill="#1B1B1B"/><circle cx="50" cy="48" r="2.8" fill="#1B1B1B"/><path d="M37,57 Q42,60 47,57" fill="none" stroke="#1B1B1B" stroke-width="2.4" stroke-linecap="round"/></svg><div><strong>Caption</strong><span>caller · detected French</span></div></div></div>
+    <div class="pcard sound" data-speed="0.09"><span class="chip ink">Sound · Auto</span><blockquote>The caller sounded upset, so the desk led with an apology: your apologetic take, slowed to 0.92×.</blockquote><div class="who"><strong>[sincerely apologetic]</strong><span>chosen for you · override any time</span></div></div>
+    <div class="pcard detect" data-speed="-0.05"><span class="chip ink">Detected on the first phrase</span><blockquote>Français. Captions in English, replies in French. You didn’t set anything.</blockquote><div class="langs-list"><span>Français</span><span>Español</span><span>Deutsch</span><span>日本語</span><span>العربية</span><span>+ 75 more</span></div></div>
+    
+  </div>
+</div></section>
+
+<section class="faq" id="faq"><div class="wrap narrow">
+  <h2 class="display h2 reveal">Good <em>questions.</em></h2>
+  <div class="faq-card">
+    <div class="faq-q" role="tablist" aria-label="Questions"><h3>Questions</h3>
+      <button type="button" role="tab" aria-selected="true" data-q="0">Does the caller hear a robot?</button>
+      <button type="button" role="tab" aria-selected="false" data-q="1">Does it work in other languages?</button>
+      <button type="button" role="tab" aria-selected="false" data-q="2">Will it work with our phone system and helpdesk?</button>
+      <button type="button" role="tab" aria-selected="false" data-q="3">What about accents, noise or a bad line?</button>
+      <button type="button" role="tab" aria-selected="false" data-q="4">What do I need to run it?</button>
+      <button type="button" role="tab" aria-selected="false" data-q="5">Can a whole team use it?</button>
+      <button type="button" role="tab" aria-selected="false" data-q="6">Does the caller need an app?</button>
+      <button type="button" role="tab" aria-selected="false" data-q="7">How is it priced?</button>
+    </div>
+    <div class="faq-a"><h3>Answer</h3><p class="asked" id="faq-asked">Does the caller hear a robot?</p><div class="answer" id="faq-answer">No. They hear a clone of your voice, built from about a minute of you reading aloud, speaking their language. The feeling comes from how you actually said it: the desk measures your clip and plays one of the six takes you recorded.</div><svg class="avatar" width="34" height="34" viewBox="0 0 100 100" aria-hidden="true"><g fill="#2F6FE0"><circle cx="67" cy="51" r="14"/><circle cx="59.7" cy="67.3" r="14"/><circle cx="42" cy="74" r="14"/><circle cx="24.3" cy="67.3" r="14"/><circle cx="17" cy="51" r="14"/><circle cx="24.3" cy="34.7" r="14"/><circle cx="42" cy="28" r="14"/><circle cx="59.7" cy="34.7" r="14"/><circle cx="80" cy="36" r="12"/><circle cx="80" cy="66" r="12"/><circle cx="71" cy="51" r="11"/><ellipse cx="42" cy="51" rx="30" ry="26"/></g><circle cx="34" cy="48" r="2.8" fill="#1B1B1B"/><circle cx="50" cy="48" r="2.8" fill="#1B1B1B"/><path d="M37,57 Q42,60 47,57" fill="none" stroke="#1B1B1B" stroke-width="2.4" stroke-linecap="round"/></svg></div>
+  </div>
+</div></section>
+
+<section class="band final" id="download"><div class="blobs"></div><div class="wrap">
+  <h2 class="display h2">Same voice. <em>Every language.</em></h2>
+  <p class="lead">Download the Mac app and read aloud for a minute so it can learn your voice. Your next call can be in any language. That’s the whole setup.</p>
+  <a class="btn" href="#download"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Download for macOS</a>
+  <p class="dl-note">Runs on the Mac next to your call: Zoom, Meet, Teams, WhatsApp, FaceTime, anything that uses a microphone. With a phone number connected it answers from any browser as well.</p>
+</div></section>
+
+<footer><div class="wrap">
+  <div class="cols">
+    <div><h4>Get started</h4><ul><li><a href="https://app.notefish.ai/desk">Open your desk</a></li><li><a href="#download">Download for macOS</a></li><li><a href="#trust">Privacy &amp; security</a></li><li><a href="#faq">Pricing</a></li><li><a href="#shift">Why not an interpreter line</a></li></ul></div>
+    <div><h4>Teams</h4><ul><li><a href="#shift">Call centres</a></li><li><a href="#shift">Customer support</a></li><li><a href="#shift">Field service</a></li><li><a href="#shift">Clinics</a></li><li><a href="#shift">Accessibility</a></li></ul></div>
+    <div><h4>Resources</h4><ul><li><a href="#faq">Help center</a></li><li><a href="#trust">Trust notes</a></li><li><a href="#shift">Integrations</a></li><li><a href="#faq">Audio setup</a></li></ul></div>
+    <div><h4>Company</h4><ul><li><a href="#top">About</a></li><li><a href="#top">Careers</a></li><li><a href="#trust">Trust center</a></li><li><a href="#top">Media kit</a></li></ul></div>
+  </div>
+  <div class="giant" aria-hidden="true"><svg viewBox="0 0 100 100"><rect width="100" height="100" rx="26" fill="#242424"/><g transform="translate(8 9) scale(.84)"><circle cx="67" cy="51" r="14" fill="#F3F1EC"/><circle cx="59.7" cy="67.3" r="14" fill="#F3F1EC"/><circle cx="42" cy="74" r="14" fill="#F3F1EC"/><circle cx="24.3" cy="67.3" r="14" fill="#F3F1EC"/><circle cx="17" cy="51" r="14" fill="#F3F1EC"/><circle cx="24.3" cy="34.7" r="14" fill="#F3F1EC"/><circle cx="42" cy="28" r="14" fill="#F3F1EC"/><circle cx="59.7" cy="34.7" r="14" fill="#F3F1EC"/><circle cx="80" cy="36" r="12" fill="#F3F1EC"/><circle cx="80" cy="66" r="12" fill="#F3F1EC"/><circle cx="71" cy="51" r="11" fill="#F3F1EC"/><ellipse cx="42" cy="51" rx="30" ry="26" fill="#F3F1EC"/><g transform="rotate(-9 34 47)"><rect x="31.4" y="40" width="5.2" height="14" rx="2.6" fill="#242424"/></g><g transform="rotate(9 50 47)"><rect x="47.4" y="40" width="5.2" height="14" rx="2.6" fill="#242424"/></g></g></svg><span>NoteFish</span></div>
+  <div class="legal"><span>© NoteFish 2026 · Terms · Privacy · Data controls</span><span>We only clone a voice with its owner’s consent.</span></div>
+</div></footer>
+
+<script>
+(function () {
+  document.documentElement.classList.add('js');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+  // reveal on scroll
+  const io = new IntersectionObserver(entries => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -12% 0px' });
+  $$('.reveal, .ul').forEach(el => io.observe(el));
+  if (reduced) $$('.reveal').forEach(el => el.classList.add('in'));
+
+  // hero: the companion pill runs through a call — detected, listening, holding, speaking
+  const PUFF = '<svg class="puff" viewBox="0 0 100 100" aria-hidden="true"><circle cx="67" cy="51" r="14"/><circle cx="59.7" cy="67.3" r="14"/><circle cx="42" cy="74" r="14"/><circle cx="24.3" cy="67.3" r="14"/><circle cx="17" cy="51" r="14"/><circle cx="24.3" cy="34.7" r="14"/><circle cx="42" cy="28" r="14"/><circle cx="59.7" cy="34.7" r="14"/><circle cx="80" cy="36" r="12"/><circle cx="80" cy="66" r="12"/><circle cx="71" cy="51" r="11"/><ellipse cx="42" cy="51" rx="30" ry="26"/></svg>'; const WAVE = '<span class="wave"><i style="--h:8px;--d:0s"></i><i style="--h:14px;--d:.1s"></i><i style="--h:20px;--d:.2s"></i><i style="--h:11px;--d:.3s"></i><i style="--h:17px;--d:.4s"></i><i style="--h:9px;--d:.5s"></i></span>';
+  const VOL = '<span class="dim2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg></span>';
+  const PHONE = '<span class="dim2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.6a2 2 0 0 1-.5 2.1L8 9.7a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.8.3 1.7.6 2.6.7a2 2 0 0 1 1.7 2z"/></svg></span>';
+  const MON = '<span class="dim2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>';
+  const STATES = [
+    { label: 'Incoming', html: PUFF + PHONE + '<span>Incoming</span><span class="dim">+33 6 12 34 56 78 · French</span><span class="start">Answer</span>', caption: false, hold: 2600 },
+    { label: 'Listening', html: PUFF + WAVE + '<span>Listening</span><span class="dim">EN ← FR</span><kbd>hold ⌥</kbd>', caption: true, hold: 3000 },
+    { label: 'Holding', html: PUFF + '<span class="rec"></span><span>Recording</span>' + WAVE + '<span class="dim">release to send</span>', caption: true, hold: 2600 },
+    { label: 'Speaking', html: PUFF + VOL + '<span>Playing in your voice</span><span class="bar"><i></i></span><span class="dim">0:03</span>', caption: true, hold: 3000 },
+  ];
+  const pill = $('#hero-pill'), cap = $('#hero-caption');
+  if (pill && !reduced) {
+    let i = 1;
+    const show = () => { const st = STATES[i]; pill.classList.add('swap'); setTimeout(() => { pill.innerHTML = st.html; cap.classList.toggle('off', !st.caption); pill.classList.remove('swap'); }, 320); setTimeout(() => { i = (i + 1) % STATES.length; show(); }, st.hold + 320); };
+    setTimeout(() => { i = 2; show(); }, 2800);
+  }
+
+  // count-up numbers
+  const cio = new IntersectionObserver(entries => entries.forEach(e => { if (!e.isIntersecting) return; const el = e.target, to = +el.dataset.to; cio.unobserve(el); if (reduced) { el.textContent = to; return; } const t0 = performance.now(); const step = t => { const p = Math.min(1, (t - t0) / 900); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); }), { threshold: .6 });
+  $$('.count').forEach(el => cio.observe(el));
+
+  // scroll-pinned flow: four steps
+  $$('[data-words]').forEach(el => { const words = el.textContent.trim().split(' '); el.textContent = ''; words.forEach((w, i) => { const s = document.createElement('span'); s.className = 'w'; s.textContent = w; s.style.transitionDelay = `${i * 55}ms`; el.appendChild(s); }); });
+  const tabs = $$('.flow-tabs button'), scenes = $$('.phone .scene'), copies = $$('.flow-copy > div');
+  let step = 0;
+  function setStep(n) { step = n; tabs.forEach((t, i) => t.setAttribute('aria-selected', i === n ? 'true' : 'false')); scenes.forEach((s, i) => s.classList.toggle('on', i === n)); copies.forEach((c, i) => c.classList.toggle('on', i === n)); }
+  tabs.forEach(t => t.addEventListener('click', () => { setStep(+t.dataset.step); const target = $$('.flow-steps div')[+t.dataset.step]; if (target && window.innerWidth > 900) window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY + 10, behavior: reduced ? 'auto' : 'smooth' }); }));
+  const sio = new IntersectionObserver(entries => entries.forEach(e => { if (e.isIntersecting) setStep($$('.flow-steps div').indexOf(e.target)); }), { rootMargin: '-45% 0px -45% 0px' });
+  $$('.flow-steps div').forEach(d => sio.observe(d));
+
+  // sticky card + rows
+  const faces = $$('.shift-card .face'), rows = $$('.rows .row');
+  const rio = new IntersectionObserver(entries => entries.forEach(e => { if (!e.isIntersecting) return; const n = +e.target.dataset.row; rows.forEach((r, i) => r.classList.toggle('on', i === n)); faces.forEach((f, i) => f.classList.toggle('on', i === n)); }), { rootMargin: '-40% 0px -40% 0px' });
+  rows.forEach(r => rio.observe(r));
+
+  // collage parallax
+  const cards = $$('.pcard'); const board = $('.board');
+  if (!reduced && cards.length) {
+    let raf = 0; const base = new Map(cards.map(c => [c, c.style.transform || getComputedStyle(c).transform]));
+    const update = () => { raf = 0; if (window.innerWidth <= 900) return; const r = board.getBoundingClientRect(); const mid = r.top + r.height / 2 - window.innerHeight / 2; cards.forEach(c => { const rot = c.classList.contains('press') ? -4 : c.classList.contains('sound') ? 2 : c.classList.contains('detect') ? -3 : 0; c.style.transform = `translateY(${(-mid * +c.dataset.speed).toFixed(1)}px) rotate(${rot}deg)`; }); };
+    window.addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(update); }, { passive: true }); update();
+  }
+
+  // faq two-panel
+  const answers = [
+    'No. They hear a clone of your voice, built from about a minute of you reading aloud, speaking their language. The feeling comes from how you actually said it: the desk measures your clip and plays one of the six takes you recorded.',
+    'Yes. Eighty-odd on the caller’s side. You keep speaking your own language. The desk works out theirs from the first phrase, or you can pin it. Captions always show in your language.',
+    'Connect your phone number and it takes real phone calls. Or send the caller a one-use link that opens in their phone’s browser. When a call ends it goes onward as a ticket in your helpdesk, a webhook to whatever you run, or a plain export.',
+    'Accents are fine. A noisy voice sample gets refused when you record it, which beats cloning it badly. On the call, push to talk means one side speaks at a time, so nothing talks over anything. If a reply can’t be confirmed as played, the desk tells you.',
+    'A Mac and a headset. The desk runs beside whatever call you’re already on. Connect a phone number and it answers real calls too, from any browser. On the server side it’s one container behind an HTTPS address.',
+    'Yes. Add agents to the roster and each gets a seat with their own voice takes, canned lines and layout. Incoming calls ring every seated agent and the first to answer takes it. Supervisors watch the floor without hearing audio.',
+    'No. They call your number from any phone, or open a one-use link in the browser they already have and tap Call. Everything else happens on your side. They just hear you.',
+    'Per seat. A single desk is free to try. For a floor of more than a few agents, talk to us.',
+  ];
+  $$('.faq-q button').forEach(b => b.addEventListener('click', () => { $$('.faq-q button').forEach(x => x.setAttribute('aria-selected', x === b ? 'true' : 'false')); $('#faq-asked').textContent = b.textContent; const a = $('#faq-answer'); a.textContent = answers[+b.dataset.q]; a.style.animation = 'none'; void a.offsetWidth; a.style.animation = ''; }));
+
+})();
+</script>
+
+</body></html>

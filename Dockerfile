@@ -20,6 +20,7 @@ ENV NOTEFISH_PUBLIC_DEMO=false
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --chown=node:node server ./server
+COPY --chown=node:node site ./site
 COPY --chown=node:node docs/THIRD_PARTY_NOTICES.md ./THIRD_PARTY_NOTICES.md
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY docker-entrypoint.sh /usr/local/bin/notefish-entrypoint

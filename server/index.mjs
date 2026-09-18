@@ -69,6 +69,13 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
   app.use('/api/export', createExportRouter({ config, calls, store, integrations }));
   // Signing in has to work before being signed in; the pages are public shells whose data is not.
   app.use('/api/auth', express.json({ limit: '8kb', strict: true }), createAuthRouter({ config, accounts, sessions }));
+  // The marketing site answers on the bare domain; the desk answers on its own
+  // subdomain. One service, so there is no second thing to deploy and keep alive.
+  const sitePage = path.join(root, 'site', 'index.html');
+  app.get('/', (req, res, next) => {
+    if (!config.siteHosts.includes(req.hostname)) return next();
+    res.sendFile(sitePage, error => { if (error && !res.headersSent) next(); });
+  });
   app.get(['/', '/desk', '/enroll', '/admin', '/voices', '/voice', '/floor', '/calls', '/calls/:id', '/insights', '/glossary', '/phrases', '/settings', '/join'], (req, res) => res.sendFile(path.join(config.distPath, 'index.html'), error => { if (error && !res.headersSent) res.status(404).end(); }));
   app.use(createSecurity(config, accounts));
   app.use('/api', express.json({ limit: '32kb', strict: true }), createApiRouter({ config, store, providers, calls, broadcast, audioAvailable, callerAccess, accounts, sessions, queue, integrations, floorEvent }));

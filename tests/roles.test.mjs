@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { request as httpRequest } from 'node:http';
 import { loadConfig } from '../server/config.mjs';
 import { createRuntime } from '../server/index.mjs';
 
@@ -111,4 +112,35 @@ test('a desk with accounts and no shared password asks people to sign in, and le
   assert.equal((await fetch(`${base}/api/settings`, { headers: { cookie } })).status, 200);
   const invited = await fetch(`${base}/api/agents`, { method: 'POST', headers: { Origin: 'https://desk.example', 'Content-Type': 'application/json', cookie }, body: JSON.stringify({ email: 'mara@acme.example' }) });
   assert.match((await invited.json()).inviteUrl, /^https:\/\/desk\.example\/join#/, 'invitations point at the desk’s own address');
+});
+
+// The bare domain is the marketing page; the desk keeps its own subdomain.
+test('the marketing site answers on the site hosts, and the desk answers everywhere else', { timeout: 10000 }, async t => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'notefish-site-'));
+  await mkdir(path.join(directory, 'dist'), { recursive: true });
+  await writeFile(path.join(directory, 'dist', 'index.html'), '<!doctype html><title>NoteFish desk</title>');
+  const config = loadConfig({ NODE_ENV: 'production', HOST: '0.0.0.0', PUBLIC_BASE_URL: 'https://app.notefish.ai', NOTEFISH_ADMIN_EMAIL: 'nina@acme.example', NOTEFISH_SITE_HOSTS: 'notefish.ai, www.notefish.ai', DATA_DIR: directory }, directory);
+  assert.deepEqual(config.siteHosts, ['notefish.ai', 'www.notefish.ai']);
+  const runtime = await createRuntime({ config, providers: { getVoice: async () => ({ state: 'trained' }) } });
+  await new Promise(resolve => runtime.server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${runtime.server.address().port}`;
+  t.after(async () => { await runtime.close(); await rm(directory, { recursive: true, force: true }); });
+  // fetch refuses to set Host, so ask over a plain socket the way a browser would.
+  const page = host => new Promise((resolve, reject) => {
+    const request = httpRequest({ host: '127.0.0.1', port: runtime.server.address().port, path: '/', headers: { Host: host } }, response => {
+      let body = ''; response.setEncoding('utf8');
+      response.on('data', chunk => { body += chunk; });
+      response.on('end', () => resolve({ status: response.statusCode, body }));
+    });
+    request.on('error', reject); request.end();
+  });
+
+  const site = await page('notefish.ai');
+  assert.equal(site.status, 200);
+  assert.match(site.body, /Don’t translate/, 'the bare domain gets the marketing page');
+  assert.match((await page('www.notefish.ai')).body, /Don’t translate/);
+  const desk = await page('app.notefish.ai');
+  assert.equal(desk.status, 200);
+  assert.match(desk.body, /NoteFish desk/, 'the desk subdomain still gets the app shell');
+  assert.doesNotMatch(desk.body, /Don’t translate/);
 });

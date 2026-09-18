@@ -26,6 +26,9 @@ services:
       # before the service is reachable; everyone else arrives by invitation.
       - key: NOTEFISH_ADMIN_EMAIL
         sync: false
+      # Hosts that should see the marketing page instead of the desk sign-in.
+      - key: NOTEFISH_SITE_HOSTS
+        sync: false
       # The address people reach this desk on, e.g. https://desk.yourcompany.com.
       # Invitation links and the sign-in cookie are built from it.
       - key: PUBLIC_BASE_URL
