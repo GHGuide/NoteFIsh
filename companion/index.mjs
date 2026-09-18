@@ -14,24 +14,18 @@
 // reaches the call — only the Fish voice does, exactly like the phone desk.
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import WebSocket from 'ws';
 import dgram from 'node:dgram';
-import { detectCall, processNames } from './detect.mjs';
+import { BROWSERS, detectCall, processNames } from './detect.mjs';
 
 const run = promisify(execFile);
 const here = path.dirname(fileURLToPath(import.meta.url));
 const FRAME = 640; // 20 ms of 16 kHz mono PCM16, the same frames the phone page sends
-// Safari calls a tab's title its name; everything Chrome-shaped calls it title.
-const BROWSERS = [
-  { app: 'Google Chrome', titleWord: 'title' }, { app: 'Comet', titleWord: 'title' },
-  { app: 'Brave Browser', titleWord: 'title' }, { app: 'Microsoft Edge', titleWord: 'title' },
-  { app: 'Arc', titleWord: 'title' }, { app: 'Chromium', titleWord: 'title' },
-  { app: 'Safari', titleWord: 'name' },
-];
+const AFTER_CALL_QUIET = 8000; // do not offer the same call again the moment it ends
 
 // ---- arguments and environment ----
 const args = parseArgs(process.argv.slice(2));
@@ -90,50 +84,86 @@ function pick(list, wanted, fallbacks) {
 }
 
 // ---- what is going on on this Mac ----
-const micProbe = path.join(here, 'bin', 'mic-in-use');
+const activityProbe = path.join(here, 'bin', 'audio-activity');
 const tapBinary = path.join(here, 'bin', 'system-audio-tap');
-async function ensureTap() {
-  if (existsSync(tapBinary)) return true;
-  try { mkdirSync(path.dirname(tapBinary), { recursive: true }); await run('swiftc', ['-O', path.join(here, 'system-audio-tap.swift'), '-o', tapBinary]); return true; }
-  catch { return false; }
+const build = async (source, binary) => {
+  const from = path.join(here, source);
+  // Rebuilt whenever the Swift has moved on past the binary: a fix to the tap is no use
+  // sitting behind a copy compiled from the version before it.
+  try { if (existsSync(binary) && statSync(binary).mtimeMs >= statSync(from).mtimeMs) return true; } catch { /* build it */ }
+  try { mkdirSync(path.dirname(binary), { recursive: true }); await run('swiftc', ['-O', from, '-o', binary]); return true; }
+  catch { return existsSync(binary); }
+};
+const ensureTap = () => build('system-audio-tap.swift', tapBinary);
+const ensureActivityProbe = () => build('audio-activity.swift', activityProbe);
+
+/** Every tab of one browser, as {url, title}. One AppleScript, and the two halves of a
+ *  tab kept together in the same line, so a title containing a comma cannot shift every
+ *  URL along by one and turn the whole list into nonsense. */
+async function tabsOf(browser, titleWord) {
+  // The separators are bound to variables out here on purpose. Inside `tell application
+  // "Comet"`, `tab` is the browser's own word for a tab, so `& tab &` joins the URL to
+  // the title with the literal text "tab" and every line comes back unparseable.
+  const script = [
+    'set fieldBreak to character id 9',
+    'set lineBreak to character id 10',
+    `tell application "${browser}"`,
+    '  if it is not running then return ""',
+    '  set found to ""',
+    '  repeat with aWindow in windows',
+    '    repeat with aTab in tabs of aWindow',
+    `      set found to found & (URL of aTab) & fieldBreak & (${titleWord} of aTab) & lineBreak`,
+    '    end repeat',
+    '  end repeat',
+    '  return found',
+    'end tell',
+  ].join('\n');
+  const text = (await run('osascript', ['-e', script], { encoding: 'utf8', timeout: 5000 }).catch(() => ({ stdout: '' }))).stdout;
+  const tabs = [];
+  for (const line of text.split('\n')) {
+    const cut = line.indexOf('\t');
+    if (cut < 0) continue;
+    const url = line.slice(0, cut).trim();
+    if (url) tabs.push({ browser, url, title: line.slice(cut + 1).trim() });
+  }
+  return tabs;
 }
-async function ensureMicProbe() {
-  if (existsSync(micProbe)) return true;
-  try { mkdirSync(path.dirname(micProbe), { recursive: true }); await run('swiftc', ['-O', path.join(here, 'mic-in-use.swift'), '-o', micProbe]); return true; }
-  catch { return false; }
-}
+
+/** The call happening right now, or null. Depends only on the Mac, never on whether we
+ *  are already bridged: a watcher whose answer changed once it started work would end
+ *  its own bridge, detect the call again, and ring for the same call for ever. */
 async function observe() {
   const processes = processNames((await run('ps', ['-Ao', 'comm'], { encoding: 'utf8' }).catch(() => ({ stdout: '' }))).stdout);
   const tabs = [];
   for (const { app: browser, titleWord } of BROWSERS) {
     if (!processes.some(name => name === browser || name === browser.split(' ')[0])) continue;
-    // Asked for separately, so one title containing a comma cannot shift every URL
-    // along by one and turn the whole list into nonsense.
-    const ask = async what => (await run('osascript', ['-e', `tell application "${browser}" to if it is running then get ${what} of tabs of windows`], { encoding: 'utf8', timeout: 3000 }).catch(() => ({ stdout: '' }))).stdout.trim();
-    const urls = (await ask('URL')).split(', ');
-    const titles = (await ask(titleWord)).split(', ');
-    urls.forEach((url, index) => { if (url) tabs.push({ browser, url, title: titles[index] || '' }); });
+    tabs.push(...await tabsOf(browser, titleWord));
   }
-  let micInUse = false;
-  if (existsSync(micProbe)) micInUse = (await run(micProbe, [], { encoding: 'utf8', timeout: 2000 }).catch(() => ({ stdout: '0' }))).stdout.trim() === '1';
-  const known = detectCall({ processes, tabs });
-  if (known && (known.kind === 'app' ? micInUse || !existsSync(micProbe) : known.live)) return { label: known.app, via: known.via };
-  if (micInUse && !bridge.active) return { label: 'Call', via: 'microphone in use' };
-  return null;
+  let capturing = null;
+  if (existsSync(activityProbe)) {
+    const printed = (await run(activityProbe, [], { encoding: 'utf8', timeout: 2000 }).catch(() => null))?.stdout;
+    if (typeof printed === 'string') capturing = printed.split('\n').map(line => line.trim()).filter(Boolean);
+  }
+  const known = detectCall({ processes, tabs, capturing });
+  return known?.live ? { label: known.app, via: known.via, bundle: known.bundle } : null;
 }
 
 // ---- the bridge: one call, as the phone page would carry it ----
-const bridge = { active: null };
+const bridge = { active: null, quietUntil: 0 };
 async function startBridge(label, devices) {
   const invite = await api('POST', '/api/caller-invitations', { label: label.slice(0, 40), transport: 'companion' });
   const ws = new WebSocket(server.replace(/^http/, 'ws') + '/ws/caller', { headers: { Origin: server } });
   const session = { label, ws, capture: null, playing: false, callId: '', ended: false, pending: Buffer.alloc(0) };
   bridge.active = session;
   const stopCapture = () => { if (session.capture) { session.capture.kill('SIGTERM'); session.capture = null; } };
-  const startCapture = () => {
+  // Listen to the app the call is in, not to the Mac. A tap on everything hears the
+  // screenshot shutter, notification sounds and music, and hands them to the desk as
+  // though the caller had said them.
+  const startCapture = (bundle = args.bundle || devices.bundle || '') => {
     if (session.capture || session.ended) return;
+    const startedAt = Date.now();
     session.capture = devices.tap
-      ? spawn(tapBinary, args.bundle ? [String(args.bundle)] : [], { stdio: ['ignore', 'pipe', 'inherit'] })
+      ? spawn(tapBinary, bundle ? [String(bundle)] : [], { stdio: ['ignore', 'pipe', 'inherit'] })
       : spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'avfoundation', '-i', `:${devices.input.index}`, '-ac', '1', '-ar', '16000', '-f', 's16le', 'pipe:1'], { stdio: ['ignore', 'pipe', 'inherit'] });
     session.capture.stdout.on('data', chunk => {
       session.pending = Buffer.concat([session.pending, chunk]);
@@ -142,7 +172,13 @@ async function startBridge(label, devices) {
         if (!session.playing && ws.readyState === WebSocket.OPEN) ws.send(frame);
       }
     });
-    session.capture.on('exit', code => { session.capture = null; if (!session.ended && code) log('capture stopped', code); });
+    session.capture.on('exit', code => {
+      session.capture = null;
+      if (session.ended || !code) return;
+      // Aimed at one app and it would not open: better the whole Mac than a silent call.
+      if (bundle && Date.now() - startedAt < 10_000) { log(`could not listen to ${bundle} alone, listening to the whole Mac instead`); startCapture(''); return; }
+      log('capture stopped', code);
+    });
   };
   // Streamed replies: into the NoteFish Voice driver over UDP (paced 20 ms packets at 48 kHz), or through ffmpeg for any other device; 'played' follows the last byte's play time.
   let stream = null;
@@ -213,7 +249,7 @@ async function startBridge(label, devices) {
     if (message.type === 'caption' && message.text) log(`${message.who === 'agent' ? '   you →' : '  them →'} ${message.text}`);
     if (message.type === 'error') log('desk:', message.error);
   });
-  ws.on('close', () => { session.ended = true; stopCapture(); if (bridge.active === session) bridge.active = null; });
+  ws.on('close', () => { session.ended = true; stopCapture(); if (bridge.active === session) { bridge.active = null; bridge.quietUntil = Date.now() + AFTER_CALL_QUIET; } });
   ws.on('error', error => log('desk connection:', error.message));
   return session;
 }
@@ -254,8 +290,8 @@ if (args.as) {
   log(`answering as ${me.name}`);
 }
 log(`desk ${server} · hear: ${tap ? input.name : `[${input.index}] ${input.name}`} · speak: [${output.index}] ${output.name}`);
-const probe = await ensureMicProbe();
-log(probe ? 'microphone-in-use detection ready (any app)' : 'no swiftc: detecting known call apps and tabs only');
+const probe = await ensureActivityProbe();
+log(probe ? 'listening for calls by who is holding the microphone (any app)' : 'no swiftc: going by known call apps and tab titles, which cannot tell a meeting you have left from one you are in');
 
 if (args.start) { await startBridge(args.start === true ? 'Call' : String(args.start), { input, output, tap }).catch(error => { console.error(`Could not bridge: ${error.message}`); process.exit(2); }); }
 else if (args.watch) {
@@ -263,7 +299,10 @@ else if (args.watch) {
   log('watching for calls… (Zoom, Meet, Teams, WhatsApp, FaceTime, Instagram, Messenger, Discord, Slack, or any app using the mic)');
   setInterval(async () => {
     const found = await observe().catch(() => null);
-    if (found && !bridge.active) { if (++seen >= 2) { seen = 0; log(`detected ${found.label} (${found.via})`); await startBridge(found.label, { input, output, tap }).catch(error => log('could not bridge:', error.message)); } }
+    if (found && !bridge.active) {
+      if (Date.now() < bridge.quietUntil) { seen = 0; return; } // the call we just hung up on
+      if (++seen >= 2) { seen = 0; log(`detected ${found.label} (${found.via})`); await startBridge(found.label, { input, output, tap, bundle: found.bundle }).catch(error => log('could not bridge:', error.message)); }
+    }
     else if (!found && bridge.active) { if (++gone >= 4) { gone = 0; endBridge('call is over'); } }
     else { seen = 0; gone = 0; }
   }, interval);

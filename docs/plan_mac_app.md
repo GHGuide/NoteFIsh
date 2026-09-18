@@ -40,7 +40,7 @@ reply starting to play within ~300 ms of releasing the key.
 - Interim: keep the BlackHole path as a documented manual option.
 
 ### Detecting the call — three signals, cheapest first
-1. Default-input `DeviceIsRunningSomewhere` (the mic light) — already built (`companion/mic-in-use.swift`), works for any app.
+1. Which processes are holding the microphone, by bundle id (`companion/audio-activity.swift`), works for any app. This replaced a probe that watched the default input device, which could not see a call whose microphone is pointed at the NoteFish Voice driver rather than at the Mac's own.
 2. `NSWorkspace.runningApplications` bundle ids (Zoom, Teams, WhatsApp, FaceTime, Discord, Slack…) — replaces `ps`.
 3. Browser tabs via AppleScript (Meet, Instagram, Messenger, Zoom web) — already built; add Safari.
 - Fold into a Rust/Swift `watch` command that emits `call-started {app}` / `call-ended` events to the UI.

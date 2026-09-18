@@ -44,7 +44,11 @@ Other devices: `--in "Name or index"` to listen to a capture device instead of t
 npm run companion -- --watch
 ```
 
-Watches for a call every few seconds: known apps and browser tabs, plus the one signal every call shares — the microphone in use (a tiny Swift probe, built on first run when `swiftc` is present). When a call appears, the desk rings with the app's name ("Zoom", "WhatsApp"); answer it on the desk like any call, or start with `--auto-answer` (on a desk with a roster, add `--as <name>` so the companion holds that seat). The bridge ends on its own when the call is gone.
+Watches for a call every few seconds. Known apps and browser tabs say *what* the call is; which processes are holding the microphone says *whether* it is happening (a tiny Swift probe, `companion/audio-activity.swift`, built on first run when `swiftc` is present). Both are needed: a tab's URL still reads as a meeting long after you have left it, which is why leaving a Google Meet used to bring the pill straight back asking to translate a call that was over. An app lets go of the microphone the moment the call ends.
+
+When a call appears, the desk rings with the app's name ("Zoom", "WhatsApp"); answer it on the desk like any call, or start with `--auto-answer` (on a desk with a roster, add `--as <name>` so the companion holds that seat). The bridge ends on its own when the call is gone, and the same call is not offered again for a few seconds afterwards.
+
+Because the probe knows which app is in the call, the audio tap is pointed at that app rather than at the whole Mac. Tapping everything meant the screenshot shutter, notification sounds and anything else playing were handed to the desk as though the caller had said them.
 
 ```bash
 npm run companion -- --start "Zoom"                  # bridge right now, whatever is running
