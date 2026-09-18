@@ -2,9 +2,9 @@
 // the ringing card, the notes form and the ended summary are the same sheet in
 // different moments. Between calls it is a home screen: a welcome, a dark
 // banner with the next thing to do, this week's numbers, recent calls.
-// Behaviour is the old Desk's (recorder, PTT keys, seats, invitations, ticket
+// Behaviour is the old Desk's (recorder, PTT keys, invitations, ticket
 // saving); the clothes are design/build.py desk_screen() and design/moments.py
-// desk_ringing / desk_ticket / desk_ended / seat_screen.
+// desk_ringing / desk_ticket / desk_ended.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioLines, Check, CheckCircle2, ChevronDown, ChevronRight, Copy, Globe2, Link2, Maximize2, Mic, MicOff, Phone, PhoneOff, Play, Send, Share2, Volume2 } from 'lucide-react';
 import { api } from '../api.js';
@@ -45,16 +45,12 @@ function Caption({ line, code, partial = false }) {
   </div>;
 }
 
-export default function DeskPage({ data, navigate, route, setError, setNotice, saveOwned, owned, updateCall, connection, invitation, setInvitation, focus, setFocus, enableAudio, clearAudio, setAudioMuted, hasFloor, seat, partialCaption }) {
+export default function DeskPage({ data, navigate, route, setError, setNotice, saveOwned, owned, updateCall, connection, invitation, setInvitation, focus, setFocus, enableAudio, clearAudio, setAudioMuted, user, voice: myVoice, partialCaption }) {
   const [selectedCallId, setSelectedCallId] = useState(route.query.call || '');
   useEffect(() => { if (route.query.call) setSelectedCallId(route.query.call); }, [route.query.call]);
-  // With a floor, this desk shows the call assigned to this seat. Another
-  // agent's live call is theirs; only the ringing queue is shared.
-  const mine = item => !hasFloor || !item.agentId || item.agentId === data.agentId;
   const ringingCalls = data.calls.filter(item => callState(item) === 'ringing');
-  const liveCall = data.calls.find(item => callState(item) === 'in_call' && mine(item)) || ringingCalls[0];
+  const liveCall = data.calls.find(item => callState(item) === 'in_call') || ringingCalls[0];
   const call = liveCall || data.calls.find(item => item.id === selectedCallId) || null;
-  const needsSeat = hasFloor && !seat;
   const active = callState(call) === 'in_call';
   const ringing = callState(call) === 'ringing';
   const ended = !!call && !active && !ringing;
@@ -76,7 +72,7 @@ export default function DeskPage({ data, navigate, route, setError, setNotice, s
   const followTranscript = useRef(true);
   const pointerHeld = useRef(false);
   const activeRef = useRef(call); activeRef.current = call;
-  // The server answers with the seat's voice and languages, falling back to the workspace's.
+  // The server answers with the desk's own voice and languages.
   const agentLanguage = owned('agentLanguage') || data.settings.agentLanguage;
   const customerLanguage = owned('customerLanguage') || data.settings.customerLanguage;
   const voice = data.voices.find(item => item.id === (owned('voiceId') || data.settings.voiceId) && item.status === 'ready' && !isArchived(item));
@@ -182,22 +178,22 @@ export default function DeskPage({ data, navigate, route, setError, setNotice, s
   const callerLanguage = call?.detectedLanguage ? `${languageName(call.detectedLanguage)}, detected` : target ? languageName(target) : 'detecting…';
   const previous = call?.from ? data.calls.filter(item => item.id !== call.id && item.from === call.from && callState(item) === 'ended').sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt)) : [];
   const last = previous[0];
-  const spokeAs = data.agents.find(agent => agent.id === call?.agentId)?.name || (call?.agentId ? '' : seat?.name);
+  const spokeAs = call?.agentName || myVoice?.name || '';
   const mostly = Object.entries(replies.reduce((counts, line) => line.feeling ? { ...counts, [line.feeling]: (counts[line.feeling] || 0) + 1 } : counts, {})).sort((a, b) => b[1] - a[1])[0]?.[0];
   const length = ended ? (call.answeredAt ? formatDuration(since(call.answeredAt, new Date(call.endedAt || Date.now()).getTime())) : 'not answered') : '';
-  const waiting = data.floor?.waiting?.length || 0;
-  const busyAgents = (data.floor?.agents || []).filter(agent => agent.state === 'on_call' && agent.id !== seat?.id).map(agent => agent.name);
+  const waiting = ringingCalls.length;
   const quick = (owned('phrases') || []).slice(0, 3);
   const zendesk = data.setup?.integrations?.zendesk?.configured;
-  const title = !call ? (seat?.name ? `Welcome back, ${seat.name.trim().split(/\s+/)[0]}` : 'Welcome to your desk') : ended ? 'Call ended' : ringing ? 'Incoming call' : call.from || 'Caller';
-  const sub = !call ? (needsSeat ? 'Choose your name in the sidebar to answer calls' : voice ? `Ready for a call · ${voice.name}` : 'Choose a voice first')
+  const firstName = (user?.name || '').trim().split(/\s+/)[0];
+  const title = !call ? (firstName ? `Welcome back, ${firstName}` : 'Welcome to your desk') : ended ? 'Call ended' : ringing ? 'Incoming call' : call.from || 'Caller';
+  const sub = !call ? (voice ? `Ready for a call · ${voice.name}` : 'Record a voice first')
     : ringing ? `${call.from || 'Caller'} · ${transportLabel(call)} · language on answer`
     : active ? `Live · ${formatDuration(since(call.answeredAt || call.startedAt, now))} · ${transportLabel(call)} · ${callerLanguage}`
     : [call.from || 'Caller', length, target && languageName(target), spokeAs && `spoke as ${spokeAs}${mostly ? `, mostly ${mostly}` : ''}`].filter(Boolean).join(' · ');
   const recording = capture.recording || capture.requesting;
   const replying = processing || busy === 'reply';
   const partial = partialCaption && partialCaption.callId === call?.id ? partialCaption : null;
-  const emptyNote = needsSeat ? 'Choose your name in the sidebar to start receiving calls.' : active ? `What they say appears here in ${languageName(call.agentLanguage || agentLanguage)}, as they speak.` : 'Nothing was said on this call.';
+  const emptyNote = active ? `What they say appears here in ${languageName(call.agentLanguage || agentLanguage)}, as they speak.` : 'Nothing was said on this call.';
 
   const captions = <div className="ds-col desk-scroll" ref={scroller} onScroll={onScroll} role="log" aria-live="polite" aria-relevant="additions text">
     {!transcript.length && !partial ? <Empty icon={<AudioLines size={34} strokeWidth={1} />} title="The conversation appears here.">{emptyNote}</Empty>
@@ -228,9 +224,9 @@ export default function DeskPage({ data, navigate, route, setError, setNotice, s
   let streak = 0; for (let d = answeredDays.has(0) ? 0 : 1; answeredDays.has(d); d++) streak++;
   const recent = data.calls.slice().sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt)).slice(0, 8);
   const groups = recent.reduce((list, item) => { const label = dayLabel(item.startedAt); if (list.at(-1)?.[0] === label) list.at(-1)[1].push(item); else list.push([label, [item]]); return list; }, []);
-  const agentOf = item => data.agents.find(agent => agent.id === item.agentId) || (item.agentName ? { name: item.agentName } : null);
+  const agentOf = item => (item.agentName ? { name: item.agentName } : null);
   const inviteNote = !voice ? 'Choose a voice first.' : inviteExpired ? 'Your previous link expired. Create a fresh one.' : !browserReady ? (connection !== 'connected' ? 'Reconnecting to the desk…' : data.setup?.blockers?.[0] || 'Finishing call setup…') : 'The caller opens it on their phone and taps Call.';
-  const invite = needsSeat ? null : invitation && !inviteExpired ? <div className="desk-invite">
+  const invite = invitation && !inviteExpired ? <div className="desk-invite">
     <div className="ds-copyrow"><input readOnly aria-label="Caller invitation link" value={invitation.url} onFocus={event => event.target.select()} /><Btn kind="ghost" small icon={<Copy size={14} />} onClick={copyInvitation}>Copy</Btn>{typeof navigator.share === 'function' && <Btn kind="ghost" small icon={<Share2 size={14} />} onClick={shareInvitation}>Share</Btn>}</div>
     <div className="between"><span className="ds-note">One use · Expires {stamp(invitation.expiresAt)}</span><TextBtn muted disabled={!browserReady || inviteBusy} onClick={createInvitation}>Create a new link</TextBtn></div>
     <p className="ds-note">Try a short conversation: they ask in {customerLanguage === 'auto' ? 'their language' : languageName(customerLanguage)} when the delivery arrives; you answer in {languageName(agentLanguage)}. Headphones on both devices.</p>
@@ -256,7 +252,7 @@ export default function DeskPage({ data, navigate, route, setError, setNotice, s
         <div className="n"><strong>{week.length}</strong><span>{week.length === 1 ? 'call' : 'calls'} this week</span></div>
         <div className="n"><strong>{minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} m` : minutes}</strong><span>{minutes >= 60 ? 'translated' : 'min translated'}</span></div>
         <div className="n"><strong>{streak}</strong><span>day streak</span></div>
-        <div className="voice"><Label>Voice</Label><div className="who"><Avatar who={seat || 'workspace'} size={36} /><div><strong>{voice ? voice.name : 'No voice chosen'}</strong><span>{voice ? (voice.kind === 'licensed' ? 'licensed voice' : 'your voice') : 'Pick one to answer calls'}</span></div><TextBtn onClick={() => navigate('/voice')}>{voice ? 'Change' : 'Choose'}</TextBtn></div></div>
+        <div className="voice"><Label>Voice</Label><div className="who"><Avatar who={voice || 'workspace'} size={36} /><div><strong>{voice ? voice.name : 'No voice chosen'}</strong><span>{voice ? (voice.kind === 'licensed' ? 'licensed voice' : 'your voice') : 'Pick one to answer calls'}</span></div><TextBtn onClick={() => navigate('/voice')}>{voice ? 'Change' : 'Choose'}</TextBtn></div></div>
       </div>
     </Col>
     <Body>
@@ -264,7 +260,7 @@ export default function DeskPage({ data, navigate, route, setError, setNotice, s
         : groups.map(([label, calls], index) => <React.Fragment key={label}>
           <Label style={{ margin: index ? '22px 0 4px' : '0 0 4px' }}>{label}</Label>
           {calls.map(item => { const agent = agentOf(item); const main = firstLine(item.ticket?.issue) || item.from || 'Caller'; const [tone, text] = statusOf(item);
-            const rowSub = [hhmm(item.startedAt), main !== item.from && item.from, pair(item), callState(item) === 'ended' ? (item.answeredAt ? formatDuration(secs(item.answeredAt, item.endedAt)) : 'no agent free') : null, agent?.name].filter(Boolean).join(' · ');
+            const rowSub = [hhmm(item.startedAt), main !== item.from && item.from, pair(item), callState(item) === 'ended' ? (item.answeredAt ? formatDuration(secs(item.answeredAt, item.endedAt)) : 'not answered') : null, agent?.name].filter(Boolean).join(' · ');
             return <Row key={item.id} lead={<Avatar who={agent || (item.answeredAt ? 'workspace' : '')} size={30} face={!!agent} />} main={main} sub={rowSub} title={item.error || undefined} right={<Status tone={tone}><span className="desk-clip">{text}</span></Status>} onClick={() => navigate(`/calls/${encodeURIComponent(item.id)}`)} />; })}
         </React.Fragment>)}
     </Body>
@@ -276,8 +272,8 @@ export default function DeskPage({ data, navigate, route, setError, setNotice, s
     {call && <Tabs items={ended ? [{ key: 'notes', label: 'Notes' }, { key: 'transcript', label: 'Transcript' }] : [{ key: 'captions', label: 'Captions' }, { key: 'notes', label: 'Notes' }]} value={tab} onChange={setTab} />}
 
     {ringing && <>
-      <Col className="ds-strip green"><span className="state"><Dot tone="green" />Ringing · {formatDuration(since(call.startedAt, now))}</span><span className="note">{needsSeat ? 'Choose your name in the sidebar to answer calls.' : [waiting > 1 && `${waiting} waiting`, busyAgents.length > 0 && `${and(busyAgents)} ${busyAgents.length === 1 ? 'is' : 'are'} on calls`].filter(Boolean).join(' · ')}</span></Col>
-      <Col className="ds-who"><span className="icon"><Phone size={22} /></span><div><strong>{call.from || 'Caller'}</strong><span>{[transportLabel(call), previous.length ? `${plural(previous.length, 'earlier call')}${last.detectedLanguage || (last.customerLanguage && last.customerLanguage !== 'auto') ? `, spoke ${languageName(last.detectedLanguage || last.customerLanguage)}` : ''}` : 'first call'].join(' · ')}</span></div><div className="actions"><Btn kind="ghost" disabled={!!busy} onClick={() => action('end', () => api.end(call.id))}>Decline</Btn><Btn kind="green" icon={busy === 'answer' ? <Spinner size={15} /> : <Phone size={15} />} disabled={!!busy || needsSeat} onClick={() => action('answer', async () => { await enableAudio(); return api.answer(call.id); })}>Answer</Btn></div></Col>
+      <Col className="ds-strip green"><span className="state"><Dot tone="green" />Ringing · {formatDuration(since(call.startedAt, now))}</span><span className="note">{waiting > 1 ? `${waiting} waiting` : ''}</span></Col>
+      <Col className="ds-who"><span className="icon"><Phone size={22} /></span><div><strong>{call.from || 'Caller'}</strong><span>{[transportLabel(call), previous.length ? `${plural(previous.length, 'earlier call')}${last.detectedLanguage || (last.customerLanguage && last.customerLanguage !== 'auto') ? `, spoke ${languageName(last.detectedLanguage || last.customerLanguage)}` : ''}` : 'first call'].join(' · ')}</span></div><div className="actions"><Btn kind="ghost" disabled={!!busy} onClick={() => action('end', () => api.end(call.id))}>Decline</Btn><Btn kind="green" icon={busy === 'answer' ? <Spinner size={15} /> : <Phone size={15} />} disabled={!!busy} onClick={() => action('answer', async () => { await enableAudio(); return api.answer(call.id); })}>Answer</Btn></div></Col>
       <Col className="ds-facts" style={{ marginTop: 12 }}>{last?.ticket?.issue && <span><CheckCircle2 size={13} />Last ticket · {last.ticket.issue}</span>}<span><Globe2 size={13} />Captions in {languageName(agentLanguage)}, you answer in {targetName}</span></Col>
       {tab === 'notes' ? notes : <Body tight>
         {ringingCalls.length > 1 && <><Label style={{ margin: '6px 0 4px' }}>Also waiting</Label>{ringingCalls.filter(item => item.id !== call.id).map((item, index) => <Row key={item.id} solid lead={<span className="lead num">{index + 2}</span>} main={item.from || 'Caller'} sub={`${transportLabel(item)} · language on answer · waiting ${formatDuration(since(item.startedAt, now))}`} />)}</>}

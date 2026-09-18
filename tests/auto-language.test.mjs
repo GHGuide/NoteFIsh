@@ -11,18 +11,16 @@ class Socket extends EventEmitter {
   close() { this.readyState = 3; this.emit('close'); }
   message(value) { this.emit('message', Buffer.from(JSON.stringify(value)), false); }
 }
-const agentId = '11111111-1111-4111-8111-111111111111';
 /** Captions run on their own queue; wait for one to land instead of guessing a delay. */
 async function settle(read, ready, tries = 100) { for (let i = 0; i < tries; i++) { const value = read(); if (ready(value)) return value; await delay(10); } return read(); }
 
-function setup({ customerLanguage = 'auto', tone = 'apologetic', singleDesk = false, callerTone = 'calm', sentences } = {}) {
-  let data = { version: 2,
+function setup({ customerLanguage = 'auto', tone = 'apologetic', callerTone = 'calm', sentences } = {}) {
+  let data = { version: 3,
     voices: [
       { id: 'voice-calm', referenceId: 'ref_calm_00', kind: 'enrolled', status: 'ready', archived: false, register: 'calm', baseline: { loudness: -26, rate: 2.6 } },
       { id: 'voice-sorry', referenceId: 'ref_sorry_0', kind: 'enrolled', status: 'ready', archived: false, register: 'apologetic' },
     ],
-    settings: { voiceId: 'voice-calm', agentLanguage: 'en', customerLanguage, queueName: 'Main line', ...(singleDesk ? { registers: { apologetic: 'voice-sorry' } } : {}) },
-    agents: singleDesk ? [] : [{ id: agentId, name: 'Nina', voiceId: 'voice-calm', agentLanguage: null, customerLanguage: null, registers: { apologetic: 'voice-sorry' }, archived: false, createdAt: '2026-09-16T00:00:00Z' }],
+    settings: { voiceId: 'voice-calm', agentLanguage: 'en', customerLanguage, queueName: 'Main line', registers: { apologetic: 'voice-sorry' } },
     calls: [] };
   let work = Promise.resolve();
   const store = { snapshot: () => structuredClone(data), update(fn) {
@@ -50,7 +48,7 @@ function setup({ customerLanguage = 'auto', tone = 'apologetic', singleDesk = fa
 test('a caller on auto-detect is heard in their own language, captioned in the agent’s, and answered in theirs with a register tag', async t => {
   const f = setup(); t.after(() => f.service.close());
   const { call, ws } = await f.start();
-  await f.service.answer(call.id, agentId);
+  await f.service.answer(call.id);
 
   // Before anyone speaks, the language is unknown: a reply cannot pick a target yet.
   await assert.rejects(f.service.ptt(call.id, { buffer: Buffer.alloc(4000), mimetype: 'audio/webm' }), /detected|pick their language/);
@@ -72,7 +70,7 @@ test('a caller on auto-detect is heard in their own language, captioned in the a
   const line = replied.transcript.at(-1);
   assert.equal(line.targetLang, 'fr', 'the reply targets the detected language');
   assert.equal(line.register, 'apologetic');
-  assert.equal(line.voiceId, 'voice-sorry', 'the agent’s own apologetic take is used');
+  assert.equal(line.voiceId, 'voice-sorry', 'the apologetic take is used');
   assert.match(line.tag, /apologetic/);
   const synth = f.invoked.find(([kind]) => kind === 'synthesize')[1];
   assert.equal(synth.referenceId, 'ref_sorry_0');
@@ -83,24 +81,24 @@ test('a caller on auto-detect is heard in their own language, captioned in the a
 test('a fixed caller language never asks the interpreter to detect, and S1 gets no bracket tag', async t => {
   const f = setup({ customerLanguage: 'fr' }); t.after(() => f.service.close());
   const { call } = await f.start();
-  await f.service.answer(call.id, agentId);
+  await f.service.answer(call.id);
   const replied = await f.service.ptt(call.id, { buffer: Buffer.alloc(4000), mimetype: 'audio/webm' });
   assert.equal(replied.transcript.at(-1).targetLang, 'fr');
   assert.equal(f.invoked.find(([kind]) => kind === 'interpret')[1].sourceLanguage, 'en');
 });
 
-test('a single desk with no roster still speaks with the workspace take for the register', async t => {
-  const f = setup({ customerLanguage: 'fr', singleDesk: true }); t.after(() => f.service.close());
+test('the desk speaks with its own take for the register', async t => {
+  const f = setup({ customerLanguage: 'fr' }); t.after(() => f.service.close());
   const { call } = await f.start();
   await f.service.answer(call.id);
   const replied = await f.service.ptt(call.id, { buffer: Buffer.alloc(4000), mimetype: 'audio/webm' });
-  assert.equal(replied.transcript.at(-1).voiceId, 'voice-sorry', 'the workspace apologetic take is used');
+  assert.equal(replied.transcript.at(-1).voiceId, 'voice-sorry', "the desk's apologetic take is used");
 });
 
-test('an upset caller is answered apologetically whatever the agent sounded like, and a chosen feeling overrides that', async t => {
+test('an upset caller is answered apologetically whatever the desk sounded like, and a chosen feeling overrides that', async t => {
   const f = setup({ customerLanguage: 'fr', tone: 'calm', callerTone: 'upset', sentences: [{ text: 'Je suis vraiment', tag: 'cheerful' }, { text: 'désolée.', tag: 'reassuring' }] }); t.after(() => f.service.close());
   const { call, ws } = await f.start();
-  await f.service.answer(call.id, agentId);
+  await f.service.answer(call.id);
   const media = fill => ws.message({ event: 'media', streamSid, media: { track: 'inbound', payload: Buffer.alloc(160, fill).toString('base64') } });
   for (let i = 0; i < 20; i++) media(0x80);
   for (let i = 0; i < 35; i++) media(0xff);

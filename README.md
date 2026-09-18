@@ -26,7 +26,6 @@ Open `http://127.0.0.1:3001`. For frontend development, run `npm run dev` and `n
 
 | Page | Purpose |
 | --- | --- |
-| `/floor` | Read-only view of who is waiting and which agent is on which call |
 | `/voices` | Find, preview, rename, archive/restore, import, and select approved voices |
 | `/enroll` | Read the 45–60 s script in your language (one take per feeling: calm, warm, energetic, reassuring, apologetic, firm) and create a private Fish clone |
 | `/desk` | Answer/end, hear the caller, read captions, hold Space to reply, retain a ticket |
@@ -51,30 +50,28 @@ Generate a caller invitation in the desk and open it on the phone. Hold Space re
 
 Any voice exports as a small JSON file (`⋯ › Export voice file`, or **Export library**) holding the Fish reference and what the library knows about it — the take it was recorded for, its baseline. Import it on another desk from **Import Fish voice › From a NoteFish voice file**; Fish confirms the model exists before it joins the library.
 
-## People, roles and who owns a voice
+## Signing in, and who owns a voice
 
-The first account created on a desk is its **admin**; after that the desk is invitation-only. Admins invite people by email from **Settings › Agents** (the link signs them up as that seat), set roles, and offboard. **Supervisors** keep the glossary, phrases and house style and watch the floor. **Agents** answer calls with their own seat and voice. A desk reached without an account, on this Mac or with the shared desk password, is treated as admin.
+Signing in happens once. The first account created on a desk claims it; a second
+sign-up is refused, and there is no sign-out in the interface. On this Mac, or
+with the shared desk password, no account is needed at all. What this is for is
+keeping a desk that lives on the internet shut to anyone who finds the address,
+with the OpenAI and Fish keys behind it.
 
-A recorded voice belongs to whoever recorded it. Only they, or an admin, can use it on a seat, share it as a file, archive it or delete it for good (**⋯ › Delete for good** removes the model at Fish). Licensed voices are shared by everyone. Offboarding an account deletes every voice they recorded at Fish, frees their seat and removes the account.
+A recorded voice belongs to whoever recorded it, and licensed voices are shared.
+**⋯ › Delete for good** removes the model at Fish as well as the library entry.
 
-## Run a floor of agents
+## One desk, many voices
 
-Leave the roster empty and NoteFish is one desk, exactly as before. Add names
-under **Setup → Put agents on the floor** and it becomes a small call centre:
-each agent picks their name in the sidebar, takes a seat, and every waiting
-caller is offered to whoever is seated and free. The first agent to answer gets
-the call; the others see it disappear. An agent can hold one call at a time, can
-pause to step away, and hears only their own caller — audio is addressed to the
-assigned seat, never to the whole floor. Each agent can override the workspace
-voice and caller language for their own calls.
+A call rings the desk and you answer it. What you switch between is your
+**voices**: a name, an avatar and how you sound. The sidebar switches between the
+ones that are ready, and the next reply is spoken in whichever is chosen.
 
-**A roster entry is a seat, not an account.** Anyone who can open the workspace
-can take any name, so the workspace password is what actually controls who
-answers calls. Multi-agent requires the protected mode; the shared demo stays a
-single desk. Set `NOTEFISH_SESSION_SECRET` (32+ characters) so seats survive a
-restart. Defaults are twenty agents and twenty concurrent calls
-(`NOTEFISH_MAX_AGENTS`, `NOTEFISH_MAX_CONCURRENT_CALLS`); the single process and
-JSON file are the real ceiling, so this suits a room of five to twenty seats.
+There was a roster of named seats here until 18 September 2026, where a person had
+to choose their name before any call would ring them. It is gone, along with the
+Floor page: a roster with nobody seated meant callers rang nobody and were hung up
+on after sixty seconds. Existing desks upgrade themselves, and the seat that was
+last answering hands its voice and languages to the desk on the way out.
 
 ## Send finished calls to your own systems
 

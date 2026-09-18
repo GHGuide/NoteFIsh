@@ -12,11 +12,9 @@ import { createStore } from './store.mjs';
 import { createProviders } from './providers.mjs';
 import { createCallService } from './calls.mjs';
 import { createSecurity, securityHeaders, canAccessDesk, validOrigin, validateTwilio } from './security.mjs';
-import { createApiRouter, createTwilioRouter, createExportRouter, errorHandler, roster } from './routes.mjs';
+import { createApiRouter, createTwilioRouter, createExportRouter, errorHandler } from './routes.mjs';
 import { createCallerAccess, CallerAccessError } from './caller-access.mjs';
-import { createSessions } from './session.mjs';
 import { createAccounts, createAuthRouter } from './accounts.mjs';
-import { createQueue } from './queue.mjs';
 import { createIntegrations } from './integrations/index.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -27,26 +25,21 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
   if (store.movedFromFile) console.log('Moved the existing desk data into the database.');
   const providers = suppliedProviders || createProviders(config);
   const callerAccess = createCallerAccess(config);
-  const sessions = createSessions(config);
   const accounts = createAccounts(config, store);
   const integrations = createIntegrations({ config });
-  // ws -> agentId ('' for a desk with no agent selected yet).
-  const clients = new Map();
-  const disconnectTimers = new Map();
-  const broadcast = (event, { to } = {}) => {
+  // One desk, however many tabs it has open. Everything a call does goes to all of
+  // them; there is no longer a seat for an event to be addressed to.
+  const clients = new Set();
+  let hangupTimer = null;
+  const broadcast = event => {
     const payload = JSON.stringify(event);
-    for (const [client, agentId] of clients) {
-      // A targeted event reaches that agent's own tabs only. An untargeted one
-      // is floor-wide information: who is ringing, who is on what.
-      if (to && agentId !== to) continue;
+    for (const client of clients) {
       if (client.readyState !== WebSocket.OPEN) continue;
       if (client.bufferedAmount > 1024 * 1024) { client.close(1013, 'Desk connection is too slow'); continue; }
       client.send(payload);
     }
   };
   const calls = suppliedCalls || createCallService({ config, store, providers, broadcast, onComplete: call => integrations.deliver(call) });
-  const queue = createQueue({ store, calls });
-  const floorEvent = () => broadcast({ type: 'floor', floor: queue.snapshot() });
   await calls.initialize?.();
   let audioAvailable = false;
   try { await execFileAsync('ffmpeg', ['-version'], { timeout: 3000, maxBuffer: 32 * 1024, env: { PATH: process.env.PATH || '/usr/bin:/bin', LANG: 'C', LC_ALL: 'C' } }); audioAvailable = true; } catch { /* status reports missing conversion support without logging subprocess output */ }
@@ -69,7 +62,7 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
   // Token-authenticated and read-only, so it sits outside the workspace gate.
   app.use('/api/export', createExportRouter({ config, calls, store, integrations }));
   // Signing in has to work before being signed in; the pages are public shells whose data is not.
-  app.use('/api/auth', express.json({ limit: '8kb', strict: true }), createAuthRouter({ config, accounts, sessions }));
+  app.use('/api/auth', express.json({ limit: '8kb', strict: true }), createAuthRouter({ config, accounts }));
   // The marketing site answers on the bare domain; the desk answers on its own
   // subdomain. One service, so there is no second thing to deploy and keep alive.
   const sitePage = name => path.join(root, 'site', `${name}.html`);
@@ -92,9 +85,9 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
       ? { url: config.macBuildUrl, version: config.macBuildVersion || null, file: config.macBuildUrl.split('/').pop() || null }
       : { url: null });
   });
-  app.get(['/', '/desk', '/enroll', '/admin', '/voices', '/voice', '/floor', '/calls', '/calls/:id', '/insights', '/glossary', '/phrases', '/settings', '/join'], (req, res) => res.sendFile(path.join(config.distPath, 'index.html'), error => { if (error && !res.headersSent) res.status(404).end(); }));
+  app.get(['/', '/desk', '/enroll', '/admin', '/voices', '/voice', '/calls', '/calls/:id', '/insights', '/glossary', '/phrases', '/settings', '/join'], (req, res) => res.sendFile(path.join(config.distPath, 'index.html'), error => { if (error && !res.headersSent) res.status(404).end(); }));
   app.use(createSecurity(config, accounts));
-  app.use('/api', express.json({ limit: '32kb', strict: true }), createApiRouter({ config, store, providers, calls, broadcast, audioAvailable, callerAccess, accounts, sessions, queue, integrations, floorEvent }));
+  app.use('/api', express.json({ limit: '32kb', strict: true }), createApiRouter({ config, store, providers, calls, broadcast, audioAvailable, callerAccess, accounts, integrations }));
   app.use('/api', (req, res) => res.status(404).json({ error: 'API route not found.' }));
   if (hasBuild) {
     app.use(express.static(config.distPath, { dotfiles: 'deny', index: false, fallthrough: true }));
@@ -112,8 +105,8 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
   server.on('upgrade', (req, socket, head) => {
     if (req.url === '/ws/desk') {
       if (!canAccessDesk(req, config, accounts) || !validOrigin(req, config)) return denyUpgrade(socket);
-      // Two tabs per seat is ordinary; the cap is on tabs, not on agents.
-      if (clients.size >= Math.max(5, config.maxAgents * 2)) return denyUpgrade(socket, 429);
+      // Several tabs of one desk is ordinary; the cap is on tabs.
+      if (clients.size >= config.maxDeskTabs) return denyUpgrade(socket, 429);
       deskWss.handleUpgrade(req, socket, head, ws => deskWss.emit('connection', ws, req));
     } else if (req.url === '/ws/caller') {
       if (!validOrigin(req, config)) return denyUpgrade(socket);
@@ -125,43 +118,27 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
       twilioWss.handleUpgrade(req, socket, head, ws => twilioWss.emit('connection', ws, req));
     } else denyUpgrade(socket, 404);
   });
-  // A caller must never be left talking to a closed browser. When the last tab
-  // for a seat goes, that seat's live browser calls end after a short grace;
-  // unassigned calls follow the floor going dark entirely.
-  const scheduleHangup = (key, owns) => {
-    clearTimeout(disconnectTimers.get(key));
-    if (!calls.snapshot().some(call => call.transport === 'browser' && call.state === 'in_call' && owns(call))) return;
-    const timer = setTimeout(() => {
-      disconnectTimers.delete(key);
-      if (key === '' ? clients.size : [...clients.values()].includes(key)) return;
-      for (const call of calls.snapshot()) {
-        if (call.transport === 'browser' && call.state === 'in_call' && owns(call)) void calls.end(call.id).catch(() => {});
-      }
+  // A caller must never be left talking to a closed browser. When the last tab goes,
+  // the live browser calls end after a short grace in case it is only a reload.
+  const scheduleHangup = () => {
+    clearTimeout(hangupTimer);
+    const stranded = () => calls.snapshot().filter(call => call.transport === 'browser' && call.state === 'in_call');
+    if (!stranded().length) return;
+    hangupTimer = setTimeout(() => {
+      hangupTimer = null;
+      if (clients.size) return;
+      for (const call of stranded()) void calls.end(call.id).catch(() => {});
     }, 10_000);
-    timer.unref();
-    disconnectTimers.set(key, timer);
+    hangupTimer.unref();
   };
-  deskWss.on('connection', (ws, req) => {
-    const agentId = config.publicDemo ? '' : sessions.read(req);
-    clients.set(ws, agentId); ws.isAlive = true;
-    if (agentId) { clearTimeout(disconnectTimers.get(agentId)); disconnectTimers.delete(agentId); queue.connect(agentId); floorEvent(); }
-    clearTimeout(disconnectTimers.get('')); disconnectTimers.delete('');
+  deskWss.on('connection', ws => {
+    clients.add(ws); ws.isAlive = true;
+    clearTimeout(hangupTimer); hangupTimer = null;
     ws.on('pong', () => { ws.isAlive = true; });
     ws.on('message', () => { /* Browser writes cannot inject telephone audio or execute commands. */ });
     ws.on('error', () => {});
-    ws.on('close', () => {
-      clients.delete(ws);
-      if (agentId) {
-        queue.disconnect(agentId);
-        floorEvent();
-        if (![...clients.values()].includes(agentId)) scheduleHangup(agentId, call => call.agentId === agentId);
-      }
-      if (!clients.size) scheduleHangup('', () => true);
-    });
-    ws.send(JSON.stringify({
-      type: 'snapshot', calls: calls.snapshot(), settings: store.snapshot().settings,
-      agents: roster(store, accounts, config), floor: queue.snapshot(), agentId,
-    }));
+    ws.on('close', () => { clients.delete(ws); if (!clients.size) scheduleHangup(); });
+    ws.send(JSON.stringify({ type: 'snapshot', calls: calls.snapshot(), settings: store.snapshot().settings }));
   });
   twilioWss.on('connection', (ws, req) => { ws.on('error', () => {}); calls.handleStream(ws, req); });
   callerWss.on('connection', ws => {
@@ -191,23 +168,21 @@ export async function createRuntime({ config = loadConfig(process.env, root), st
     ws.on('message', join);
   });
   const heartbeat = setInterval(() => {
-    for (const ws of clients.keys()) { if (!ws.isAlive) { ws.terminate(); continue; } ws.isAlive = false; ws.ping(); }
+    for (const ws of clients) { if (!ws.isAlive) { ws.terminate(); continue; } ws.isAlive = false; ws.ping(); }
   }, 30_000);
   heartbeat.unref();
   const close = async () => {
     clearInterval(heartbeat);
-    for (const timer of disconnectTimers.values()) clearTimeout(timer);
-    disconnectTimers.clear();
+    clearTimeout(hangupTimer);
     callerAccess.clear();
-    queue.clear();
     await calls.close?.();
-    for (const ws of [...clients.keys(), ...twilioWss.clients, ...callerWss.clients]) ws.close(1001, 'Server shutting down');
+    for (const ws of [...clients, ...twilioWss.clients, ...callerWss.clients]) ws.close(1001, 'Server shutting down');
     await store.flush();
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
     deskWss.close(); twilioWss.close(); callerWss.close();
   };
-  return { app, server, config, store, calls, queue, sessions, integrations, close };
+  return { app, server, config, store, calls, integrations, close };
 }
 
 async function main() {

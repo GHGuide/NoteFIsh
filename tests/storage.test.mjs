@@ -26,7 +26,7 @@ function fakeDatabase() {
   return { driver: { Client }, queries, read: () => row };
 }
 
-const seat = { id: '11111111-1111-4111-8111-111111111111', name: 'Nina', voiceId: null, agentLanguage: null, customerLanguage: null, registers: {}, archived: false, createdAt: new Date().toISOString() };
+const sample = { id: '11111111-1111-4111-8111-111111111111', referenceId: 'ref_leo_0001', name: 'Leo', description: '', language: 'en', kind: 'enrolled', status: 'ready', archived: false, createdAt: new Date().toISOString() };
 
 test('with a database configured the desk keeps its data there, and reads it back on the next start', async t => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'notefish-db-'));
@@ -37,15 +37,15 @@ test('with a database configured the desk keeps its data there, and reads it bac
   const store = await createStore(file, { connectionString: 'postgres://desk@example/notefish', driver: db.driver });
   assert.equal(store.where(), 'the database');
   assert.equal(store.movedFromFile, false, 'nothing to move, there was no file');
-  await store.update(state => { state.agents.push(seat); state.settings.queueName = 'Main line'; });
+  await store.update(state => { state.voices.push(sample); state.settings.queueName = 'Main line'; });
   await store.close();
 
   assert.ok(db.queries.some(q => /CREATE TABLE IF NOT EXISTS notefish_state/.test(q)), 'it makes its own table');
-  assert.equal(JSON.parse(db.read()).agents[0].name, 'Nina', 'the document is in the database');
+  assert.equal(JSON.parse(db.read()).voices[0].name, 'Leo', 'the document is in the database');
   assert.equal(await readFile(file, 'utf8').catch(() => null), null, 'and nothing was written to disk');
 
   const reopened = await createStore(file, { connectionString: 'postgres://desk@example/notefish', driver: db.driver });
-  assert.deepEqual(reopened.snapshot().agents.map(a => a.name), ['Nina'], 'a restart finds it again');
+  assert.deepEqual(reopened.snapshot().voices.map(v => v.name), ['Leo'], 'a restart finds it again');
   assert.equal(reopened.snapshot().settings.queueName, 'Main line');
   await reopened.close();
 });
@@ -57,13 +57,13 @@ test('switching a running desk over moves the existing file into the empty datab
 
   const onDisk = await createStore(file);
   assert.equal(onDisk.where(), file, 'without a connection string it is still a file');
-  await onDisk.update(state => { state.agents.push(seat); });
+  await onDisk.update(state => { state.voices.push(sample); });
   await onDisk.close();
 
   const db = fakeDatabase();
   const moved = await createStore(file, { connectionString: 'postgres://desk@example/notefish', driver: db.driver });
   assert.equal(moved.movedFromFile, true);
-  assert.deepEqual(moved.snapshot().agents.map(a => a.name), ['Nina'], 'the desk comes up with its data, not empty');
+  assert.deepEqual(moved.snapshot().voices.map(v => v.name), ['Leo'], 'the desk comes up with its data, not empty');
   await moved.close();
 
   // Second start: the database already has it, so the file is left alone.

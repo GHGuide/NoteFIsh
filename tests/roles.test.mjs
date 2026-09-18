@@ -7,9 +7,10 @@ import { request as httpRequest } from 'node:http';
 import { loadConfig } from '../server/config.mjs';
 import { createRuntime } from '../server/index.mjs';
 
-// One desk, three people: the admin who created it, an agent who joined by invitation, and what each may touch.
-test('roles: the first account runs the desk, invited people get a seat and their own voice, and nothing more', { timeout: 15000 }, async t => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'notefish-roles-'));
+// One desk, one owner. There is no roster to administer and nobody to invite; what is
+// left of accounts is keeping a hosted desk shut to everyone but the person who set it up.
+test('the first sign-up claims the desk, a second is refused, and a voice still belongs to whoever recorded it', { timeout: 15000 }, async t => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'notefish-owner-'));
   await mkdir(path.join(directory, 'dist'), { recursive: true });
   await writeFile(path.join(directory, 'dist', 'index.html'), '<!doctype html><title>NoteFish</title>');
   const config = loadConfig({ NODE_ENV: 'production', PUBLIC_BASE_URL: 'https://example.test', NOTEFISH_DESK_PASSWORD: 'test-only-password-12345', DATA_DIR: directory }, directory);
@@ -25,73 +26,32 @@ test('roles: the first account runs the desk, invited people get a seat and thei
     return { status: response.status, body: text ? JSON.parse(text) : null, cookie: response.headers.getSetCookie().map(item => item.split(';')[0]).join('; ') };
   };
 
-  // Nobody runs the desk yet: the first sign-up becomes admin, and from then on it is invitation-only.
   const open = await call('', 'GET', '/auth/me');
   assert.equal(open.body.open, true);
-  const admin = await call('', 'POST', '/auth/signup', { name: 'Nina Okafor', email: 'nina@acme.example', password: 'ten characters!' });
-  assert.equal(admin.status, 201); assert.equal(admin.body.user.role, 'admin');
-  const stranger = await call('', 'POST', '/auth/signup', { name: 'Anyone', email: 'anyone@else.example', password: 'ten characters!' });
-  assert.equal(stranger.status, 403);
+  const owner = await call('', 'POST', '/auth/signup', { name: 'Nina Okafor', email: 'nina@acme.example', password: 'ten characters!' });
+  assert.equal(owner.status, 201);
+  assert.equal((await call('', 'POST', '/auth/signup', { name: 'Anyone', email: 'anyone@else.example', password: 'ten characters!' })).status, 403, 'the desk is taken');
   assert.equal((await call('', 'GET', '/auth/me')).body.open, false);
+  assert.doesNotMatch(owner.cookie, /notefish_agent=/, 'signing in no longer takes a seat, because there are none');
 
-  // The admin invites Mara; Mara joins as an agent with her seat.
-  const seat = await call(admin.cookie, 'POST', '/agents', { email: 'mara@acme.example' });
-  assert.equal(seat.status, 201);
-  const token = new URL(seat.body.inviteUrl).hash.slice(1);
-  const mara = await call('', 'POST', '/auth/signup', { password: 'ten characters!', invite: token });
-  assert.equal(mara.status, 201); assert.equal(mara.body.user.role, 'agent'); assert.equal(mara.body.agentId, seat.body.agent.id);
-  assert.match(mara.cookie, /notefish_agent=/, 'joining takes the seat');
-  const adminSeat = await call(admin.cookie, 'POST', '/agents', { name: 'Nina' });
-  await runtime.store.update(state => { state.agents.find(item => item.id === adminSeat.body.agent.id).userId = admin.body.user.id; }); // Nina's own seat
+  // Nothing is left to ask about a roster.
+  for (const route of ['/agents', '/floor']) assert.equal((await call(owner.cookie, 'GET', route)).status, 404, `${route} is gone`);
 
-  // Workspace settings and the roster are the admin's. Mara's own seat is hers.
-  assert.equal((await call(mara.cookie, 'PUT', '/settings', { queueName: 'Hijacked' })).status, 403);
-  assert.equal((await call(mara.cookie, 'POST', '/agents', { name: 'Extra' })).status, 403);
-  assert.equal((await call(mara.cookie, 'DELETE', `/agents/${adminSeat.body.agent.id}`)).status, 403);
-  assert.equal((await call(mara.cookie, 'PATCH', `/agents/${adminSeat.body.agent.id}`, { customerLanguage: 'de' })).status, 403);
-  assert.equal((await call(mara.cookie, 'PATCH', `/agents/${seat.body.agent.id}`, { customerLanguage: 'de' })).status, 200);
-  assert.equal((await call(mara.cookie, 'POST', `/agents/${adminSeat.body.agent.id}/session`, {})).status, 403, 'another person’s seat cannot be taken');
-  assert.equal((await call(mara.cookie, 'GET', '/users')).status, 403);
-  assert.equal((await call(admin.cookie, 'PUT', '/settings', { queueName: 'Main line' })).status, 200);
-
-  // Voices: Nina's recording is hers. Mara sees it, cannot use, share or archive it.
+  // Voices are what a person switches between now. The desk's owner reaches all of
+  // them, including anything recorded under an account from before the roster went, so
+  // collapsing to one person never strands a voice nobody can use.
   const voice = (kind, ownerId, name) => ({ id: `${name.toLowerCase()}-voice`, referenceId: `ref${name.toLowerCase()}00000000`, name, description: '', language: 'en', kind, status: 'ready', archived: false, createdAt: new Date().toISOString(), consent: true, consentAt: new Date().toISOString(), ownerId });
-  await runtime.store.update(state => { state.voices.push(voice('enrolled', admin.body.user.id, 'Nina'), voice('enrolled', mara.body.user.id, 'Mara'), voice('licensed', admin.body.user.id, 'Kyoko')); });
-  const seen = (await call(mara.cookie, 'GET', '/voices')).body.voices;
-  assert.deepEqual(seen.map(item => [item.name, item.mine, item.usable, item.owner]), [['Nina', false, false, 'Nina Okafor'], ['Mara', true, true, 'Mara'], ['Kyoko', false, true, 'Nina Okafor']]);
-  assert.equal((await call(mara.cookie, 'GET', '/voices/nina-voice/export')).status, 403);
-  assert.equal((await call(mara.cookie, 'PATCH', '/voices/nina-voice', { archived: true })).status, 403);
-  assert.equal((await call(mara.cookie, 'PATCH', `/agents/${seat.body.agent.id}`, { voiceId: 'nina-voice' })).status, 403);
-  assert.equal((await call(mara.cookie, 'PATCH', `/agents/${seat.body.agent.id}`, { voiceId: 'kyoko-voice' })).status, 200, 'licensed voices are shared');
-  assert.equal((await call(mara.cookie, 'PATCH', `/agents/${seat.body.agent.id}`, { voiceId: 'mara-voice' })).status, 200);
-  assert.equal((await call(mara.cookie, 'GET', '/voices/mara-voice/export')).status, 200);
-  assert.equal((await call(admin.cookie, 'GET', '/voices/mara-voice/export')).status, 200, 'an admin can share any voice');
-  assert.equal((await call(mara.cookie, 'GET', '/voices/export')).body.voices.map(item => item.name).join(), 'Mara', 'the library export holds only what you manage');
+  await runtime.store.update(state => { state.voices.push(voice('enrolled', owner.body.user.id, 'Nina'), voice('enrolled', 'a-long-gone-account', 'Mara'), voice('licensed', null, 'Kyoko')); });
+  const seen = (await call(owner.cookie, 'GET', '/voices')).body.voices;
+  assert.deepEqual(seen.map(item => [item.name, item.usable]), [['Nina', true], ['Mara', true], ['Kyoko', true]]);
+  for (const id of ['nina-voice', 'mara-voice', 'kyoko-voice']) {
+    assert.equal((await call(owner.cookie, 'PUT', '/settings', { voiceId: id })).status, 200, `${id} can be the voice that answers`);
+  }
 
-  // Setting up is per person: an agent finishes their own without touching the workspace.
-  assert.equal((await call(mara.cookie, 'PATCH', `/agents/${seat.body.agent.id}`, { onboardedAt: true })).status, 200);
-  const settledIn = runtime.store.snapshot().agents.find(item => item.id === seat.body.agent.id);
-  assert.match(settledIn.onboardedAt, /^\d{4}-\d{2}-\d{2}T/, 'her seat remembers she is set up');
-  assert.equal(runtime.store.snapshot().settings.onboardedAt, undefined, 'and the workspace is untouched by it');
-  assert.equal((await call(mara.cookie, 'PATCH', `/agents/${adminSeat.body.agent.id}`, { onboardedAt: true })).status, 403, 'nobody finishes setup on another seat');
-
-  // A supervisor keeps the glossary but not the workspace.
-  assert.equal((await call(admin.cookie, 'PATCH', `/users/${admin.body.user.id}`, { role: 'agent' })).status, 409, 'not your own role');
-  assert.equal((await call(admin.cookie, 'PATCH', `/users/${mara.body.user.id}`, { role: 'supervisor' })).body.user.role, 'supervisor');
-  assert.equal((await call(mara.cookie, 'PUT', '/settings', { glossary: [{ id: 'g1', term: 'Acme', kind: 'keep', as: '' }] })).status, 200);
-  assert.equal((await call(mara.cookie, 'PUT', '/settings', { queueName: 'Nope' })).status, 403);
-
-  // Offboarding Mara: her recorded voice goes at Fish, the seat that pointed at it is freed and cleared.
-  assert.equal((await call(admin.cookie, 'DELETE', `/users/${admin.body.user.id}`)).status, 409, 'not yourself');
-  const gone = await call(admin.cookie, 'DELETE', `/users/${mara.body.user.id}`);
-  assert.equal(gone.status, 200); assert.equal(gone.body.voicesDeleted, 1);
-  assert.deepEqual(deleted, ['refmara00000000']);
-  const after = runtime.store.snapshot();
-  assert.equal(after.users.length, 1);
-  assert.deepEqual(after.voices.map(item => item.name), ['Nina', 'Kyoko']);
-  const freed = after.agents.find(item => item.id === seat.body.agent.id);
-  assert.equal(freed.userId, null); assert.equal(freed.voiceId, null);
-  assert.equal((await call(mara.cookie, 'GET', '/settings')).status, 401, 'her cookie no longer opens the desk');
+  // Recording sets you up; there is no separate seat to finish setting up.
+  assert.equal((await call(owner.cookie, 'PUT', '/settings', { onboardedAt: true })).status, 200);
+  assert.match(runtime.store.snapshot().settings.onboardedAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(deleted.length, 0);
 });
 
 // The hosted shape: no shared desk password, accounts only.
@@ -117,8 +77,10 @@ test('a desk with accounts and no shared password asks people to sign in, and le
   assert.equal(signUp.status, 201);
   const cookie = signUp.headers.getSetCookie().map(item => item.split(';')[0]).join('; ');
   assert.equal((await fetch(`${base}/api/settings`, { headers: { cookie } })).status, 200);
-  const invited = await fetch(`${base}/api/agents`, { method: 'POST', headers: { Origin: 'https://desk.example', 'Content-Type': 'application/json', cookie }, body: JSON.stringify({ email: 'mara@acme.example' }) });
-  assert.match((await invited.json()).inviteUrl, /^https:\/\/desk\.example\/join#/, 'invitations point at the desk’s own address');
+  // Signing out is gone from the interface; the route still answers so an old tab that
+  // calls it is not left hanging, and the desk is simply signed in to again.
+  const out = await fetch(`${base}/api/auth/signout`, { method: 'POST', headers: { Origin: 'https://desk.example', cookie } });
+  assert.equal(out.status, 204);
 });
 
 // The bare domain is the marketing page; the desk keeps its own subdomain.

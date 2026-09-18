@@ -12,8 +12,6 @@ import { Avatar } from './shell.jsx';
 export { languages, languageName };
 
 export const DEFAULT_SETTINGS = { voiceId: '', agentLanguage: 'en', customerLanguage: 'fr', queueName: 'Main line' };
-export const EMPTY_FLOOR = { waiting: [], agents: [] };
-export const AGENT_STATE = { available: 'Available', on_call: 'On a call', paused: 'Paused', offline: 'Offline' };
 export const isArchived = voice => Boolean(voice.archived || voice.archivedAt);
 export const needsDispatch = value => value === true || ['requested', 'pending', 'confirmed'].includes(value);
 export const callState = call => call?.state || (call?.status === 'active' ? 'in_call' : call?.status);

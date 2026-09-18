@@ -88,7 +88,9 @@ test('named multipart enrollment progresses from training to ready, selection an
   assert.deepEqual((await (await app.request('/voices')).json()).voices, [{ ...voice, owner: null, mine: true, usable: true }], 'the list says who may use and manage each voice');
 
   assert.equal((await app.request('/settings', { method: 'PUT', body: { voiceId: voice.id } })).status, 409, 'an unfinished clone cannot be used for calls');
-  assert.equal(app.snapshot().settings.voiceId, null);
+  // Recording your first voice is enough to be ready for a call: the desk takes it as
+  // the voice that answers, rather than making you go and choose it afterwards.
+  assert.equal(app.snapshot().settings.voiceId, voice.id, 'the first voice recorded becomes the one that answers');
   const pending = await app.request(`/voices/${voice.id}/refresh`, { method: 'POST' });
   assert.equal((await pending.json()).voice.status, 'training');
   app.ready();

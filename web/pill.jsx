@@ -46,7 +46,6 @@ function LanguageSel({ label, value, allowAuto = false, disabled, onChange }) {
 
 export default function PillEntry() {
   const [calls, setCalls] = useState([]);
-  const [floor, setFloor] = useState({ agents: [], agentId: '' }); // who this desk answers as, if a roster exists
   const [connection, setConnection] = useState('connecting');
   const [holding, setHolding] = useState(false);
   const [partial, setPartial] = useState(null);
@@ -84,7 +83,7 @@ export default function PillEntry() {
       socket.onopen = () => setConnection('connected');
       socket.onmessage = event => {
         let message; try { message = JSON.parse(event.data); } catch { return; }
-        if (message.type === 'snapshot') { setCalls(message.calls || []); setFloor(current => ({ agents: message.agents || current.agents, agentId: message.agentId === undefined ? current.agentId : message.agentId })); }
+        if (message.type === 'snapshot') setCalls(message.calls || []);
         if (message.type === 'call' && message.call) setCalls(current => [message.call, ...current.filter(call => call.id !== message.call.id)]);
         if (message.type === 'caption-partial') setPartial(message.text ? { callId: message.callId, text: message.text, shown: message.shown || '' } : null);
         if (message.type === 'level') setLevel({ at: Date.now(), value: Math.max(0, Math.min(1, Number(message.level) || 0)) });
@@ -111,7 +110,6 @@ export default function PillEntry() {
     return () => { offs.forEach(off => off()); timers.forEach(clearTimeout); };
   }, []);
 
-  const needsSeat = floor.agents.some(agent => !agent.archived) && !floor.agentId;
   const live = calls.find(call => call.state === 'in_call');
   const ringing = calls.find(call => call.state === 'ringing');
   const ended = !live && !ringing ? calls.filter(call => call.state === 'ended' && call.endedAt).sort((a, b) => new Date(b.endedAt) - new Date(a.endedAt))[0] : null;
@@ -124,7 +122,7 @@ export default function PillEntry() {
   const status = connection !== 'connected' ? 'Desk offline'
     : ringing ? `Ringing · ${ringing.from || 'a caller'}`
     : live ? `On a call · ${live.from || 'a caller'}`
-    : needsSeat ? 'Choose your name on the desk' : 'No call';
+    : 'No call';
   useEffect(() => { send('desk-state', { status }); }, [status]);
 
   const state = hidden ? null
@@ -221,8 +219,7 @@ export default function PillEntry() {
   const talkNow = on => { setHolding(on); send('ptt', on); };
   const openDesk = () => send('open-desk');
   const answer = call => act('answer', async () => { await api.answer(call.id); if (call.via !== 'companion') openDesk(); });
-  // Languages go to the seat when there is one (the seat's own language wins), else to the workspace.
-  const setLanguage = (key, value) => act('language', () => floor.agentId ? api.editAgent(floor.agentId, { [key]: value }) : api.settings({ [key]: value }));
+  const setLanguage = (key, value) => act('language', () => api.settings({ [key]: value }));
 
   const pair = live ? <span className="dim">{code(live.agentLanguage)} ← {code(live.detectedLanguage || live.customerLanguage)}</span> : null;
   const played = playingSince.current ? (Date.now() - playingSince.current) / 1000 : 0;
@@ -230,8 +227,8 @@ export default function PillEntry() {
     ringing: ringing && <>
       <span className="dim2">{ringing.via === 'companion' ? <Monitor size={15} /> : <Phone size={15} />}</span>
       <b>{ringing.from || 'Caller'}</b>
-      <span className="dim">{needsSeat ? 'choose your name on the desk' : ringing.via === 'companion' ? 'translate this call?' : 'incoming'}</span>
-      {needsSeat ? <button type="button" className="act" onClick={openDesk}>Open desk</button> : <button type="button" className="act" disabled={!!busy} onClick={() => answer(ringing)}>{busy === 'answer' ? 'Answering…' : 'Answer'}</button>}
+      <span className="dim">{ringing.via === 'companion' ? 'translate this call?' : 'incoming'}</span>
+      <button type="button" className="act" disabled={!!busy} onClick={() => answer(ringing)}>{busy === 'answer' ? 'Answering…' : 'Answer'}</button>
       <button type="button" className="act ghost icon" aria-label="Decline" disabled={!!busy} onClick={() => act('end', () => api.end(ringing.id))}><X size={14} /></button>
     </>,
     listening: deaf

@@ -58,7 +58,7 @@ Icons come from `lucide-react` (already a dependency), 13–16px, stroke 1.65–
 - agent: `{ id, name, voiceId, agentLanguage, customerLanguage, registers, layout, phrases, persona, formality, avatar, archived }`
 - floor: `{ waiting: [{ id, from, transport, startedAt, position }], agents: [{ id, name, state: 'available'|'on_call'|'paused'|'offline', paused, pauseReason }] }`
 - voice: `{ id, name, description, language, kind: 'enrolled'|'licensed', status: 'training'|'ready'|'failed', archived, register, referenceId }`
-- setup (`/api/status`): `{ ready, blockers, providers: { fish: { configured }, openai, twilio }, audioAvailable, publicUrl, phoneNumber, webhookUrl, integrations: { webhook: { configured, url }, zendesk: { configured }, exportApi: { configured } }, access: { mode }, floor: { multiAgent, maxAgents, reason } }`
+- setup (`/api/status`): `{ ready, blockers, providers: { fish: { configured }, openai, twilio }, audioAvailable, publicUrl, phoneNumber, webhookUrl, integrations: { webhook: { configured, url }, zendesk: { configured }, exportApi: { configured } }, access: { mode }, limits: { maxDeskTabs, maxConcurrentCalls } }`
 - languages: `import { languages, languageName } from '../lib.jsx'` (`languages` = `[{ code, name }]`).
 
 ## API (web/api.js)

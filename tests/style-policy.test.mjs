@@ -37,9 +37,8 @@ test('sentences carry their own tags after the register leads the first one', ()
 });
 
 test('stored takes recorded as brisk load as energetic', () => {
-  const state = migrateState({ version: 2, voices: [{ id: 'v1', register: 'brisk' }], settings: { registers: { brisk: 'v1', calm: null } }, agents: [{ id: 'a1', registers: { brisk: 'v1' } }], calls: [] });
+  const state = migrateState({ version: 2, voices: [{ id: 'v1', register: 'brisk' }], settings: { registers: { brisk: 'v1', calm: null } }, agents: [], calls: [] });
   assert.equal(state.voices[0].register, 'energetic');
   assert.deepEqual(state.settings.registers, { energetic: 'v1', calm: null });
-  assert.deepEqual(state.agents[0].registers, { energetic: 'v1' });
   assert.equal(canonicalRegister('warm'), 'warm');
 });

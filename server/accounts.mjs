@@ -1,10 +1,10 @@
 // Accounts: who may open the desk. A user is a name, an email and a scrypt-hashed
 // password in the store; a signed cookie says which user a browser is. Seats
-// (session.mjs) stay what they were: which roster entry a signed-in desk answers as.
+// The desk belongs to whoever set it up, and stays theirs: there is no seat to take
+// and no reason to sign out again.
 import express from 'express';
 import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { constantTimeEqual, isLocalRequest, validOrigin } from './security.mjs';
-import { readCookie } from './session.mjs';
 
 const COOKIE = 'notefish_user';
 const TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -31,6 +31,19 @@ const DECOY = hashPassword(randomBytes(12).toString('hex'));
 
 const publicUser = user => user ? { id: user.id, name: user.name, email: user.email, role: user.role || 'admin', createdAt: user.createdAt } : null; // accounts from before roles ran the desk
 
+/** One cookie out of a Cookie header, bounded so a huge header cannot be walked. */
+export function readCookie(header, name) {
+  if (typeof header !== 'string' || header.length > 4096) return '';
+  for (const part of header.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq < 0) continue;
+    if (part.slice(0, eq).trim() !== name) continue;
+    const value = part.slice(eq + 1).trim();
+    return value.length <= 512 ? value : '';
+  }
+  return '';
+}
+
 export function createAccounts(config, store, { now = Date.now } = {}) {
   // The cookie secret: the configured one, else one minted once and kept in the store,
   // so sign-ins survive a restart even without NOTEFISH_SESSION_SECRET.
@@ -40,46 +53,10 @@ export function createAccounts(config, store, { now = Date.now } = {}) {
   const users = () => store.snapshot().users || [];
   const failures = new Map(); // ip → { count, until }
 
-  // An invitation names a seat and an email. Whoever opens it signs up as that email and
-  // owns the seat from then on; signing in later takes the seat again.
-  const invites = {
-    async issue(agent) {
-      const token = `${randomUUID()}${randomUUID().replace(/-/g, '')}`;
-      await store.update(state => {
-        state.invites = (state.invites || []).filter(item => item.agentId !== agent.id);
-        state.invites.push({ token, agentId: agent.id, email: agent.email, expires: now() + INVITE_TTL, createdAt: new Date(now()).toISOString() });
-      });
-      return { token, expiresAt: new Date(now() + INVITE_TTL).toISOString() };
-    },
-    find(token) {
-      if (typeof token !== 'string' || token.length > 128) return null;
-      const state = store.snapshot();
-      const invite = (state.invites || []).find(item => item.token === token && item.expires > now());
-      const agent = invite && state.agents.find(item => item.id === invite.agentId && !item.archived);
-      return invite && agent ? { ...invite, agent } : null;
-    },
-    pending(agentId) {
-      const invite = (store.snapshot().invites || []).find(item => item.agentId === agentId && item.expires > now());
-      return invite ? { token: invite.token, expiresAt: new Date(invite.expires).toISOString() } : null;
-    },
-    async accept(token, user) {
-      const invite = invites.find(token);
-      if (!invite) throw new AuthError('This invitation is no longer valid. Ask for a new one.', 410);
-      await store.update(state => {
-        const agent = state.agents.find(item => item.id === invite.agentId);
-        if (agent) { agent.userId = user.id; agent.email = user.email; }
-        state.invites = (state.invites || []).filter(item => item.token !== token);
-      });
-      return invite.agent.id;
-    },
-  };
-  const seatOf = userId => store.snapshot().agents.find(agent => agent.userId === userId && !agent.archived)?.id || '';
   const hasAdmin = () => users().some(user => (user.role || 'admin') === 'admin');
   const roleOf = id => { const user = users().find(item => item.id === id); return user ? user.role || 'admin' : ''; };
 
   return {
-    invites,
-    seatOf,
     hasAdmin,
     roleOf,
     count: () => users().length,
@@ -102,7 +79,6 @@ export function createAccounts(config, store, { now = Date.now } = {}) {
         if (!item) throw new AuthError('Account not found.', 404);
         if ((item.role || 'admin') === 'admin' && !state.users.some(other => other.id !== id && (other.role || 'admin') === 'admin')) throw new AuthError('The desk needs at least one admin.', 409);
         state.users = state.users.filter(user => user.id !== id);
-        for (const agent of state.agents) if (agent.userId === id) agent.userId = null;
         return item;
       });
       return publicUser(user);
@@ -168,8 +144,7 @@ export class AuthError extends Error {
 }
 
 /** /api/auth: reachable without being signed in, which is the point. */
-export function createAuthRouter({ config, accounts, sessions = null }) {
-  const withSeat = (res, userId, agentId) => { const cookies = [accounts.cookie(userId)]; if (sessions && agentId) cookies.push(sessions.cookie(agentId)); res.set('Set-Cookie', cookies); return res; };
+export function createAuthRouter({ config, accounts }) {
   const router = express.Router();
   router.use((req, res, next) => {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !validOrigin(req, config)) return res.status(403).json({ error: 'This action must originate from the NoteFish website.', code: 'INVALID_ORIGIN' });
@@ -177,35 +152,28 @@ export function createAuthRouter({ config, accounts, sessions = null }) {
   });
   router.get('/me', (req, res) => {
     const id = accounts.read(req);
-    // open: nobody runs this desk yet, so signing up makes you its admin. After that it is invitation-only.
+    // open: nobody has set this desk up yet, so signing up claims it. After that the
+    // desk belongs to that person and signing up again is refused.
     res.json({ user: id ? accounts.find(id) : null, users: accounts.count(), open: !accounts.hasAdmin(), local: isLocalRequest(req), google: false });
-  });
-  router.get('/invite/:token', (req, res) => {
-    const invite = accounts.invites.find(req.params.token);
-    if (!invite) return res.status(410).json({ error: 'This invitation is no longer valid. Ask for a new one.', code: 'INVITE_GONE' });
-    res.json({ email: invite.email, name: invite.agent.name, expiresAt: new Date(invite.expires).toISOString() });
   });
   router.post('/signup', async (req, res, next) => {
     try {
       const body = { ...(req.body || {}) };
-      const invite = body.invite ? accounts.invites.find(body.invite) : null;
-      if (body.invite && !invite) throw new AuthError('This invitation is no longer valid. Ask for a new one.', 410);
-      if (invite) { body.email = invite.email; body.name = body.name || invite.agent.name; }
-      else if (accounts.hasAdmin()) throw new AuthError('This desk is invitation-only. Ask an admin to invite you.', 403);
-      else if (config.adminEmail && String(body.email || '').trim().toLowerCase() !== config.adminEmail) throw new AuthError('This desk is waiting for the person who set it up. Ask them to invite you.', 403);
-      const user = await accounts.signUp({ ...body, role: invite ? 'agent' : 'admin' });
-      const agentId = invite ? await accounts.invites.accept(body.invite, user) : '';
-      withSeat(res, user.id, agentId).status(201).json({ user, agentId: agentId || null });
+      if (accounts.hasAdmin()) throw new AuthError('This desk already belongs to someone. Sign in instead.', 403);
+      if (config.adminEmail && String(body.email || '').trim().toLowerCase() !== config.adminEmail) throw new AuthError('This desk is waiting for the person who set it up.', 403);
+      const user = await accounts.signUp({ ...body, role: 'admin' });
+      res.set('Set-Cookie', accounts.cookie(user.id)).status(201).json({ user });
     } catch (error) { next(error); }
   });
   router.post('/signin', async (req, res, next) => {
     try {
       const user = await accounts.signIn(req.body || {}, req.socket?.remoteAddress || '');
-      const agentId = accounts.seatOf(user.id);
-      withSeat(res, user.id, agentId).json({ user, agentId: agentId || null });
+      res.set('Set-Cookie', accounts.cookie(user.id)).json({ user });
     } catch (error) { next(error); }
   });
-  router.post('/signout', (req, res) => res.set('Set-Cookie', sessions ? [accounts.clearCookie(), sessions.clearCookie()] : accounts.clearCookie()).status(204).end());
+  // Signing out on purpose is gone: you set this desk up once and it stays yours. The
+  // route stays so an old tab calling it is answered rather than left hanging.
+  router.post('/signout', (req, res) => res.set('Set-Cookie', accounts.clearCookie()).status(204).end());
   router.use((error, req, res, next) => {
     if (error instanceof AuthError) return res.status(error.status).json({ error: error.message, code: 'AUTH' });
     next(error);

@@ -62,8 +62,9 @@ Admin never stores a caller recording as a `VoiceProfile`.
 ## Agents and assignment — 15 Sep 2026
 
 State version 2. The existing `settings` row is now the **workspace default**
-that every agent inherits, and `agents: Agent[]` is the roster. Loading a
-version 1 file adds an empty roster and rewrites it.
+for the desk. Version 2 added `agents: Agent[]`, a roster of seats; version 3
+takes it out again, handing the last seat's voice and languages to the desk's own
+settings so nothing that was in use is lost.
 
 ```
 Agent {
@@ -80,13 +81,11 @@ Agent {
 }
 ```
 
-`settings.registers` holds the same per-register map for a desk without a
-roster. `Call` gains `detectedLanguage` (set from the first caller phrase when the
-customer language is `auto`), and `agentId` (null until answered) and `agentName` (captured at
-answer, so a later rename does not rewrite history). Resolution order for a
-call's voice and language pair is agent override, then workspace default,
-captured when the call is answered.
+`settings.registers` holds the per-register map for the desk. `Call` gains
+`detectedLanguage` (set from the first caller phrase when the customer language is
+`auto`). `agentId` is always null now and stays only so old rows still load;
+`agentName` is written at answer with the name of the voice the caller heard, which
+is what the history and the outbound webhook show.
 
-Seats are not stored. Presence lives in memory for the life of the process:
-who is connected, who is paused, and which call each agent holds. A restart
-empties the floor, which is correct — nobody is actually sitting there.
+A call's voice and language pair is the desk's, captured when the call is answered,
+so changing a voice mid-call does not disturb the call in progress.

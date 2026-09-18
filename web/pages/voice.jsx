@@ -1,5 +1,5 @@
 // Voice: the voice callers hear (the one in use, one take per feeling, the
-// library), the puff you are on the floor, and how formal replies are.
+// library), the puff that stands for you, and how formal replies are.
 import React, { useEffect, useRef, useState } from 'react';
 import { Share2, Trash2, Archive, ArrowDownToLine, AudioLines, Check, Globe2, Mic, MoreHorizontal, Play, RefreshCw, Search, Settings2, Square } from 'lucide-react';
 import { api } from '../api.js';
@@ -19,7 +19,7 @@ const feelingOf = key => REGISTERS.find(item => item.key === key);
 const dateOf = value => new Date(value).toLocaleDateString([], { month: 'short', day: 'numeric' });
 
 export default function VoicePage(common) {
-  const { data, navigate, route, setError, setNotice, saveOwned, owned, refreshVoices, seat } = common;
+  const { data, navigate, route, setError, setNotice, saveOwned, owned, refreshVoices, user } = common;
   const [localTab, setLocalTab] = useState('voice');
   const tab = TABS.some(item => item.key === route.query.tab) ? route.query.tab : localTab;
   const setTab = key => { setLocalTab(key); navigate(`/voice?tab=${key}`); };
@@ -38,11 +38,11 @@ export default function VoicePage(common) {
       setNotice(`${result.imported.length} voice${result.imported.length === 1 ? '' : 's'} imported${result.skipped.length ? `, ${result.skipped.length} already here` : ''}.`);
     } catch (failure) { setError(failure.message.startsWith('Unexpected') ? 'That is not a NoteFish voice file.' : failure.message); }
   };
-  const shared = { share, importFile, ...common, setTab, setSelectedId, setImporting, use, voiceId, me: seat || { name: 'workspace', avatar: data.settings.avatar }, voice: data.voices.find(item => item.id === voiceId), ready: data.voices.filter(item => item.status === 'ready' && !isArchived(item) && (item.usable ?? true)), registers: owned('registers') || {} };
+  const shared = { share, importFile, ...common, setTab, setSelectedId, setImporting, use, voiceId, me: { name: user?.name || 'workspace', avatar: data.settings.avatar }, voice: data.voices.find(item => item.id === voiceId), ready: data.voices.filter(item => item.status === 'ready' && !isArchived(item) && (item.usable ?? true)), registers: owned('registers') || {} };
   const Section = { voice: YourVoice, takes: Takes, avatar: AvatarTab, register: Register, library: Library }[tab];
   return <>
     <Toolbar />
-    <Title title="Voice" sub={tab === 'takes' ? 'One take is enough. Record more feelings only if you want them to sound exactly like you.' : 'How you sound to callers, and how you look on the floor'} />
+    <Title title="Voice" sub={tab === 'takes' ? 'One take is enough. Record more feelings only if you want them to sound exactly like you.' : 'How you sound to callers, and the puff that stands for you'} />
     <Tabs items={TABS} value={tab} onChange={setTab} />
     <Section {...shared} />
     <Ask placeholder="Ask how a reply will sound" scope="settings" />
@@ -51,23 +51,23 @@ export default function VoicePage(common) {
   </>;
 }
 
-function YourVoice({ data, seat, owned, saveOwned, me, voice, ready, registers, setTab, setSelectedId, share }) {
+function YourVoice({ data, owned, saveOwned, me, voice, ready, registers, setTab, setSelectedId, share }) {
   const own = owned('voiceId') || '';
   const ownVoice = data.voices.find(item => item.id === own);
   const choices = ownVoice && !ready.includes(ownVoice) ? [ownVoice, ...ready] : ready;
-  const options = [...(seat ? [{ value: '', label: 'Workspace voice' }] : own ? [] : [{ value: '', label: ready.length ? 'Choose a voice' : 'No voice yet', disabled: true }]), ...choices.map(item => ({ value: item.id, label: item.name }))];
+  const options = [...(own ? [] : [{ value: '', label: ready.length ? 'Choose a voice' : 'No voice yet', disabled: true }]), ...choices.map(item => ({ value: item.id, label: item.name }))];
   const taken = REGISTERS.filter(item => registers[item.key]);
   return <Body>
     <div className="ds-card"><Avatar who={me} size={54} /><div><strong>{voice ? `${voice.name} · ${voice.kind === 'licensed' ? 'licensed voice' : 'your voice'}` : 'No voice yet'}</strong><span>{voice ? [voice.createdAt && `Recorded ${dateOf(voice.createdAt)}`, languageName(voice.language || 'en'), kindOf(voice)].filter(Boolean).join(' · ') : 'Read one short passage and callers hear you in their language.'}</span></div>
       <div className="actions">{voice && <Btn pill kind="ghost" icon={<Play size={12} />} onClick={() => setSelectedId(voice.id)}>Hear it</Btn>}{voice && (voice.mine ?? true) && <Btn pill kind="ghost" icon={<Share2 size={12} />} onClick={() => share(voice)}>Share</Btn>}<Btn pill icon={<Mic size={13} />} onClick={() => setTab('takes')}>{voice ? 'Re-record' : 'Record'}</Btn></div></div>
     <h3>Voice for calls</h3>
-    <Setting main="Which voice answers" sub={seat ? 'Your own voice on calls, or the workspace voice when you have none.' : 'The voice every reply is spoken in.'}><SelectPill aria-label="Which voice answers" value={own} onChange={id => saveOwned({ voiceId: id || null })} options={options} /></Setting>
+    <Setting main="Which voice answers" sub="The voice every reply is spoken in. Switch between them here or in the sidebar."><SelectPill aria-label="Which voice answers" value={own} onChange={id => saveOwned({ voiceId: id || null })} options={options} /></Setting>
     <h3>Takes</h3>
     <Setting main={taken.length ? `${taken.length} of ${REGISTERS.length} feelings recorded` : 'One take is enough'} sub={taken.length ? taken.map(item => item.label).join(', ') : 'The desk adds the feeling itself. A take per feeling makes it sound exactly like you.'}><TextBtn onClick={() => setTab('takes')}>{taken.length ? 'Record more' : 'Record a take'}</TextBtn></Setting>
   </Body>;
 }
 
-function Takes({ data, seat, registers, setError, setNotice, saveOwned, refreshVoices, trainingNotes, sharedDemo, setSelectedId }) {
+function Takes({ data, user, registers, setError, setNotice, saveOwned, refreshVoices, trainingNotes, sharedDemo, setSelectedId }) {
   const [register, setRegister] = useState('calm');
   const [language, setLanguage] = useState(READING_SCRIPTS[data.settings.customerLanguage] ? data.settings.customerLanguage : 'en');
   const [sample, setSample] = useState(null);
@@ -80,7 +80,7 @@ function Takes({ data, seat, registers, setError, setNotice, saveOwned, refreshV
   const script = READING_SCRIPTS[language] || READING_SCRIPTS.en;
   const liveCall = data.calls.some(call => ['ringing', 'in_call'].includes(callState(call)));
   const created = data.voices.find(item => item.id === savedId);
-  const take = next => { setSample(next); setName(`${seat?.name || 'My voice'} · ${feeling.label}`); setConsent(false); setSavedId(null); };
+  const take = next => { setSample(next); setName(`${user?.name || 'My voice'} · ${feeling.label}`); setConsent(false); setSavedId(null); };
   const capture = useCapture((blob, duration) => {
     if (duration < 10) { setError('Read for at least 10 seconds. Try reading the whole passage at your usual pace.'); return; }
     if (duration < 30) setNotice('Under 30 seconds. It will work, but 45–60 seconds sounds more like you.');
@@ -136,11 +136,11 @@ function Takes({ data, seat, registers, setError, setNotice, saveOwned, refreshV
   </>;
 }
 
-function AvatarTab({ seat, owned, saveOwned }) {
+function AvatarTab({ user, owned, saveOwned }) {
   const [draft, setDraft] = useState(null);
-  useEffect(() => { setDraft(null); }, [seat?.id]);
+  useEffect(() => { setDraft(null); }, [owned('voiceId')]);
   const saved = owned('avatar');
-  const fallback = avatarOf(seat?.name || 'workspace');
+  const fallback = avatarOf(user?.name || 'workspace');
   const avatar = draft || (saved?.variant && saved?.color ? { variant: saved.variant, color: saved.color, face: saved.face !== false } : fallback);
   const change = next => { setDraft(next); saveOwned({ avatar: next }); };
   return <Body tight className="voice-look">
@@ -150,17 +150,17 @@ function AvatarTab({ seat, owned, saveOwned }) {
       <div className="ds-avatar-cells">{PUFFS.map(variant => <button type="button" key={variant} className={`ds-avatar-cell ${variant === avatar.variant ? 'on' : ''}`} aria-label={variant} aria-pressed={variant === avatar.variant} onClick={() => change({ ...avatar, variant })}><Puff variant={variant} color={avatar.color} size={44} /></button>)}</div>
       {[SWATCHES.slice(0, 6), SWATCHES.slice(6)].map((row, index) => <div className="ds-swatches" key={index}>{row.map(([name, color]) => <button type="button" key={color} className={`ds-swatch ${color === avatar.color ? 'on' : ''}`} style={{ background: color }} aria-label={name} aria-pressed={color === avatar.color} onClick={() => change({ ...avatar, color })} />)}</div>)}
     </div>
-    <div className="ds-toggle-row"><div><strong>Show my face on the floor</strong><span>Off shows the puff without eyes in lists and call records.</span></div><Puff variant={avatar.variant} color={avatar.color} size={32} face={false} /><Switch checked={avatar.face} onChange={face => change({ ...avatar, face })} label="Show my face on the floor" /></div>
+    <div className="ds-toggle-row"><div><strong>Show my face</strong><span>Off shows the puff without eyes in lists and call records.</span></div><Puff variant={avatar.variant} color={avatar.color} size={32} face={false} /><Switch checked={avatar.face} onChange={face => change({ ...avatar, face })} label="Show my face" /></div>
   </Body>;
 }
 
-function Register({ seat, owned, saveOwned }) {
+function Register({ owned, saveOwned }) {
   const formality = owned('formality') || 'formal';
   const persona = owned('persona') || '';
   return <Body tight>
     <h3 className="voice-first">Register</h3>
     {FORMALITY.map(([key, main, sub]) => <Option key={key} on={formality === key} main={main} sub={sub} onClick={() => saveOwned({ formality: key })} />)}
-    <Field label="House style" className="voice-style"><textarea key={`${seat?.id || ''}:${persona}`} rows={3} maxLength={300} defaultValue={persona} placeholder="Brief and friendly. Formal “vous”. Never promise a time you can’t keep." onBlur={event => { const next = event.target.value.trim(); if (next !== persona) saveOwned({ persona: next }); }} /></Field>
+    <Field label="House style" className="voice-style"><textarea key={persona} rows={3} maxLength={300} defaultValue={persona} placeholder="Brief and friendly. Formal “vous”. Never promise a time you can’t keep." onBlur={event => { const next = event.target.value.trim(); if (next !== persona) saveOwned({ persona: next }); }} /></Field>
     <p className="ds-note">Shapes how replies are worded before they are spoken — length, politeness, phrasing. Facts and meaning never change.</p>
   </Body>;
 }

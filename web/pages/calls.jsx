@@ -24,17 +24,18 @@ const statusOf = call => call.state === 'in_call' ? ['green', 'On the line'] : c
   : firstLine(call.ticket?.issue) ? ['green', 'Notes saved'] : !call.answeredAt ? ['muted', 'Not answered'] : ['muted', 'Transcript saved'];
 
 export default function CallsPage(common) {
-  const { data, navigate, route, seat, hasFloor } = common;
+  const { data, navigate, route } = common;
   const [tab, setTab] = useState(route.query.tab || 'all');
   const [q, setQ] = useState('');
   if (route.params.id) return <Record key={route.params.id} {...common} call={data.calls.find(call => call.id === route.params.id)} />;
-  const agentOf = call => data.agents.find(agent => agent.id === call.agentId) || (call.agentName ? { name: call.agentName } : null);
+  // The name on a past call is the voice the caller heard it in.
+  const agentOf = call => (call.agentName ? { name: call.agentName } : null);
   const week = data.calls.filter(call => new Date(call.startedAt) >= monday());
   const needle = q.trim().toLowerCase();
-  const shown = data.calls.filter(call => tab === 'mine' ? Boolean(seat) && call.agentId === seat.id : tab === 'attention' ? attention(call) : true)
+  const shown = data.calls.filter(call => tab === 'attention' ? attention(call) : true)
     .filter(call => !needle || [call.from, call.ticket?.issue, call.ticket?.address, ...(call.transcript || []).flatMap(line => [line.textSource, line.textShown])].some(text => text?.toLowerCase().includes(needle)));
   const groups = [['TODAY', 0], ['YESTERDAY', 1], ['EARLIER', 2]].map(([label, day]) => [label, shown.filter(call => Math.min(daysAgo(call.startedAt), 2) === day)]).filter(([, calls]) => calls.length);
-  const tabs = [{ key: 'all', label: 'All' }, ...(hasFloor ? [{ key: 'mine', label: 'Mine' }] : []), { key: 'attention', label: 'Needs attention' }];
+  const tabs = [{ key: 'all', label: 'All' }, { key: 'attention', label: 'Needs attention' }];
   return <>
     <Toolbar />
     <Title title="Calls" sub={`This week · ${week.length} call${week.length === 1 ? '' : 's'} · ${longMinutes(week.reduce((sum, call) => sum + length(call), 0))} translated`} />
@@ -45,7 +46,7 @@ export default function CallsPage(common) {
         : groups.map(([label, calls], index) => <React.Fragment key={label}>
           <Label style={{ margin: index ? '22px 0 4px' : '0 0 4px' }}>{label}</Label>
           {calls.map(call => { const agent = agentOf(call); const main = firstLine(call.ticket?.issue) || call.from || 'Caller'; const [tone, text] = statusOf(call);
-            const sub = [when(call.startedAt), main !== call.from && call.from, pair(call), call.state === 'ended' ? (call.answeredAt ? formatDuration(length(call)) : 'no agent free') : null, agent?.name].filter(Boolean).join(' · ');
+            const sub = [when(call.startedAt), main !== call.from && call.from, pair(call), call.state === 'ended' ? (call.answeredAt ? formatDuration(length(call)) : 'not answered') : null, agent?.name].filter(Boolean).join(' · ');
             return <Row key={call.id} lead={<Avatar who={agent || (call.answeredAt ? 'workspace' : '')} size={30} face={!!agent} />} main={main} sub={sub} title={call.error || undefined} right={<Status tone={tone}><span className="calls-clip">{text}</span></Status>} onClick={() => navigate(`/calls/${encodeURIComponent(call.id)}`)} />; })}
         </React.Fragment>)}
     </Body>
@@ -57,7 +58,7 @@ function Record({ call, data, navigate, route, setNotice, setError }) {
   const [tab, setTab] = useState(route.query.tab === 'transcript' ? 'transcript' : 'notes');
   const [find, setFind] = useState(null); // null = closed
   if (!call) return <><Toolbar back onBack={() => navigate('/calls')} /><Title title="Calls" /><Body><Empty title="That call is not here.">It may have been removed, or the link is old.</Empty></Body><Ask placeholder="Ask about your calls" scope="calls" /></>;
-  const agent = data.agents.find(item => item.id === call.agentId) || (call.agentName ? { name: call.agentName } : null);
+  const agent = call.agentName ? { name: call.agentName } : null;
   const lines = call.transcript || [];
   const ticket = call.ticket || {};
   const issue = (ticket.issue || '').trim();

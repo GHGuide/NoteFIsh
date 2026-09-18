@@ -29,25 +29,28 @@ Read `finalidea.md` and `docs/hold-project.md` before changing anything.
 - Clone only enrolled / licensed `reference_id`s. Never clone callers or coworkers from the live line.
 - OpenAI = words. Fish = who it sounds like. Browser audio = current demo transport. Twilio remains an optional future phone-number transport.
 - If you drop Fish, you sound like every Twilio demo. Do not drop Fish.
-- Pages: `/voices` (library), `/enroll` (create), `/desk` (call), `/floor` (read-only queue and room), `/admin` (setup), and `/caller` (phone caller). The user explicitly approved the caller page and browser-call demo without Twilio. Caller transport is scoped to an expiring invitation; its UI/socket must not load or broadcast desk APIs or transcripts. The temporary shared workspace is separately public by user request.
+- Pages: `/voices` (library), `/enroll` (create), `/desk` (call), `/admin` (setup), and `/caller` (phone caller). The user explicitly approved the caller page and browser-call demo without Twilio. Caller transport is scoped to an expiring invitation; its UI/socket must not load or broadcast desk APIs or transcripts. The temporary shared workspace is separately public by user request.
 - Done means: a real phone browser calls a laptop, rings/answers, caller microphone is audible at the desk with translated captions, a real agent microphone reply is heard in the selected Fish voice on the phone, end works, transcript persists. Synthetic audio and same-laptop tabs are intermediate checks only.
 
-## Floor rules (added 15 Sep 2026)
+## One desk (18 Sep 2026, replacing the floor rules of 15 Sep)
 
-- A roster entry is a **seat, not an account**. The signed cookie says which
-  agent a browser acts as; it does not verify a person. Never describe it as
-  authentication in code comments, UI copy, or docs.
-- An empty roster means one desk and no seat is required. Seats become required
-  only once agents exist, so a single-person deployment stays simple.
-- Multi-agent requires the protected access mode. A shared demo cannot tell
-  visitors apart, so it stays a single desk.
-- Caller audio is addressed to the assigned agent only. `broadcast(event, {to})`
-  exists for that reason; never widen an audio event to the whole floor.
-- Routing is ring-all, first-answer-wins. The call service owns the assignment
-  guard; `queue.mjs` only reports presence and the queue view.
-- One live call per agent, `NOTEFISH_MAX_CONCURRENT_CALLS` (default 20) for the
-  process. The JSON store and single process are the real ceiling: this is built
-  for 5–20 seats, not 100.
+The roster, seats, the Floor page and signing out are gone, at the user's request:
+"the whole floor thing is badly designed and very confusing. also signing in as
+operators is a bad idea."
+
+- **A call rings the desk.** There is nothing to claim first. A roster with nobody
+  seated used to mean calls rang nobody and died after sixty seconds, which is the
+  failure this removed.
+- **A person switches between their voices, not between seats.** A voice is a name,
+  an avatar and how you sound; the sidebar switches it and the next call uses it.
+- **Signing in happens once.** The first account claims the desk, a second sign-up is
+  refused, and there is no sign-out in the interface. This is what keeps a hosted desk
+  shut to anyone with the link, with the API keys behind it.
+- **Settings are the desk's.** `resolveSettings()` reads one place. Languages, style
+  and glossary do not change when a voice does.
+- Store version 3 drops `agents` and `invites`; the migration hands the last seat's
+  voice and languages to the desk so nobody loses what they were answering with.
+- `broadcast(event)` has no `to`: one desk, and every tab of it sees the same events.
 
 ## How to work
 

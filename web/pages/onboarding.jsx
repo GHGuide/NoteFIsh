@@ -19,7 +19,7 @@ const STEPS = [
   { key: 'done', label: 'Ready' },
 ];
 
-export default function Onboarding({ data, seat, owned, saveSettings, saveOwned, navigate, setError, onDone }) {
+export default function Onboarding({ data, owned, saveSettings, saveOwned, navigate, setError, onDone }) {
   const mac = data.setup?.mac?.platform === 'darwin';
   const steps = STEPS.filter(step => !step.macOnly || mac);
   const [index, setIndex] = useState(0);
@@ -136,7 +136,7 @@ export default function Onboarding({ data, seat, owned, saveSettings, saveOwned,
     <aside className="ob-rail">
       <div className="ob-lockup"><LogoMark size={22} /><span>NoteFish<span className="dot">.</span></span></div>
       <ol className="ob-steps">{steps.map((item, i) => <li key={item.key} className={i === index ? 'now' : i < index ? 'done' : ''}><i>{i < index ? <Check size={11} strokeWidth={2.8} /> : i + 1}</i>{item.label}</li>)}</ol>
-      <div className="ob-who"><Avatar who={seat || 'workspace'} size={30} /><div><strong>{seat?.name || 'Your desk'}</strong><span>Setup</span></div></div>
+      <div className="ob-who"><Avatar who={voice || 'workspace'} size={30} /><div><strong>{voice?.name || 'Your desk'}</strong><span>Setup</span></div></div>
     </aside>
     <section className="ob-main">
       <div className="ob-art" aria-hidden="true"><Puff variant="fish" color="#2F6FE0" size={72} /><Puff variant="puff" color="#3C8A4E" size={48} face={false} /><Puff variant="bloom" color="#E7A72F" size={40} face={false} /></div>

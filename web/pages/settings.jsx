@@ -1,5 +1,5 @@
-// Settings: the workspace defaults every seat inherits, the roster, the
-// integrations, and the phone number (the old Setup page in design clothes).
+// Settings: the desk's own defaults, the integrations, and the phone number
+// (the old Setup page in design clothes).
 import React, { useEffect, useState } from 'react';
 import { Copy, ExternalLink, Plus, RefreshCw, Send, Trash2 } from 'lucide-react';
 import { api } from '../api.js';
@@ -7,7 +7,7 @@ import { languages, languageName, isArchived } from '../lib.jsx';
 import { Toolbar, Title, Tabs, ReadBar, Body, Row, Setting, Status, Dot, Label, Chip, Btn, TextBtn, SelectPill, Field, Avatar, Empty, Ask } from '../shell.jsx';
 import './settings.css';
 
-const TABS = [{ key: 'workspace', label: 'Workspace' }, { key: 'agents', label: 'Agents' }, { key: 'integrations', label: 'Integrations' }, { key: 'phone', label: 'Phone number' }];
+const TABS = [{ key: 'workspace', label: 'Workspace' }, { key: 'integrations', label: 'Integrations' }, { key: 'phone', label: 'Phone number' }];
 const LANGS = languages.map(item => ({ value: item.code, label: item.name }));
 const callerName = code => code === 'auto' ? 'whatever they speak' : languageName(code);
 const onOff = on => <Status tone={on ? 'green' : 'muted'}>{on ? 'On' : 'Off'}</Status>;
@@ -22,17 +22,17 @@ export default function SettingsPage(common) {
   const readyVoices = data.voices.filter(voice => voice.status === 'ready' && !isArchived(voice));
   const copy = async value => { try { await navigator.clipboard.writeText(value); setNotice('Copied to clipboard.'); } catch { setError('Clipboard access is unavailable. Select and copy it by hand.'); } };
   const shared = { ...common, setup, readyVoices, copy, setTab };
-  const Pane = { workspace: Workspace, agents: Agents, integrations: Integrations, phone: Phone }[tab];
+  const Pane = { workspace: Workspace, integrations: Integrations, phone: Phone }[tab];
   return <>
     <Toolbar><button type="button" className="ds-tool filled" disabled={refreshing} onClick={async () => { setRefreshing(true); await reload(); setRefreshing(false); }}><RefreshCw size={14} className={refreshing ? 'spin' : ''} />Refresh status</button></Toolbar>
-    <Title title="Settings" sub="Workspace defaults every seat inherits" />
+    <Title title="Settings" sub="How this desk answers, and what it is connected to" />
     <Tabs items={TABS} value={tab} onChange={setTab} />
     <Pane {...shared} />
     <Ask placeholder="Ask about a setting" scope="settings" />
   </>;
 }
 
-function Workspace({ data, setup, readyVoices, saveSettings, roster, setTab }) {
+function Workspace({ data, setup, readyVoices, saveSettings, setTab }) {
   const [style, setStyle] = useState(false);
   const s = data.settings;
   const voice = data.voices.find(item => item.id === s.voiceId);
@@ -54,7 +54,6 @@ function Workspace({ data, setup, readyVoices, saveSettings, roster, setTab }) {
       <p className="ds-note">Shapes how replies are worded before they are spoken: length, politeness, phrasing. Facts and meaning never change.</p>
     </div>}
     <Setting main="Setup" sub="The five-minute walkthrough: languages, voice, a test line, this Mac."><TextBtn onClick={() => { try { sessionStorage.removeItem('notefish.setupPaused'); } catch { /* fine */ } saveSettings({ onboardedAt: null }); }}>Run again</TextBtn></Setting>
-        <Setting main="Agents on the floor" sub={roster.length ? roster.map(agent => agent.name).join(', ') : 'Nobody yet · one desk'}><TextBtn onClick={() => setTab('agents')}>Manage</TextBtn></Setting>
     <Setting main="Zendesk" sub="Creates a ticket for every completed call">{onOff(hooks.zendesk?.configured)}</Setting>
     <Setting main="Signed webhook" sub={hooks.webhook?.url || 'Posts every completed call to your endpoint, signed'}>{onOff(hooks.webhook?.configured)}</Setting>
     <Setting main="Export API" sub="Let a system pull calls as JSON or CSV">{onOff(hooks.exportApi?.configured)}</Setting>
@@ -63,44 +62,6 @@ function Workspace({ data, setup, readyVoices, saveSettings, roster, setTab }) {
 }
 
 const ROLE_OPTIONS = [{ value: 'admin', label: 'Admin' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'agent', label: 'Agent' }];
-function Agents({ setup, readyVoices, roster, multiAgent, refreshFloor, setNotice, setError, user }) {
-  const [name, setName] = useState('');
-  const [busy, setBusy] = useState(false);
-  // Roles live on accounts. A seat that someone joined shows their role and can be offboarded.
-  const [people, setPeople] = useState([]);
-  const loadPeople = () => api.users().then(result => setPeople(result.users)).catch(() => setPeople([]));
-  useEffect(() => { loadPeople(); }, []);
-  const accountOf = agent => agent.userId ? people.find(person => person.id === agent.userId) : null;
-  const run = async (work, message) => { setBusy(true); try { await work(); await refreshFloor(); if (message) setNotice(message); } catch (failure) { setError(failure.message); } finally { setBusy(false); } };
-  const copyLink = async (url, who) => { try { await navigator.clipboard.writeText(url); setNotice(`Invitation link copied. Send it to ${who}.`); } catch { setNotice(`Invitation link: ${url}`); } };
-  // An email invites: the link signs them up as this seat. A bare name is a seat anyone here can take.
-  const add = () => { const trimmed = name.trim(); if (!trimmed || busy) return; const email = /@/.test(trimmed); run(async () => { const result = await api.createAgent(email ? { email: trimmed } : { name: trimmed }); setName(''); if (result.inviteUrl) await copyLink(result.inviteUrl, trimmed); }, email ? '' : `${trimmed} added to the roster.`); };
-  const reinvite = agent => run(async () => { const result = await api.reinvite(agent.id); await copyLink(result.inviteUrl, agent.email); });
-  const mailto = agent => `mailto:${agent.email}?subject=${encodeURIComponent('Join our NoteFish desk')}&body=${encodeURIComponent(`Hi ${agent.name.split(' ')[0]},\n\nYou have a seat on our NoteFish desk. Open this link, set a password, and you are in:\n${agent.inviteUrl}\n\nThe link works for a week.`)}`;
-  const remove = agent => {
-    const account = accountOf(agent);
-    if (account) { if (window.confirm(`Offboard ${agent.name}? Their account and seat go, and every voice they recorded is deleted at Fish. This cannot be undone.`)) run(async () => { await api.removeUser(account.id); await api.removeAgent(agent.id); await loadPeople(); }, `${agent.name} offboarded.`); }
-    else if (window.confirm(`Remove ${agent.name} from the roster?`)) run(() => api.removeAgent(agent.id), `${agent.name} removed from the roster.`);
-  };
-  if (!multiAgent) return <Body><div className="ds-info">{setup.floor?.reason || 'This deployment runs a single desk.'}</div></Body>;
-  return <>
-    <ReadBar right={<Btn small disabled={busy || !name.trim()} onClick={add}>Add</Btn>}><Plus size={14} /><input value={name} maxLength={100} placeholder="Invite by email, or add a name" aria-label="Email or name" onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') add(); }} /></ReadBar>
-    <Body>
-      {roster.length ? roster.map(agent => <Row key={agent.id} lead={<Avatar who={agent} />} main={agent.name}
-        sub={agent.email ? `${agent.email} · ${agent.userId ? 'joined' : agent.inviteUrl ? 'invited, not joined yet' : 'invitation expired'}` : 'Name only · anyone at this desk can take this seat'}
-        right={<>
-          {accountOf(agent) && <SelectPill aria-label={`Role for ${agent.name}`} value={accountOf(agent).role} disabled={busy || accountOf(agent).id === user?.id} onChange={role => run(async () => { await api.setRole(accountOf(agent).id, role); await loadPeople(); }, `${agent.name} is now ${role === 'admin' ? 'an admin' : role === 'supervisor' ? 'a supervisor' : 'an agent'}.`)} options={ROLE_OPTIONS} />}
-          {agent.email && !agent.userId && (agent.inviteUrl ? <><TextBtn icon={<Copy size={13} />} disabled={busy} onClick={() => copyLink(agent.inviteUrl, agent.email)}>Copy link</TextBtn><a className="ds-text muted" href={mailto(agent)}><Send size={13} />Send</a></> : <TextBtn icon={<Send size={13} />} disabled={busy} onClick={() => reinvite(agent)}>Invite</TextBtn>)}
-          <SelectPill aria-label={`Voice for ${agent.name}`} value={agent.voiceId || ''} disabled={busy} onChange={value => run(() => api.editAgent(agent.id, { voiceId: value || null }))} options={[{ value: '', label: 'Workspace voice' }, ...readyVoices.map(voice => ({ value: voice.id, label: voice.name }))]} />
-          <SelectPill aria-label={`Caller language for ${agent.name}`} value={agent.customerLanguage || ''} disabled={busy} onChange={value => run(() => api.editAgent(agent.id, { customerLanguage: value || null }))} options={[{ value: '', label: 'Workspace default' }, { value: 'auto', label: 'Detect automatically' }, ...LANGS]} />
-          <button type="button" className="ds-tool" aria-label={`Remove ${agent.name}`} disabled={busy} onClick={() => remove(agent)}><Trash2 size={14} /></button>
-        </>} />) : <Empty title="Nobody on the floor yet.">With an empty roster this stays a single desk and anyone can answer.</Empty>}
-      <p className="ds-note" style={{ marginTop: 14 }}>Invite by email and the link signs them up as their seat. A name on its own is a seat anyone at this desk can take.</p>
-      <p className="ds-note">Admins run the desk. Supervisors keep the glossary and watch the floor. Agents answer calls with their own seat and voice; a voice belongs to whoever recorded it.</p>
-    </Body>
-  </>;
-}
-
 function Integrations({ setup }) {
   const [recent, setRecent] = useState(null);
   useEffect(() => { let live = true; api.integrations().then(result => { if (live) setRecent(result.recent || []); }).catch(() => { if (live) setRecent([]); }); return () => { live = false; }; }, []);

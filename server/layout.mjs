@@ -9,16 +9,14 @@ export const PANELS = [
   { id: 'transcript', label: 'Live transcript' },
   { id: 'caller', label: 'Caller' },
   { id: 'notes', label: 'Call notes' },
-  { id: 'queue', label: 'Queue', floorOnly: true },
-  { id: 'agents', label: 'Agents', floorOnly: true },
 ];
 export const PANEL_IDS = PANELS.map(panel => panel.id);
 export const COLUMNS = ['side', 'main', 'hidden'];
 
 export const PRESETS = {
-  classic: { side: ['voice', 'connect', 'speak', 'phrases'], main: ['transcript', 'caller', 'notes'], hidden: ['queue', 'agents'] },
-  transcript: { side: ['speak', 'voice', 'connect', 'notes'], main: ['transcript'], hidden: ['phrases', 'caller', 'queue', 'agents'] },
-  compact: { side: ['connect', 'speak', 'phrases'], main: ['transcript'], hidden: ['voice', 'caller', 'notes', 'queue', 'agents'] },
+  classic: { side: ['voice', 'connect', 'speak', 'phrases'], main: ['transcript', 'caller', 'notes'], hidden: [] },
+  transcript: { side: ['speak', 'voice', 'connect', 'notes'], main: ['transcript'], hidden: ['phrases', 'caller'] },
+  compact: { side: ['connect', 'speak', 'phrases'], main: ['transcript'], hidden: ['voice', 'caller', 'notes'] },
 };
 export const DEFAULT_LAYOUT = PRESETS.classic;
 
@@ -49,12 +47,9 @@ export function normalizeLayout(value) {
 
 export const sameLayout = (a, b) => COLUMNS.every(column => a[column].join(',') === b[column].join(','));
 
-/** Which preset a layout is, if any; presets are compared without floor-only panels
- * so a desk without a floor still recognises them. */
-export function presetOf(layout, { floor = true } = {}) {
-  const strip = value => Object.fromEntries(COLUMNS.map(column => [column, value[column].filter(id => floor || !PANELS.find(panel => panel.id === id)?.floorOnly)]));
-  const target = strip(layout);
-  return Object.keys(PRESETS).find(key => sameLayout(strip(normalizeLayout(PRESETS[key])), target)) || '';
+/** Which preset a layout is, if any. */
+export function presetOf(layout) {
+  return Object.keys(PRESETS).find(key => sameLayout(normalizeLayout(PRESETS[key]), layout)) || '';
 }
 
 /** Move one panel to a column at an index; used by drag-and-drop and the arrow buttons. */

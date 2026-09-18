@@ -244,7 +244,7 @@ export function createCallService({
     for (const runtime of live.values()) {
       // Each live call follows its own agent's pair, so a workspace-default
       // change leaves calls whose agent overrides it untouched.
-      const resolved = resolveSettings(runtime.call.agentId);
+      const resolved = resolveSettings();
       if (!isCallerLanguage(resolved.customerLanguage) || !languageCodes.has(resolved.agentLanguage)) continue;
       if (runtime.call.state === 'ended' || (runtime.call.customerLanguage === resolved.customerLanguage && runtime.call.agentLanguage === resolved.agentLanguage)) continue;
       // Finish the current phrase with its original language hint. Already queued
@@ -280,7 +280,7 @@ export function createCallService({
     };
     live.set(call.id, runtime);
     try { await persist(runtime); } catch (error) { live.delete(call.id); throw error; }
-    runtime.noAnswerTimer = setTimeout(() => void backgroundFinish(runtime, 'No agent answered within 60 seconds.', true), noAnswerMs);
+    runtime.noAnswerTimer = setTimeout(() => void backgroundFinish(runtime, 'Nobody answered within 60 seconds.', true), noAnswerMs);
     runtime.noAnswerTimer.unref?.();
     runtime.lifetimeTimer = setTimeout(() => void backgroundFinish(runtime, 'The call reached the one-hour demo limit.', true), maxCallMs);
     runtime.lifetimeTimer.unref?.();
@@ -326,7 +326,7 @@ export function createCallService({
           runtime.pcmTail = Buffer.from(buffered.subarray(pairedBytes));
           if (pairedBytes) {
             const audio = pcm16kToMulaw8k(buffered.subarray(0, pairedBytes));
-            emit({ type: 'audio', callId, payload: audio.toString('base64') }, runtime.call.agentId);
+            emit({ type: 'audio', callId, payload: audio.toString('base64') });
           }
           hearCaller(runtime, raw);
           return;
@@ -415,7 +415,7 @@ export function createCallService({
         runtime.frameBytes += frame.length;
         if (runtime.frameBytes > 160000) return fail();
         if (runtime.call.state !== 'in_call' || runtime.busy) return;
-        emit({ type: 'audio', callId: runtime.call.id, payload }, runtime.call.agentId);
+        emit({ type: 'audio', callId: runtime.call.id, payload });
         hearCaller(runtime, null, frame);
       })().catch(() => fail());
     });
@@ -442,18 +442,18 @@ export function createCallService({
     if (as.length) lines.push(`Translate these terms exactly so: ${as.join('; ')}.`);
     return lines.join('\n').slice(0, 1500);
   }
-  function resolveSettings(agentId) {
-    const state = store.snapshot();
-    const defaults = state.settings;
-    const agent = agentId ? (state.agents || []).find(item => item.id === agentId && !item.archived) : null;
+  /** One desk, one set of settings. This used to resolve a roster entry over the
+   *  workspace; there is no roster now, and which voice answers is simply which
+   *  voice the desk has chosen. */
+  function resolveSettings() {
+    const defaults = store.snapshot().settings;
     return {
-      agent,
-      voiceId: agent?.voiceId || defaults.voiceId,
-      registers: agent?.registers || defaults.registers || {},
-      persona: agent?.persona || defaults.persona || '',
-      style: composeStyle({ persona: agent?.persona || defaults.persona || '', formality: agent?.formality || defaults.formality || null, glossary: defaults.glossary || [] }),
-      agentLanguage: agent?.agentLanguage || defaults.agentLanguage,
-      customerLanguage: agent?.customerLanguage || defaults.customerLanguage,
+      voiceId: defaults.voiceId,
+      registers: defaults.registers || {},
+      persona: defaults.persona || '',
+      style: composeStyle({ persona: defaults.persona || '', formality: defaults.formality || null, glossary: defaults.glossary || [] }),
+      agentLanguage: defaults.agentLanguage,
+      customerLanguage: defaults.customerLanguage,
     };
   }
 
@@ -461,7 +461,7 @@ export function createCallService({
    * phrase joins the caption queue as text. Without the provider, or if it fails, the segmenter path carries on. */
   function startLiveCaptions(runtime) {
     if (!providers.openTranscription || runtime.live) return;
-    const settings = resolveSettings(runtime.call.agentId);
+    const settings = resolveSettings();
     const hint = settings.customerLanguage === 'auto' ? (runtime.call.detectedLanguage || 'auto') : settings.customerLanguage;
     try {
       const live = providers.openTranscription({
@@ -492,7 +492,7 @@ export function createCallService({
   /** What the caller is saying right now: their own words, and the agent's
    * language once a translation of the phrase so far has come back. */
   function showPartial(runtime, text, shown = '') {
-    emit({ type: 'caption-partial', callId: runtime.call.id, text, ...(shown ? { shown } : {}) }, runtime.call.agentId);
+    emit({ type: 'caption-partial', callId: runtime.call.id, text, ...(shown ? { shown } : {}) });
   }
   function clearPartial(runtime) {
     if (!runtime.partial) return;
@@ -562,7 +562,7 @@ export function createCallService({
     runtime.levelAt = at;
     const level = loudness(runtime.levelPeak);
     runtime.levelPeak = 0;
-    emit({ type: 'level', callId: runtime.call.id, level: Math.round(level * 100) / 100 }, runtime.call.agentId);
+    emit({ type: 'level', callId: runtime.call.id, level: Math.round(level * 100) / 100 });
   }
   const heardSpeech = runtime => runtime.lastSound && Date.now() - runtime.lastSound < SPEECH_MEMORY;
   function hearCaller(runtime, pcm16k, mulawFrame) {
@@ -571,24 +571,17 @@ export function createCallService({
     if (runtime.live?.open) { runtime.live.push(pcm); return; }
     queueCaption(runtime, runtime.segmenter.push(pcm16k ?? mulawFrame));
   }
-  async function answer(id, agentId = null) {
+  async function answer(id) {
     const runtime = find(id); connected(runtime);
-    // Every available agent sees a ringing call. The first one through this
-    // check owns it; the rest are told so rather than silently stealing it.
-    if (agentId && runtime.call.agentId && runtime.call.agentId !== agentId) throw new CallError('Another agent already answered this call.');
     if (runtime.call.state === 'in_call') return structuredClone(runtime.call);
-    if (agentId) {
-      const settings = resolveSettings(agentId);
-      if (!settings.agent) throw new CallError('This agent is no longer on the roster.', 403);
-      for (const other of live.values()) {
-        if (other !== runtime && other.call.agentId === agentId && other.call.state === 'in_call') throw new CallError('You are already on another call. End it before answering.');
-      }
-      runtime.call.agentId = agentId;
-      runtime.call.agentName = settings.agent.name;
-      if (settings.voiceId) runtime.call.voiceId = settings.voiceId;
-      if (languageCodes.has(settings.agentLanguage)) runtime.call.agentLanguage = settings.agentLanguage;
-      if (isCallerLanguage(settings.customerLanguage)) runtime.call.customerLanguage = settings.customerLanguage;
-    }
+    // The call takes the desk's settings as they are at the moment it is picked up,
+    // so changing a voice between calls is enough and nobody has to claim a seat.
+    const settings = resolveSettings();
+    if (settings.voiceId) runtime.call.voiceId = settings.voiceId;
+    const voice = (store.snapshot().voices || []).find(item => item.id === runtime.call.voiceId);
+    if (voice?.name) runtime.call.agentName = voice.name; // who the caller heard, for the history and the webhook
+    if (languageCodes.has(settings.agentLanguage)) runtime.call.agentLanguage = settings.agentLanguage;
+    if (isCallerLanguage(settings.customerLanguage)) runtime.call.customerLanguage = settings.customerLanguage;
     clearTimeout(runtime.noAnswerTimer); clearInterval(runtime.ringbackTimer);
     send(runtime, { event: 'clear' });
     runtime.call.state = 'in_call'; runtime.call.answeredAt = now();
@@ -612,7 +605,7 @@ export function createCallService({
     if (runtime.busy) throw new CallError('Wait for the current reply, or stop it before starting another.');
     feeling = feeling === undefined ? undefined : canonicalRegister(feeling);
     if (feeling !== undefined && feeling !== 'auto' && !REGISTERS.includes(feeling)) throw new CallError(`Choose a feeling: auto, ${REGISTERS.join(', ')}.`);
-    const state = store.snapshot(); const settings = resolveSettings(runtime.call.agentId);
+    const state = store.snapshot(); const settings = resolveSettings();
     const readyVoice = id => { const v = state.voices.find(voice => voice.id === id); return v && v.status === 'ready' && !v.archived && ['enrolled', 'licensed'].includes(v.kind) ? v : null; };
     const baseVoice = readyVoice(settings.voiceId);
     if (!baseVoice) throw new CallError('Select a ready, enrolled or licensed voice before speaking.');

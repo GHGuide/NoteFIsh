@@ -58,7 +58,8 @@ export function loadConfig(env = process.env, root = process.cwd()) {
     if (!/^\d{1,6}$/.test(value) || Number(value) < 1 || Number(value) > max) throw new ConfigError(`Invalid ${key}`);
     return Number(value);
   };
-  const maxAgents = count('NOTEFISH_MAX_AGENTS', 20, 50);
+  // How many tabs of the one desk may hold a socket at once. It was a seat count.
+  const maxDeskTabs = count('NOTEFISH_MAX_DESK_TABS', 20, 100);
   const maxConcurrentCalls = count('NOTEFISH_MAX_CONCURRENT_CALLS', 20, 50);
   const webhookUrl = read('NOTEFISH_WEBHOOK_URL');
   if (webhookUrl) {
@@ -107,7 +108,7 @@ export function loadConfig(env = process.env, root = process.cwd()) {
     elevenLabsApiKey: read('ELEVENLABS_API_KEY'),
     elevenLabsModel: model('ELEVENLABS_MODEL', 'eleven_flash_v2_5'),
     twilioAccountSid, twilioAuthToken: read('TWILIO_AUTH_TOKEN'), twilioNumber,
-    sessionSecret, adminEmail, siteHosts, macBuildUrl, macBuildVersion, maxAgents, maxConcurrentCalls,
+    sessionSecret, adminEmail, siteHosts, macBuildUrl, macBuildVersion, maxDeskTabs, maxConcurrentCalls,
     webhookUrl, webhookSecret, exportToken,
     zendeskSubdomain, zendeskEmail, zendeskApiToken,
     demoVoiceReferenceId: read('NOTEFISH_DEMO_VOICE_REFERENCE_ID', 128),
@@ -145,14 +146,7 @@ export function getStatus(config, { audioAvailable = false, driverInstalled = nu
     mac: { platform: process.platform, driverInstalled }, // the NoteFish Voice virtual microphone, for calls in Zoom and the rest
     access: { mode: config.publicDemo ? 'shared-demo' : 'protected', loginRequired: !config.publicDemo },
     callerUrl: config.publicBaseUrl ? `${config.publicBaseUrl}/caller` : null,
-    // A shared demo has no way to tell one visitor from another, so a roster of
-    // named agents there would be theatre. Multi-agent stays protected-only.
-    floor: {
-      multiAgent: !config.publicDemo,
-      reason: config.publicDemo ? 'The shared demo runs as one desk. Set NOTEFISH_PUBLIC_DEMO=false to run a roster of agents.' : '',
-      maxAgents: config.maxAgents, maxConcurrentCalls: config.maxConcurrentCalls,
-      persistentSessions: Boolean(config.sessionSecret),
-    },
+    limits: { maxDeskTabs: config.maxDeskTabs, maxConcurrentCalls: config.maxConcurrentCalls },
     integrations: {
       webhook: { configured: Boolean(config.webhookUrl), url: config.webhookUrl || null },
       zendesk: { configured: Boolean(config.zendeskSubdomain && config.zendeskEmail && config.zendeskApiToken) },

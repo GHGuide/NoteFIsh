@@ -1,14 +1,14 @@
 // Insights: the last seven days in six numbers, the languages callers spoke, and who answered.
 import React, { useState } from 'react';
 import { Toolbar, Title, Tabs, Body, Row, Stat, Bar, Status, Avatar, Ask } from '../shell.jsx';
-import { languageName, AGENT_STATE } from '../lib.jsx';
+import { languageName } from '../lib.jsx';
 
 const secs = (a, b) => a && b ? Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000)) : 0;
 const hm = s => { const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h ? `${h} h ${m} m` : `${m} m`; };
 const callerLang = call => { const l = call.detectedLanguage || call.customerLanguage; return l && l !== 'auto' ? l : null; };
 const TONE = { available: 'green', on_call: 'amber', paused: 'muted', offline: 'muted' };
 
-export default function InsightsPage({ data, route, roster, hasFloor }) {
+export default function InsightsPage({ data, route }) {
   const [tab, setTab] = useState(route.query.tab || 'overview');
   const end = new Date(), start = new Date(Date.now() - 6 * 864e5); start.setHours(0, 0, 0, 0);
   const week = data.calls.filter(call => new Date(call.startedAt) >= start);
@@ -18,7 +18,7 @@ export default function InsightsPage({ data, route, roster, hasFloor }) {
   const spoken = byLang.reduce((sum, [, calls]) => sum + calls.length, 0);
   const short = d => d.toLocaleDateString([], { month: 'short', day: 'numeric' });
   const bars = list => <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 4 }}>{list.map(([l, calls]) => <Bar key={l} label={languageName(l)} pct={100 * calls.length / spoken} />)}</div>;
-  const tabs = [{ key: 'overview', label: 'Overview' }, { key: 'languages', label: 'Languages' }, ...(hasFloor ? [{ key: 'agents', label: 'Agents' }] : [])];
+  const tabs = [{ key: 'overview', label: 'Overview' }, { key: 'languages', label: 'Languages' }];
   return <>
     <Toolbar />
     <Title title="Insights" sub={`Last 7 days · ${short(start)} – ${start.getMonth() === end.getMonth() ? end.getDate() : short(end)}`} />
@@ -39,8 +39,6 @@ export default function InsightsPage({ data, route, roster, hasFloor }) {
         {bars(byLang)}
         <div style={{ marginTop: 18 }}>{byLang.map(([l, calls]) => <Row key={l} main={languageName(l)} sub={`${calls.length} call${calls.length === 1 ? '' : 's'} · ${hm(minutes(calls))}`} right={<span className="ds-chip">{l.toUpperCase()}</span>} />)}</div>
       </>)}
-      {tab === 'agents' && (!roster.length ? <p className="ds-note">No agents on the roster yet.</p> : roster.map(agent => { const mine = week.filter(call => call.agentId === agent.id && call.answeredAt); const state = data.floor?.agents?.find(item => item.id === agent.id)?.state || 'offline';
-        return <Row key={agent.id} lead={<Avatar who={agent} size={30} />} main={agent.name} sub={`${mine.length} call${mine.length === 1 ? '' : 's'} answered · ${hm(minutes(mine))} this week`} right={<Status tone={TONE[state]}>{AGENT_STATE[state]}</Status>} />; }))}
     </Body>
     <Ask placeholder="Ask about this week" scope="calls" />
   </>;

@@ -53,12 +53,9 @@ function readEnv(file) {
 }
 
 // ---- the desk API, as the desk itself would call it ----
-let seatCookie = '';
 async function api(method, route, body) {
-  const headers = { 'Content-Type': 'application/json', Origin: server, ...(password ? { Authorization: 'Basic ' + Buffer.from(`desk:${password}`).toString('base64') } : {}), ...(seatCookie ? { Cookie: seatCookie } : {}) };
+  const headers = { 'Content-Type': 'application/json', Origin: server, ...(password ? { Authorization: 'Basic ' + Buffer.from(`desk:${password}`).toString('base64') } : {}) };
   const response = await fetch(server + route, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-  const setCookie = response.headers.get('set-cookie');
-  if (setCookie) seatCookie = setCookie.split(';')[0]; // the seat: presence on the roster, so the desk offers this call to us and lets us answer it
   const text = await response.text();
   let data; try { data = JSON.parse(text); } catch { data = { error: text.slice(0, 200) }; }
   if (!response.ok) throw new Error(data.error || `${method} ${route} failed (${response.status})`);
@@ -281,14 +278,6 @@ if (!input || !output) {
 }
 if (!tap && input.name === output.name) console.error(`Warning: listening to and speaking into the same device (${input.name}) will echo your own replies back as captions. Use two devices.`);
 try { await api('GET', '/api/session'); } catch (error) { console.error(`Cannot reach the desk at ${server}: ${error.message}`); process.exit(2); }
-// --as Nina: sign in on the roster as that agent, so --auto-answer can pick up and the call carries their voice and takes.
-if (args.as) {
-  const roster = (await api('GET', '/api/agents')).agents.filter(agent => !agent.archived);
-  const me = roster.find(agent => agent.name.toLowerCase() === String(args.as).toLowerCase());
-  if (!me) { console.error(`No agent named "${args.as}" on the roster (${roster.map(a => a.name).join(', ') || 'empty'}).`); process.exit(2); }
-  await api('POST', `/api/agents/${me.id}/session`, {});
-  log(`answering as ${me.name}`);
-}
 log(`desk ${server} · hear: ${tap ? input.name : `[${input.index}] ${input.name}`} · speak: [${output.index}] ${output.name}`);
 const probe = await ensureActivityProbe();
 log(probe ? 'listening for calls by who is holding the microphone (any app)' : 'no swiftc: going by known call apps and tab titles, which cannot tell a meeting you have left from one you are in');
@@ -310,4 +299,4 @@ else if (args.watch) {
   console.log('Nothing to do: pass --watch to detect calls, --start "Label" to bridge now, or --list-devices.');
   process.exit(0);
 }
-process.on('SIGINT', () => { endBridge('stopped'); const bye = seatCookie ? api('DELETE', '/api/agents/session').catch(() => {}) : Promise.resolve(); bye.finally(() => setTimeout(() => process.exit(0), 300)); });
+process.on('SIGINT', () => { endBridge('stopped'); setTimeout(() => process.exit(0), 300); });

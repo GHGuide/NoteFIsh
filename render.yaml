@@ -58,7 +58,7 @@ services:
       # floor and the JSON store live in one process.
       - key: NOTEFISH_SESSION_SECRET
         generateValue: true
-      - key: NOTEFISH_MAX_AGENTS
+      - key: NOTEFISH_MAX_DESK_TABS
         value: "20"
       - key: NOTEFISH_MAX_CONCURRENT_CALLS
         value: "20"
