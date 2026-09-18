@@ -79,7 +79,8 @@ test('a database that refuses to answer stops the desk rather than quietly losin
   class Broken { on() {} async connect() { throw new Error('connection refused'); } async end() {} async query() { throw new Error('connection refused'); } }
   await assert.rejects(
     createStore(path.join(directory, 'notefish.json'), { connectionString: 'postgres://desk@example/notefish', driver: { Client: Broken } }),
-    /connection refused/,
+    error => error.name === 'StorageError' && /DATABASE_URL: connection refused/.test(error.message),
+    'and says which setting named the database, and what it said',
   );
 });
 

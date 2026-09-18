@@ -229,7 +229,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     // Config messages name variables only; never print raw provider exceptions.
     // A configuration error names a variable and is safe to print; anything else
     // could carry a provider's own words, so it stays generic.
-    console.error(error.name === 'ConfigError' ? error.message : 'NoteFish could not start. Check configuration and local data permissions.');
+    console.error(['ConfigError', 'StorageError'].includes(error.name) ? error.message : 'NoteFish could not start. Check configuration and local data permissions.');
     process.exitCode = 1;
   });
 }

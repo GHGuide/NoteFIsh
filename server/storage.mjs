@@ -8,6 +8,15 @@
 import { mkdir, open, readFile, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
 
+/** A database that will not talk to us, said plainly. Postgres reports the host,
+ *  the user and what went wrong, none of which is the password. */
+export class StorageError extends Error {
+  constructor(message) { super(message); this.name = 'StorageError'; }
+}
+const dbFailure = error => new StorageError(
+  `Could not use the database named in DATABASE_URL: ${error.message || 'no reason given'}${error.code ? ` (${error.code})` : ''}`,
+);
+
 /** A file beside the server. Written to a temporary name and renamed, so a crash
  *  mid-write leaves the previous document intact rather than half of a new one. */
 export function fileStorage(filePath, { maxBytes }) {
@@ -54,7 +63,7 @@ export function postgresStorage(connectionString, { maxBytes, driver }) {
   };
   const withClient = async work => {
     try { return await work(await connect()); }
-    catch (error) { client = null; throw error; }
+    catch (error) { client = null; throw error.name === 'StorageError' ? error : dbFailure(error); }
   };
   return {
     describe: () => 'the database',
