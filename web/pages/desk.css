@@ -2,7 +2,7 @@
    caption column, the invite block, and the home screen shown between calls. */
 .desk-pair { display: inline-flex; align-items: center; height: 28px; padding-left: 10px; border-radius: 999px; border: 1px solid var(--sheet-line); background: var(--sheet); font: 600 12px var(--sans); color: var(--ink); white-space: nowrap; }
 .desk-pair .arrow { color: var(--muted); margin: 0 1px 0 6px; }
-.desk-pair .ds-selectpill { border: 0; background: transparent; height: 26px; }
+.desk-pair .ds-select { border: 0; background: transparent; height: 26px; }
 .ds-col.desk-scroll { flex: 1 1 0; min-height: 0; overflow: auto; margin-top: 14px; padding-bottom: 12px; }
 .desk-code { font-weight: 600; margin-right: 6px; }
 .desk-live .ds-wave { color: var(--red); }

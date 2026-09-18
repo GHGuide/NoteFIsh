@@ -165,13 +165,7 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 .ds-pill:disabled { opacity: .45; cursor: not-allowed; }
 .ds-pillrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .ds-pillrow .ds-label { margin-right: 4px; }
-.ds-selectpill { position: relative; display: inline-flex; align-items: center; height: 28px; border-radius: 999px; border: 1px solid var(--sheet-line); background: var(--sheet); color: var(--ink); font: 600 12px var(--sans); }
-.ds-selectpill svg { position: absolute; pointer-events: none; }
-.ds-selectpill svg.lead { left: 9px; color: var(--navtext); }
-.ds-selectpill svg.chev { right: 8px; color: var(--navtext); }
-.ds-selectpill select { appearance: none; height: 100%; padding: 0 24px 0 10px; border: 0; background: transparent; font: inherit; color: inherit; cursor: pointer; max-width: 220px; }
-.ds-selectpill select.with-lead { padding-left: 28px; }
-.ds-selectpill.bar { background: var(--bar); border-color: transparent; }
+/* .ds-selectpill was the native <select>'s skin; see .ds-select below. */
 
 /* fields */
 .ds-field { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
@@ -206,7 +200,7 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 .ds-setting strong { display: block; font-size: 16px; font-weight: 600; }
 .ds-setting > div > span { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; line-height: 1.45; }
 .ds-setting .ctl { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.ds-setting .ctl .ds-selectpill select { max-width: 200px; }
+.ds-setting .ctl .ds-select { max-width: 210px; }
 
 /* strips and captions (desk) */
 .ds-strip { display: flex; align-items: center; justify-content: space-between; gap: 10px; height: 38px; padding: 0 12px; border-radius: 8px; background: var(--bar); margin-top: 18px; flex-shrink: 0; }
@@ -441,3 +435,27 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 .ds-pop-pick .txt strong { display: block; font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ds-pop-pick .txt span { display: block; font-size: 11.5px; color: var(--muted); margin-top: 1px; }
 .ds-pop-pick .tick { color: var(--green); flex-shrink: 0; }
+
+/* ---- the select: a pill you press, and a menu drawn into the page ---- */
+.ds-select { display: inline-flex; align-items: center; gap: 7px; height: 28px; max-width: 220px; padding: 0 9px 0 11px; border: 1px solid var(--sheet-line); border-radius: 999px; background: var(--sheet); color: var(--ink); font: 600 12px var(--sans); white-space: nowrap; cursor: pointer; transition: background .14s var(--ease), border-color .14s, box-shadow .14s; }
+.ds-select:hover:not(:disabled) { background: var(--bar); }
+.ds-select.on { background: var(--card); border-color: var(--line); box-shadow: 0 2px 8px rgba(36, 36, 36, .08); }
+.ds-select:disabled { opacity: .45; cursor: not-allowed; }
+.ds-select.bar { background: var(--bar); border-color: transparent; }
+.ds-select .lead { display: grid; color: var(--navtext); flex-shrink: 0; }
+.ds-select.wide { width: 100%; max-width: none; height: 38px; border-radius: 10px; font-size: 13.5px; }
+.ds-select .now { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.ds-select .chev { color: var(--navtext); flex-shrink: 0; transition: transform .18s var(--ease); }
+.ds-select.on .chev { transform: rotate(180deg); }
+
+/* Drawn into the body, because the sheet clips its overflow and the rows scroll. */
+.ds-menu { position: fixed; z-index: 90; display: flex; flex-direction: column; gap: 1px; padding: 6px; border: 1px solid var(--sheet-line); border-radius: 16px; background: var(--card); box-shadow: 0 2px 6px rgba(36, 36, 36, .05), 0 20px 48px rgba(36, 36, 36, .2); overflow: auto; overscroll-behavior: contain; animation: ds-menu-in .15s var(--ease); transform-origin: top center; }
+.ds-menu.up { transform-origin: bottom center; }
+@keyframes ds-menu-in { from { opacity: 0; transform: translateY(-5px) scale(.98); } }
+.ds-menu-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 32px; padding: 6px 10px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: 500 13px var(--sans); text-align: left; cursor: pointer; }
+.ds-menu-item > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-menu-item svg { color: var(--green); flex-shrink: 0; }
+.ds-menu-item.here { background: var(--bar); }
+.ds-menu-item.on { font-weight: 650; }
+.ds-menu-item:disabled { opacity: .45; cursor: not-allowed; background: transparent; }
+@media (prefers-reduced-motion: reduce) { .ds-menu { animation: none; } .ds-select .chev { transition: none; } }

@@ -4,6 +4,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronLeft, Loader2, Send, X } from 'lucide-react';
 import { api } from './api.js';
+import Select from './components/select.jsx';
 
 // ---- avatars: eight puffs, eleven colours (design/build.py PUFFS / SWATCHES) ----
 export const PUFFS = ['fish', 'puff', 'cloud', 'sheep', 'bloom', 'tuft', 'pom', 'squish'];
@@ -106,9 +107,9 @@ export function Btn({ kind = 'ink', small = false, pill = false, grow = false, i
 }
 export function TextBtn({ muted = false, icon, children, className = '', ...props }) { return <button type="button" className={`ds-text ${muted ? 'muted' : ''} ${className}`} {...props}>{icon}{children}</button>; }
 export function Pill({ on = false, children, className = '', ...props }) { return <button type="button" className={`ds-pill ${on ? 'on' : ''} ${className}`} aria-pressed={on} {...props}>{children}</button>; }
-export function SelectPill({ value, onChange, options, lead, bar = false, className = '', ...props }) {
-  return <span className={`ds-selectpill ${bar ? 'bar' : ''} ${className}`}>{lead && <span className="lead" style={{ position: 'absolute', left: 9, display: 'grid', color: 'var(--navtext)', pointerEvents: 'none' }}>{lead}</span>}<select value={value} onChange={event => onChange(event.target.value)} className={lead ? 'with-lead' : ''} {...props}>{options.map(option => <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>)}</select><ChevronDown size={12} className="chev" /></span>;
-}
+// Kept as a name because eight call sites use it; it is a menu in the app's own clothes
+// now rather than a native <select> that opened the operating system's menu on press.
+export const SelectPill = Select;
 export function Field({ label, children, className = '' }) { return <label className={`ds-field ${className}`}>{label && <span>{label}</span>}{children}</label>; }
 export function Switch({ checked, onChange, label }) { return <button type="button" role="switch" aria-checked={checked} aria-label={label} className="ds-switch" onClick={() => onChange(!checked)}><i /></button>; }
 export function Option({ on, main, sub, onClick }) { return <button type="button" className={`ds-option ${on ? 'on' : ''}`} onClick={onClick} aria-pressed={on}><span className="mark">{on && <Check size={11} strokeWidth={2.6} />}</span><div><strong>{main}</strong><span>{sub}</span></div></button>; }

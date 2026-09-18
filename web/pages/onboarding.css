@@ -26,8 +26,7 @@
 .ob-fields { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 6px; }
 .ob-field { display: flex; flex-direction: column; gap: 8px; }
 .ob-field > span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
-.ob-field .ds-selectpill { height: 40px; font-size: 14px; }
-.ob-field .ds-selectpill select { max-width: 260px; padding-right: 30px; }
+.ob-field .ds-select { height: 40px; max-width: 260px; font-size: 14px; padding: 0 12px 0 14px; }
 .ob-options { display: flex; flex-direction: column; margin-top: 4px; }
 .ob-try { display: flex; align-items: center; gap: 18px; padding: 18px 20px; border: 1px solid var(--sheet-line); border-radius: 16px; background: var(--card); margin-top: 6px; }
 .ob-try.is-recording { background: #FFF7F5; border-color: #E3B8B4; }
