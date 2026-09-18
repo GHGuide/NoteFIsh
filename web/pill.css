@@ -19,6 +19,12 @@
 .dim { opacity: .5; } .dim2 { opacity: .6; display: inline-flex; }
 .pillrow b { font-weight: 600; }
 .pillrow kbd { font: inherit; font-size: 11px; border: 1px solid #777; padding: 3px 7px; border-radius: 4px; color: #E2E0DB; }
+/* Hold to talk. The ⌥Space shortcut still works; this is for when your hands are on the
+   mouse, or when the shortcut is taken by something else. */
+.talk { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 9px 0 12px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .14); color: #FFF; font: 600 12.5px 'DM Sans', sans-serif; cursor: pointer; white-space: nowrap; flex-shrink: 0; -webkit-user-select: none; user-select: none; touch-action: none; }
+.talk:hover { background: rgba(255, 255, 255, .24); }
+.talk.on { background: #C43B36; }
+.talk kbd { font: inherit; font-size: 10.5px; font-weight: 500; opacity: .75; border: 1px solid rgba(255, 255, 255, .35); border-radius: 4px; padding: 2px 5px; }
 .act { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: 0; border-radius: 999px; background: #FFF; color: #242424; font: 600 13px 'DM Sans', sans-serif; cursor: pointer; margin-left: 2px; white-space: nowrap; }
 .act:hover { background: #ECEAE5; }
 .act.ghost { background: rgba(255, 255, 255, .14); color: #FFF; }
@@ -38,7 +44,8 @@
 @keyframes pill-spin { to { transform: rotate(360deg); } }
 
 /* the options that appear on hover: languages, the desk, hide, end */
-.acts { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.acts { display: flex; flex-direction: column; align-items: stretch; gap: 8px; white-space: nowrap; width: 100%; }
+.acts .actrow { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; }
 .acts .lab { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: rgba(255, 255, 255, .45); margin-right: 2px; }
 .acts .sel { position: relative; display: inline-flex; align-items: center; height: 28px; border-radius: 999px; background: rgba(255, 255, 255, .12); color: #FFF; }
 .acts .sel:hover { background: rgba(255, 255, 255, .2); }
@@ -46,7 +53,6 @@
 .acts .sel select:focus { outline: none; }
 .acts .sel svg { position: absolute; right: 8px; pointer-events: none; opacity: .6; }
 .acts .sel option { color: #242424; }
-.acts .gap { flex: 1; min-width: 6px; }
 
 /* ---- "pill": the strip ---- */
 .pillcap { width: 420px; padding: 11px 14px; border-radius: 14px; background: #FEFDFC; border: 1px solid rgba(36, 36, 36, .12); box-shadow: 0 10px 30px rgba(36, 36, 36, .18); text-align: left; }
@@ -62,18 +68,18 @@
 .pill { display: inline-flex; align-items: center; gap: 10px; height: 46px; padding: 0 16px 0 12px; border-radius: 999px; background: #242424; color: #FFF; box-shadow: 0 10px 30px rgba(36, 36, 36, .28), inset 0 0 0 1px rgba(255, 255, 255, .10); font: 500 14px/1 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; white-space: nowrap; }
 @media (prefers-color-scheme: dark) { .pill { background: #2E2D2A; box-shadow: 0 12px 34px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 255, 255, .18); } }
 .pill.is-recording { background: #3A2422; }
-.pillacts { display: inline-flex; padding: 6px 8px; border-radius: 999px; background: #242424; color: #FFF; box-shadow: 0 10px 30px rgba(36, 36, 36, .28), inset 0 0 0 1px rgba(255, 255, 255, .10); font: 500 13px/1 'DM Sans', sans-serif; }
+.pillacts { display: inline-flex; width: 420px; box-sizing: border-box; justify-content: center; padding: 6px 8px; border-radius: 999px; background: #242424; color: #FFF; box-shadow: 0 10px 30px rgba(36, 36, 36, .28), inset 0 0 0 1px rgba(255, 255, 255, .10); font: 500 13px/1 'DM Sans', sans-serif; }
 @media (prefers-color-scheme: dark) { .pillacts { background: #2E2D2A; } }
 
 /* ---- "notch": the island ---- */
 /* The top --bar px sit over the menu bar band and are the notch's own black; the island
    is never narrower than the notch, and the ears curve into the menu bar like the real one. */
-.island { position: relative; min-width: var(--notch, 220px); padding: var(--bar, 38px) 14px 10px; border-radius: 0 0 22px 22px; background: #000; color: #FFF; font: 500 14px/1 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; box-shadow: 0 14px 34px rgba(0, 0, 0, .45); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.island { position: relative; width: 460px; min-width: var(--notch, 220px); padding: var(--bar, 38px) 14px 10px; border-radius: 0 0 22px 22px; background: #000; color: #FFF; font: 500 14px/1 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; box-shadow: 0 14px 34px rgba(0, 0, 0, .45); display: flex; flex-direction: column; align-items: center; gap: 8px; box-sizing: border-box; }
 .island::before, .island::after { content: ''; position: absolute; top: 0; width: 18px; height: 18px; background: #000; }
 .island::before { right: 100%; -webkit-mask: radial-gradient(circle at 0 100%, transparent 17.5px, #000 18px); mask: radial-gradient(circle at 0 100%, transparent 17.5px, #000 18px); }
 .island::after { left: 100%; -webkit-mask: radial-gradient(circle at 100% 100%, transparent 17.5px, #000 18px); mask: radial-gradient(circle at 100% 100%, transparent 17.5px, #000 18px); }
-.island .pillrow { height: 34px; padding: 0 4px; }
-.island .ic { width: 400px; max-width: 100%; padding: 8px 10px 10px; border-radius: 12px; background: #161616; text-align: left; }
+.island .pillrow { min-height: 34px; padding: 0 4px; flex-wrap: wrap; justify-content: center; white-space: normal; row-gap: 6px; }
+.island .ic { width: 100%; padding: 8px 10px 10px; border-radius: 12px; background: #161616; text-align: left; box-sizing: border-box; }
 .island .ic .who { display: block; font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: rgba(255, 255, 255, .4); margin-bottom: 3px; }
 .island .ic.mine .who { color: #E7A72F; }
 .island .ic p { margin: 0; font-size: 14px; line-height: 1.4; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

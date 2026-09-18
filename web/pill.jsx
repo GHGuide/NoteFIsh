@@ -186,6 +186,9 @@ export default function PillEntry() {
   }, [!!state, reduced]);
 
   const act = (name, work) => { setBusy(name); work().catch(() => {}).finally(() => setBusy('')); };
+  // The same event ⌥Space raises, so the desk records either way. Set locally too, so the
+  // button answers the press at once instead of after the round trip through Rust.
+  const talkNow = on => { setHolding(on); send('ptt', on); };
   const openDesk = () => send('open-desk');
   const answer = call => act('answer', async () => { await api.answer(call.id); if (call.via !== 'companion') openDesk(); });
   // Languages go to the seat when there is one (the seat's own language wins), else to the workspace.
@@ -201,8 +204,8 @@ export default function PillEntry() {
       {needsSeat ? <button type="button" className="act" onClick={openDesk}>Open desk</button> : <button type="button" className="act" disabled={!!busy} onClick={() => answer(ringing)}>{busy === 'answer' ? 'Answering…' : 'Answer'}</button>}
       <button type="button" className="act ghost icon" aria-label="Decline" disabled={!!busy} onClick={() => act('end', () => api.end(ringing.id))}><X size={14} /></button>
     </>,
-    listening: <><Wave /><span>Listening</span>{pair}<kbd>hold ⌥</kbd></>,
-    recording: <><span className="rec" /><span>Recording</span><Wave /><span className="dim">release to send</span></>,
+    listening: <><Wave /><span>Listening</span>{pair}</>,
+    recording: <><span className="rec" /><span>Recording</span><Wave /></>,
     thinking: <><Loader2 className="spin" size={15} /><span>Translating</span>{pair}</>,
     speaking: <>
       <span className="dim2"><Volume2 size={15} /></span><span>Playing in your voice</span>
@@ -217,17 +220,32 @@ export default function PillEntry() {
   const enter = reduced ? {} : { initial: { opacity: 0, y: -8, scale: .96 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: -8, scale: .96 }, transition: SPRING };
   const drop = reduced ? {} : { initial: { opacity: 0, y: -24 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -24 }, transition: SPRING };
   const swap = reduced ? {} : { initial: { opacity: 0, y: 5 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -5 }, transition: { duration: .15 } };
+  const talk = live && <button
+    type="button"
+    className={`talk ${holding ? 'on' : ''}`}
+    aria-label={holding ? 'Release to send' : 'Hold to talk'}
+    onPointerDown={event => { event.currentTarget.setPointerCapture?.(event.pointerId); talkNow(true); }}
+    onPointerUp={() => talkNow(false)}
+    onPointerCancel={() => talkNow(false)}
+    onLostPointerCapture={() => talkNow(false)} // whatever interrupts the press, stop recording
+  >{holding ? 'Release to send' : 'Hold to talk'}<kbd>⌥Space</kbd></button>;
   const row = <>
     <button type="button" className="mark" aria-label="Open the desk" onClick={openDesk}><Puff variant="fish" color="#F3F1EC" size={22} face={false} /></button>
     <AnimatePresence mode="wait" initial={false}><motion.span key={state} className="pillrow" {...swap}>{body}</motion.span></AnimatePresence>
+    {talk}
   </>;
+  // Two deliberate rows rather than one that wraps wherever it happens to run out:
+  // which language is whose, then what to do with the call.
   const actions = showActions && current && <div className="acts">
-    <LanguageSel label="Caller" value={current.customerLanguage || 'auto'} allowAuto disabled={!!busy} onChange={value => setLanguage('customerLanguage', value)} />
-    <LanguageSel label="Captions" value={current.agentLanguage || 'en'} disabled={!!busy} onChange={value => setLanguage('agentLanguage', value)} />
-    <span className="gap" />
-    <button type="button" className="act ghost" onClick={openDesk}><Maximize2 size={13} />Desk</button>
-    <button type="button" className="act ghost" onClick={() => setDismissed(current.id)}><EyeOff size={13} />Hide</button>
-    {live && <button type="button" className="act red" disabled={!!busy} onClick={() => act('end', () => api.end(live.id))}><PhoneOff size={13} />End</button>}
+    <div className="actrow">
+      <LanguageSel label="They speak" value={current.customerLanguage || 'auto'} allowAuto disabled={!!busy} onChange={value => setLanguage('customerLanguage', value)} />
+      <LanguageSel label="You speak" value={current.agentLanguage || 'en'} disabled={!!busy} onChange={value => setLanguage('agentLanguage', value)} />
+    </div>
+    <div className="actrow">
+      <button type="button" className="act ghost" onClick={openDesk}><Maximize2 size={13} />Desk</button>
+      <button type="button" className="act ghost" onClick={() => setDismissed(current.id)}><EyeOff size={13} />Hide</button>
+      {live && <button type="button" className="act red" disabled={!!busy} onClick={() => act('end', () => api.end(live.id))}><PhoneOff size={13} />End</button>}
+    </div>
   </div>;
   const captionBlock = shown && <><span className="who">{shown.who}</span><p>{shown.text}</p>{shown.sub && <p className="sub"><b>{shown.lang}</b>{shown.sub}</p>}</>;
 
