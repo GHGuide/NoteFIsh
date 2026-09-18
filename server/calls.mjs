@@ -534,10 +534,35 @@ export function createCallService({
   // last made a sound, and let a caption through only if it followed one.
   const SPEECH_FLOOR = 350; // PCM16 RMS, about -39 dBFS: quieter than any voice on a call
   const SPEECH_MEMORY = 6000; // a phrase finishes within a few seconds of its last sound
+  const LEVEL_EVERY = 120; // how often the meter is worth redrawing, in ms
+  /** How loud the caller is right now, 0 to 1, on a decibel scale so an ordinary voice
+   *  sits in the middle of the meter rather than at the bottom of it. */
+  const loudness = rms => {
+    if (!(rms > 0)) return 0;
+    const dbfs = 20 * Math.log10(rms / 32768);
+    return Math.max(0, Math.min(1, (dbfs + 50) / 50));
+  };
   function noteSound(runtime, pcm) {
     let sum = 0, count = 0;
     for (let i = 0; i + 1 < pcm.length; i += 8) { const v = pcm.readInt16LE(i); sum += v * v; count++; }
-    if (count && Math.sqrt(sum / count) > SPEECH_FLOOR) runtime.lastSound = Date.now();
+    if (!count) return;
+    const rms = Math.sqrt(sum / count);
+    if (rms > SPEECH_FLOOR) runtime.lastSound = Date.now();
+    // The same number, kept rather than thrown away, so the desk and the pill can draw a
+    // meter that moves with the caller's voice. It is the one thing on screen that proves
+    // the call is being heard at all; an animation that plays regardless proves nothing,
+    // and a bridge that had gone deaf looked exactly like one that was working.
+    const at = Date.now();
+    // A gap in the audio makes whatever was loudest before it old news, not the level
+    // now, so the meter starts again from this frame rather than replaying that peak.
+    if (at - (runtime.frameAt || 0) > LEVEL_EVERY * 2) runtime.levelPeak = 0;
+    runtime.frameAt = at;
+    runtime.levelPeak = Math.max(runtime.levelPeak || 0, rms);
+    if (at - (runtime.levelAt || 0) < LEVEL_EVERY) return;
+    runtime.levelAt = at;
+    const level = loudness(runtime.levelPeak);
+    runtime.levelPeak = 0;
+    emit({ type: 'level', callId: runtime.call.id, level: Math.round(level * 100) / 100 }, runtime.call.agentId);
   }
   const heardSpeech = runtime => runtime.lastSound && Date.now() - runtime.lastSound < SPEECH_MEMORY;
   function hearCaller(runtime, pcm16k, mulawFrame) {
