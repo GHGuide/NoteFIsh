@@ -133,3 +133,15 @@ export function describe(register, arousal) {
 }
 
 // ponytail: loudness + rate, no pitch tracking. Add F0 range if listening tests say arousal is misread.
+
+/** How the reply was said, in words the interpreter can act on. Both numbers come from
+ *  the speaker's own clip measured against their own enrolment, so "louder" means
+ *  louder than they usually are, not louder than some absolute. */
+export function deliveryOf(arousal) {
+  if (!arousal) return '';
+  const loud = arousal.louderDb >= 4 ? 'noticeably louder than usual'
+    : arousal.louderDb <= -4 ? 'quieter than usual' : 'at their usual level';
+  const pace = arousal.rateRatio >= 1.25 ? 'and faster than usual'
+    : arousal.rateRatio <= 0.8 ? 'and slower than usual' : 'and at their usual pace';
+  return `${loud} ${pace}`;
+}

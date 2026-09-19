@@ -202,10 +202,20 @@ export function createApiRouter({ config, store, providers, calls, broadcast, au
     let baseline = null;
     try {
       const wav = await convertAudio(req.file.buffer, req.file.mimetype, { output: 'wav', sampleRate: 16000, maxSeconds: 120, minSeconds: 3 });
-      const clip = measureClip(wav, transcript ? transcript.trim().split(/\s+/u).length : 0);
+      // Without a passage there is no word count, so ask for one rather than guess: a
+      // baseline rate of nearly zero makes every later reply measure as shouting.
+      let words = transcript ? transcript.trim().split(/\s+/u).length : 0;
+      if (!words && providers.transcribe) {
+        try { words = (await providers.transcribe({ audio: wav, mimeType: 'audio/wav', language: selectedLanguage }) || '').trim().split(/\s+/u).filter(Boolean).length; }
+        catch { /* the clip is still worth a loudness baseline without a rate */ }
+      }
+      const clip = measureClip(wav, words);
       // Digital silence measures as nothing at all; only a real signal drowned in noise is refused.
       if (clip.voicedSeconds >= 1 && clip.snr < 15 && clip.loudness > -70) throw new InputError('The room is louder than your voice. Find a quieter spot and record again.', 422, 'NOISY_SAMPLE');
-      baseline = { loudness: clip.loudness, rate: clip.rate, snr: clip.snr, seconds: clip.voicedSeconds };
+      // A rate outside human speech is a measurement failure, not a slow talker. Storing
+      // none is honest; storing 0.02 words per second poisons every reply that follows.
+      const plausible = clip.rate >= 0.5 && clip.rate <= 8;
+      baseline = { loudness: clip.loudness, rate: plausible ? clip.rate : 0, snr: clip.snr, seconds: clip.voicedSeconds };
     } catch (error) { if (error instanceof InputError) throw error; /* measurement is best-effort */ }
     const result = await providers.createVoice({ name, description, audio: req.file.buffer, mimeType: req.file.mimetype, transcript });
     const voice = { id: randomUUID(), referenceId: ref(result.referenceId), name, description, language: selectedLanguage, kind: 'enrolled', status: voiceState(result.state), archived: false, createdAt: new Date().toISOString(), consent: true, consentAt: new Date().toISOString(), ownerId: userOf(req) || null, ...(result.fallbackReferenceId ? { elevenReferenceId: result.fallbackReferenceId } : {}), register, baseline };

@@ -97,7 +97,7 @@ function Takes({ data, user, registers, setError, setNotice, saveOwned, refreshV
   const feeling = feelingOf(register);
   // A passage exists for a handful of languages. For the rest, what matters is a minute
   // of unhurried speech, not which words — so say that instead of falling back to English.
-  const script = READING_SCRIPTS[language] || null;
+  const script = READING_SCRIPTS[language] || '';
   const liveCall = data.calls.some(call => ['ringing', 'in_call'].includes(callState(call)));
   const created = data.voices.find(item => item.id === savedId);
   const take = next => { setSample(next); setName(`${user?.name || 'My voice'} · ${feeling.label}`); setConsent(false); setSavedId(null); };

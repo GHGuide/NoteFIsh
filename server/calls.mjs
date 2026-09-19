@@ -13,7 +13,7 @@ function upsample8kTo16k(pcm8k) {
 }
 import { ProviderError } from './providers.mjs';
 import { languageCodes, isCallerLanguage } from './languages.mjs';
-import { measureClip, arousalOf, registerFor, tagFor, prosodyFor, describe, chooseRegister, taggedText, REGISTERS, canonicalRegister } from './emotion.mjs';
+import { measureClip, arousalOf, registerFor, tagFor, prosodyFor, describe, chooseRegister, taggedText, REGISTERS, canonicalRegister, deliveryOf } from './emotion.mjs';
 
 const CALL_SID = /^CA[0-9a-f]{32}$/iu;
 const STREAM_SID = /^MZ[0-9a-f]{32}$/iu;
@@ -638,12 +638,12 @@ export function createCallService({
       if (!current()) return structuredClone(runtime.call);
       if (!textSource?.trim()) throw new CallError('No speech was detected. Hold the button and try again.', 422);
       runtime.call.stage = 'translating'; await persist(runtime);
+      arousal = clip ? arousalOf(clip, baseVoice.baseline || undefined) : { level: 'medium', rateRatio: 1, louderDb: 0 };
       // Providers without an interpreter (tests, older adapters) still translate; tone then defaults to calm.
       const interpreted = providers.interpret
-        ? await providers.interpret({ text: textSource, sourceLanguage: settings.agentLanguage, targetLanguage, style: settings.style, signal })
+        ? await providers.interpret({ text: textSource, sourceLanguage: settings.agentLanguage, targetLanguage, style: settings.style, delivery: clip ? deliveryOf(arousal) : '', signal })
         : { text: await providers.translate({ text: textSource, sourceLanguage: settings.agentLanguage, targetLanguage, signal }), tone: 'calm', language: settings.agentLanguage, sentences: [] };
       if (!current()) return structuredClone(runtime.call);
-      arousal = clip ? arousalOf(clip, baseVoice.baseline || undefined) : { level: 'medium', rateRatio: 1, louderDb: 0 };
       const firstReply = !runtime.call.transcript.some(line => line.speaker === 'agent');
       const waited = new Date(runtime.call.answeredAt || runtime.call.startedAt).getTime() - new Date(runtime.call.startedAt).getTime();
       const chosen = chooseRegister({ override: feeling, tone: interpreted.tone, arousal, callerTone: runtime.call.callerTone, longWait: Number.isFinite(waited) && waited > 120000, firstReply });
