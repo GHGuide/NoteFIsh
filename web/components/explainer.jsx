@@ -39,7 +39,7 @@ export default function Explainer({ id, title, sub, examples = [], action, puff 
   if (hidden) return null;
   const dismiss = () => { write({ ...read(), [id]: true }); setHidden(true); };
   return <section className="ds-explain" aria-label="About this screen">
-    <span className="art" aria-hidden="true"><Puff variant={puff} color={color} size={260} face={false} /></span>
+    <span className="art" aria-hidden="true"><Puff variant={puff} color={color} size={190} /></span>
     <button type="button" className="x" aria-label="Hide this" onClick={dismiss}><X size={15} /></button>
     <h2>{title}</h2>
     <p>{sub}</p>

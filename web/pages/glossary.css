@@ -1,4 +1,0 @@
-/* Glossary: the inline translation field on a "Translate as" row. */
-.glossary-as { height: 28px; width: 170px; padding: 0 10px; border: 1px solid var(--sheet-line); border-radius: 999px; background: var(--sheet); font: 500 12px var(--sans); color: var(--ink); outline: none; }
-.glossary-as:focus { border-color: #8F8B83; }
-.glossary-as::placeholder { color: var(--placeholder); }

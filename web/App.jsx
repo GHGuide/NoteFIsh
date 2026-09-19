@@ -21,28 +21,26 @@ import PillEntry from './pill.jsx';
 import DeskPage from './pages/desk.jsx';
 import CallsPage from './pages/calls.jsx';
 import InsightsPage from './pages/insights.jsx';
-import GlossaryPage from './pages/glossary.jsx';
 import PhrasesPage from './pages/phrases.jsx';
 import VoicePage from './pages/voice.jsx';
 import SettingsModal from './pages/settings.jsx';
 import FreeMonth from './pages/free.jsx';
 import AuthPage from './pages/auth.jsx';
 import Onboarding, { PAUSE_KEY } from './pages/onboarding.jsx';
-import { Mic, Disc, BarChart3, BookOpen, Quote, Gift, Settings, CircleHelp } from 'lucide-react';
+import { Mic, Disc, BarChart3, Quote, Gift, Settings, CircleHelp } from 'lucide-react';
 
 const HELP_URL = 'https://github.com/GHGuide/NoteFish#readme';
 const NAV = [
   { path: '/desk', label: 'Desk', icon: Mic },
   { path: '/calls', label: 'Calls', icon: Disc },
   { path: '/insights', label: 'Insights', icon: BarChart3 },
-  { path: '/glossary', label: 'Glossary', icon: BookOpen },
   { path: '/phrases', label: 'Phrases', icon: Quote },
   { path: '/voice', label: 'Voice', icon: AudioLines },
 ];
 // Older links keep working: the library and the recorder are tabs of Voice, Setup is Settings.
 // Pages whose content is a grid, not prose: they get the wider column.
 const WIDE = new Set(['/insights', '/desk']);
-const ALIASES = { '/': '/desk', '/voices': '/voice?tab=library', '/enroll': '/voice?tab=takes', '/admin': '/settings' };
+const ALIASES = { '/': '/desk', '/glossary': '/phrases?tab=words', '/voices': '/voice?tab=library', '/enroll': '/voice?tab=takes', '/admin': '/settings' };
 
 export default function App() {
   // The public caller surface never initializes authenticated workspace hooks,
@@ -192,7 +190,7 @@ function WorkspaceApp({ user }) {
   const needsSetup = !loading && !owned('onboardedAt') && !sharedDemo;
   const resumeSetup = () => { try { sessionStorage.removeItem(PAUSE_KEY); } catch { /* fine */ } setSetupPaused(false); navigate('/desk'); };
   if (needsSetup && !setupPaused) return <Onboarding {...common} onDone={() => { try { setSetupPaused(sessionStorage.getItem(PAUSE_KEY) === '1'); } catch { /* fine */ } }} />;
-  const PAGES = { '/desk': DeskPage, '/calls': CallsPage, '/insights': InsightsPage, '/glossary': GlossaryPage, '/phrases': PhrasesPage, '/voice': VoicePage };
+  const PAGES = { '/desk': DeskPage, '/calls': CallsPage, '/insights': InsightsPage, '/phrases': PhrasesPage, '/voice': VoicePage };
   // Settings opens over whatever you were reading rather than taking its place, so
   // closing it puts you back where you were instead of on some default page.
   const settingsOpen = parsed.path === '/settings';

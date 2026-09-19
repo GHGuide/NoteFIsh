@@ -1,9 +1,32 @@
-/* Phrases: the board's block per line (shortcut chip + the line, the caller-language note under it). */
-.phrases-item { padding: 12px 0; border-bottom: 1px solid var(--sheet-line); }
-.phrases-item .head { display: flex; align-items: center; gap: 10px; }
-.phrases-item .head .ds-chip { font-size: 12px; padding: 3px 8px; border-radius: 6px; }
-.phrases-item .head strong { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; line-height: 1.4; }
-.phrases-item .head .ds-tool { opacity: .55; }
-.phrases-item:hover .head .ds-tool, .phrases-item .head .ds-tool:focus-visible { opacity: 1; }
-.phrases-item p { font-size: 13px; line-height: 1.5; color: var(--muted); margin: 6px 0 0; padding-left: 2px; }
-.phrases-item p b { font-size: 10px; font-weight: 600; margin-right: 6px; }
+/* One row per saved thing: what you call it, what it is, and what happens to it. Every
+   piece of text on this screen is editable where it sits — a phrase you cannot correct
+   without deleting and retyping it is a phrase you stop keeping up to date. */
+
+.ph-item { padding: 13px 0; border-bottom: 1px solid var(--sheet-line); }
+.ph-item .head { display: flex; align-items: flex-start; gap: 10px; }
+.ph-item .head > .ds-tool { opacity: .5; margin-left: auto; flex-shrink: 0; }
+.ph-item:hover .head > .ds-tool, .ph-item .head > .ds-tool:focus-visible { opacity: 1; }
+.ph-item p { font-size: 13px; line-height: 1.5; color: var(--muted); margin: 7px 0 0; }
+.ph-item p b { font-weight: 650; color: var(--ink); }
+
+/* click-to-edit */
+.ph-edit { display: block; border: 0; background: transparent; padding: 4px 7px; margin: -4px -7px; border-radius: 8px; font: inherit; color: inherit; text-align: left; cursor: text; transition: background .12s var(--ease); }
+.ph-edit:hover { background: var(--bar); }
+.ph-ghost { color: var(--placeholder); }
+.ph-editing { display: flex; align-items: flex-start; gap: 4px; flex: 1; min-width: 0; }
+.ph-editing input, .ph-editing textarea { flex: 1; min-width: 0; padding: 4px 7px; border: 1px solid #8F8B83; border-radius: 8px; background: var(--card); font: inherit; color: var(--ink); outline: none; resize: vertical; }
+.ph-editing .ds-tool { flex-shrink: 0; }
+
+.ph-trigger { flex: 0 0 auto; max-width: 180px; font-size: 12px; font-weight: 650; letter-spacing: .2px; color: var(--ink); background: var(--bar); border-radius: 999px; padding: 5px 12px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ph-trigger:hover { background: var(--nav-active); }
+.ph-editing.ph-trigger { background: transparent; padding: 0; max-width: 240px; }
+.ph-text { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; line-height: 1.45; }
+.ph-editing.ph-text { flex: 1; }
+.ph-term { flex: 0 0 auto; max-width: 260px; font-size: 15px; font-weight: 600; }
+.ph-as { flex: 1; min-width: 0; font-size: 14px; color: var(--muted); }
+.ph-item.word .head { align-items: center; flex-wrap: wrap; }
+
+@media (max-width: 700px) {
+  .ph-item .head { flex-wrap: wrap; }
+  .ph-text, .ph-editing.ph-text { flex-basis: 100%; }
+}

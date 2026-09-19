@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Share2, Trash2, Archive, ArrowDownToLine, AudioLines, Check, Globe2, Mic, MoreHorizontal, Play, RefreshCw, Search, Settings2, Square } from 'lucide-react';
 import { api } from '../api.js';
 import { Toolbar, Title, Tabs, ReadBar, Body, Col, Label, Status, Chip, Row, Btn, TextBtn, Pill, SelectPill, Field, Switch, Option, Setting, Empty, Spinner, Ask, Avatar, Puff, PUFFS, SWATCHES, avatarOf } from '../shell.jsx';
-import { useCapture, VoiceModal, ImportModal, REGISTERS, READING_SCRIPTS, downloadJson, isArchived, languageName, formatDuration, callState } from '../lib.jsx';
+import { languages, useCapture, VoiceModal, ImportModal, REGISTERS, READING_SCRIPTS, downloadJson, isArchived, languageName, formatDuration, callState } from '../lib.jsx';
 import { ActionMenu } from '../components/ui.jsx';
 import AudioWaveform from '../components/AudioWaveform.jsx';
 import RecordedAudio from '../components/RecordedAudio.jsx';
@@ -87,7 +87,7 @@ function YourVoice({ data, owned, saveOwned, me, voice, ready, registers, setTab
 
 function Takes({ data, user, registers, setError, setNotice, saveOwned, refreshVoices, trainingNotes, sharedDemo, setSelectedId }) {
   const [register, setRegister] = useState('calm');
-  const [language, setLanguage] = useState(READING_SCRIPTS[data.settings.customerLanguage] ? data.settings.customerLanguage : 'en');
+  const [language, setLanguage] = useState(data.settings.agentLanguage || 'en');
   const [sample, setSample] = useState(null);
   const [name, setName] = useState('');
   const [consent, setConsent] = useState(false);
@@ -95,7 +95,9 @@ function Takes({ data, user, registers, setError, setNotice, saveOwned, refreshV
   const [savedId, setSavedId] = useState(null);
   const fileInput = useRef(null);
   const feeling = feelingOf(register);
-  const script = READING_SCRIPTS[language] || READING_SCRIPTS.en;
+  // A passage exists for a handful of languages. For the rest, what matters is a minute
+  // of unhurried speech, not which words — so say that instead of falling back to English.
+  const script = READING_SCRIPTS[language] || null;
   const liveCall = data.calls.some(call => ['ringing', 'in_call'].includes(callState(call)));
   const created = data.voices.find(item => item.id === savedId);
   const take = next => { setSample(next); setName(`${user?.name || 'My voice'} · ${feeling.label}`); setConsent(false); setSavedId(null); };
@@ -136,12 +138,14 @@ function Takes({ data, user, registers, setError, setNotice, saveOwned, refreshV
     {sharedDemo && <p className="ds-note">Saved voices are available to everyone using this shared demo.</p>}
   </form></Body>;
   return <>
-    <Col className="ds-pillrow" style={{ marginTop: 18 }}><Label>Take</Label>{REGISTERS.map(item => <Pill key={item.key} on={item.key === register} disabled={capture.recording} onClick={() => setRegister(item.key)}>{item.label}{registers[item.key] && <Check size={11} strokeWidth={2.6} />}</Pill>)}<SelectPill bar className="voice-lang" aria-label="Recording language" lead={<Globe2 size={13} />} value={language} onChange={setLanguage} disabled={capture.recording} options={Object.keys(READING_SCRIPTS).map(code => ({ value: code, label: languageName(code) }))} /></Col>
+    <Col className="ds-pillrow" style={{ marginTop: 18 }}><Label>Take</Label>{REGISTERS.map(item => <Pill key={item.key} on={item.key === register} disabled={capture.recording} onClick={() => setRegister(item.key)}>{item.label}{registers[item.key] && <Check size={11} strokeWidth={2.6} />}</Pill>)}<SelectPill bar className="voice-lang" aria-label="Recording language" lead={<Globe2 size={13} />} value={language} onChange={setLanguage} disabled={capture.recording} options={languages.map(item => ({ value: item.code, label: READING_SCRIPTS[item.code] ? item.name : `${item.name} · read anything` }))} /></Col>
     <Body tight className="ds-stack">
       {created && <div className="ds-card"><Avatar who={created.name} size={40} /><div><strong>{created.name}</strong><span>{[created.register && `${feelingOf(created.register)?.label} take`, kindOf(created), toneOf(created)[1]].filter(Boolean).join(' · ')}</span></div>{created.status === 'ready' && <div className="actions"><Btn pill kind="ghost" icon={<Play size={12} />} onClick={() => setSelectedId(created.id)}>Hear it</Btn></div>}</div>}
       {created?.status === 'training' && <div className="ds-info"><Spinner size={14} />{trainingNotes[created.id] || 'Fish is preparing your voice. You can keep using the desk while it finishes.'}</div>}
       {created?.status === 'failed' && <div className="ds-info">{created.error || 'Fish could not create this voice. Try another clear recording.'}</div>}
-      <div className="ds-script"><div className="head"><span className="ds-label">Read this aloud</span><span>{feeling.hint} · 45–60 s</span></div><p>{script}</p></div>
+      <div className="ds-script"><div className="head"><span className="ds-label">{script ? 'Read this aloud' : `Speak ${languageName(language)} for a minute`}</span><span>{feeling.hint} · 45–60 s</span></div>
+        {script ? <p>{script}</p> : <p>Say anything you like, as long as it is unhurried and a minute long: read a news article, describe your morning, or talk through what you would say on a call. The clone is built from how you sound, not from which words you choose. Include a few numbers and a name if you can.</p>}
+      </div>
     </Body>
     <Col className="ds-foot voice-foot">
       {liveCall && <div className="ds-info">Finish the call before creating a voice.</div>}

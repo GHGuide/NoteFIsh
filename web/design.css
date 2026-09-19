@@ -391,24 +391,26 @@ button.ds-row:hover strong { text-decoration: underline; text-decoration-color: 
 .ds-pop .ds-btn.pill:not(.ink):hover { background: var(--bar); }
 
 /* ---- the card that says what a screen is for ---- */
-.ds-explain { position: relative; overflow: hidden; margin-top: 20px; padding: 30px 32px 28px; border-radius: 18px; background: var(--ink); color: #F3F1EC; }
-.ds-explain .art { position: absolute; right: -40px; bottom: -78px; opacity: .3; pointer-events: none; }
+.ds-explain { position: relative; overflow: hidden; margin-top: 20px; padding: 40px 44px 38px; border-radius: 20px; background: var(--ink); color: #F3F1EC; }
+/* The whole puff, eyes and all: it is a character, not a texture. */
+.ds-explain .art { position: absolute; right: 44px; bottom: 26px; opacity: .92; pointer-events: none; }
 .ds-explain .x { position: absolute; top: 14px; right: 14px; display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 50%; background: rgba(243, 241, 236, .12); color: #F3F1EC; cursor: pointer; transition: background .12s; }
 .ds-explain .x:hover { background: rgba(243, 241, 236, .24); }
-.ds-explain h2 { position: relative; max-width: 30ch; margin: 0; font: 400 32px/1.18 var(--serif); letter-spacing: -.5px; }
+.ds-explain h2 { position: relative; max-width: 26ch; margin: 0; font: 400 40px/1.14 var(--serif); letter-spacing: -.8px; }
 .ds-explain h2 em { font-style: italic; }
-.ds-explain p { position: relative; max-width: 62ch; margin: 10px 0 0; font-size: 14.5px; line-height: 1.55; color: rgba(243, 241, 236, .72); }
-.ds-explain .eg { position: relative; display: flex; flex-direction: column; gap: 8px; margin-top: 20px; align-items: flex-start; }
+.ds-explain p { position: relative; max-width: 52ch; margin: 14px 0 0; font-size: 15.5px; line-height: 1.6; color: rgba(243, 241, 236, .74); }
+.ds-explain .eg { position: relative; display: flex; flex-direction: column; gap: 9px; margin-top: 26px; align-items: flex-start; }
 .ds-explain .egrow { display: flex; align-items: center; gap: 9px; max-width: 100%; }
 .ds-explain .egrow svg { color: rgba(243, 241, 236, .45); flex-shrink: 0; }
-.ds-explain .say, .ds-explain .then { display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 9px; background: rgba(243, 241, 236, .13); font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-explain .say, .ds-explain .then { display: inline-flex; align-items: center; height: 34px; padding: 0 15px; border-radius: 999px; background: rgba(243, 241, 236, .13); font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ds-explain .say { font-style: italic; color: #F3F1EC; flex-shrink: 0; }
 .ds-explain .then { background: rgba(243, 241, 236, .2); color: rgba(243, 241, 236, .92); min-width: 0; }
-.ds-explain .go { position: relative; display: inline-flex; align-items: center; height: 38px; margin-top: 22px; padding: 0 17px; border: 0; border-radius: 10px; background: #F3F1EC; color: var(--ink); font: 600 13px var(--sans); cursor: pointer; transition: background .12s; }
+.ds-explain .go { position: relative; display: inline-flex; align-items: center; height: 42px; margin-top: 28px; padding: 0 20px; border: 0; border-radius: 999px; background: #F3F1EC; color: var(--ink); font: 600 13px var(--sans); cursor: pointer; transition: background .12s; }
 .ds-explain .go:hover { background: #FFF; }
+@media (max-width: 1080px) { .ds-explain .art { display: none; } .ds-explain h2, .ds-explain p { max-width: none; } }
 @media (max-width: 900px) {
-  .ds-explain { padding: 24px 20px 22px; }
-  .ds-explain h2 { font-size: 25px; }
+  .ds-explain { padding: 26px 22px 24px; }
+  .ds-explain h2 { font-size: 27px; }
   .ds-explain .art { display: none; }
   .ds-explain .egrow { flex-wrap: wrap; }
 }
